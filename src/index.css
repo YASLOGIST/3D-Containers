@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Chakra Petch", "Chakra Petch Fallback", sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-void: #08090b;
+  --color-deck: #0d1013;
+  --color-panel: #14181d;
+  --color-raise: #1b2128;
+  --color-line: #2a323b;
+  --color-line-soft: #1f262d;
+  --color-ink: #e8ecef;
+  --color-mute: #94a0ab;
+  --color-dim: #65717c;
+
+  --color-amber: #ffb020;
+  --color-amber-deep: #c2790a;
+  --color-signal: #e2513c;
+  --color-steel: #79b8c9;
+  --color-jade: #6fbf8f;
+  --color-alloy: #b9c2ca;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  ::selection {
+    background: var(--color-amber);
+    color: #101316;
+  }
+}
+
+@layer utilities {
+  .panel-surface {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(180deg, #171c22 0%, #11151a 100%);
+    border: 1px solid var(--color-line);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.05) inset,
+      0 18px 40px -22px rgba(0, 0, 0, 0.9);
+  }
+
+  .hairline {
+    border-color: var(--color-line-soft);
+  }
+
+  .etch {
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  }
+
+  .stencil {
+    font-family: var(--font-display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: #39424b transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: #333c45;
+    border-radius: 99px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb:hover {
+    background: #4a555f;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .range-uld {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 22px;
+    background: transparent;
+    cursor: ew-resize;
+  }
+  .range-uld::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #3b4650, #2a323b);
+  }
+  .range-uld::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 14px;
+    width: 14px;
+    margin-top: -5.5px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #ffd06a, #e39407);
+    border: 1px solid #7c5204;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  }
+  .range-uld::-moz-range-track {
+    height: 3px;
+    border-radius: 99px;
+    background: #333d46;
+  }
+  .range-uld::-moz-range-thumb {
+    height: 13px;
+    width: 13px;
+    border-radius: 3px;
+    background: #ffb020;
+    border: 1px solid #7c5204;
+  }
+
+  .anim-in {
+    animation: panel-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .anim-rise {
+    animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .marquee-track {
+    animation: marquee 46s linear infinite;
+  }
+  .blink {
+    animation: blink 1.6s steps(2, end) infinite;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+/* --- source drawer token colours ---------------------------------- */
+.code-scroll .c-ln {
+  display: inline-block;
+  width: 3.4ch;
+  margin-right: 1.6ch;
+  color: #3d4750;
+  text-align: right;
+  user-select: none;
+}
+.code-scroll .c-com {
+  color: #5c6a75;
+  font-style: italic;
+}
+.code-scroll .c-str {
+  color: #8fbd6a;
+}
+.code-scroll .c-key {
+  color: #ffb020;
+}
+.code-scroll .c-num {
+  color: #79b8c9;
+}
+.code-scroll .c-typ {
+  color: #dfe5ea;
+  font-weight: 500;
+}
+.code-scroll .c-fn {
+  color: #ffd479;
+}
