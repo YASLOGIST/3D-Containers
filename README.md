@@ -1,0 +1,324 @@
+<div align="center">
+  <a href="https://www.yaslogist.com">
+    <img src="assets/readme/yaslogist-hero.gif" alt="3D-Containers — Zero-Asset Procedural Aviation ULD Geometry Lab · Engineered by YASLOGIST" width="100%" />
+  </a>
+  <img src="assets/readme/yaslogist-telemetry-strip.svg" alt="3D-Containers Real-Time Telemetry — CCW Polygon Kernel · 4 Certified ULD Families · Three.js r180 PBR · GLB OBJ STL Export" width="100%" />
+
+  <br />
+
+  <p>
+    <strong>Browser-native procedural CAD &amp; WebGL2 inspection laboratory for certified aviation Unit Load Devices (ULDs)</strong><br />
+    <sub>Synthesizing watertight metre-scale solids, instanced hardware, procedural Canvas PBR materials, articulated kinematics, and native <code>.glb</code> / <code>.obj</code> / <code>.stl</code> exports from pure TypeScript math — with zero external 3D or texture assets.</sub>
+  </p>
+
+  <p>
+    <a href="#architectural-overview"><code>01 · Overview</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#certified-uld-fleet-matrix"><code>02 · ULD Fleet</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#procedural-cad--pbr-kernel"><code>03 · CAD Kernel</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#interactive-workbench--exporters"><code>04 · Workbench &amp; I/O</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#repository-topology"><code>05 · Topology</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#quick-start"><code>06 · Quick Start</code></a>&nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="https://www.yaslogist.com"><code>YASLOGIST ↗</code></a>
+  </p>
+
+  <sub>
+    Prefer a static high-resolution plate? View the 24-bit keyframe poster: <a href="assets/readme/yaslogist-hero.png"><code>assets/readme/yaslogist-hero.png</code></a> (<code>1920 × 720</code>)
+  </sub>
+</div>
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="architectural-overview"></a>
+
+## `01 //` Architectural Overview
+
+**3D-Containers** is an interactive procedural geometry workbench built with **React 19**, **Three.js (`r180`)**, **TypeScript 5.9**, and **Tailwind CSS v4**. Rather than loading pre-baked `.glb` models or bitmap texture atlases over the network, the engine constructs complete aircraft cargo containers and main-deck pallets algorithmically at runtime inside the browser (`1 world unit = 1.00 metre`).
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>Deterministic Polygon-Offset Solids</h4>
+      <p>
+        Every structural wall ring, extruded corner rail, forklift pocket, cam-latch bar, and scalloped seat track derives from a single counter-clockwise (CCW) 2D profile polygon shrunk inward by exact edge-normal offsets (<code>offsetPolygon</code>). Changing a contour angle—such as the <strong>16.5° lower-deck fuselage bilge taper</strong> on an <code>AKE · LD-3</code>—propagates cleanly across every adjoining rail and panel without gaps or overlapping faces.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <h4>YASLOGIST Spatial Engineering Signature</h4>
+      <p>
+        Crafted within the <a href="https://www.yaslogist.com"><strong>YASLOGIST</strong></a> creative engineering ecosystem, <strong>3D-Containers</strong> pairs aerospace logistics domain precision (IATA AHM / SAE AS1811 envelopes) with self-contained software craftsmanship: procedural HTML5 Canvas PBR maps, live GPU draw-call telemetry, raw TypeScript source inspection, and single-file HTML compilation via <code>vite-plugin-singlefile</code>.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="certified-uld-fleet-matrix"></a>
+
+## `02 //` Certified ULD Fleet Matrix
+
+All four procedural generators conform to the shared `ContainerBase` / `ViewerContainer` contract in `src/three/models.ts` and `src/three/primitives.ts`, exposing real-time assembly explode groups, part bills-of-materials, and family-specific parametric toggles:
+
+<table>
+  <thead>
+    <tr>
+      <th align="left">IATA / SAE Code</th>
+      <th align="left">Classification &amp; Generator</th>
+      <th align="left">Envelope (<code>W × D × H</code>)</th>
+      <th align="left">Volume &amp; Mass Rating</th>
+      <th align="left">Parametric Kinematics &amp; Assemblies</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top"><strong><code>AKE · LD-3</code></strong><br /><sub>Lower-Deck Contour</sub></td>
+      <td valign="top">Half-width widebody lower-deck container<br /><code>src/three/akeLD3.ts</code></td>
+      <td valign="top"><code>1.53 × 1.56 × 1.62 m</code><br /><sub><code>2.01 m</code> upper contour · <code>16.5°</code> taper</sub></td>
+      <td valign="top"><code>4.3 m³</code> (<code>152 ft³</code>)<br /><sub>Tare <code>92 kg</code> · Gross <code>1,588 kg</code></sub></td>
+      <td valign="top">Toggleable fuselage overhang (<code>contour</code>), <code>0°–112°</code> plug/bifold door, cam-latch rods, tie-down rings.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>RKN · LD-9</code></strong><br /><sub>Active Cold-Chain</sub></td>
+      <td valign="top">Refrigerated lower-deck cuboid reefer<br /><code>src/three/rkn.ts</code></td>
+      <td valign="top"><code>2.00 × 1.53 × 1.62 m</code><br /><sub><code>0.0°</code> vertical insulated walls</sub></td>
+      <td valign="top"><code>3.6 m³</code> internal<br /><sub>Tare <code>285 kg</code> · Gross <code>3,500 kg</code></sub></td>
+      <td valign="top">Toggleable compressor bay (<code>reefer</code>), live <code>-20 °C … +20 °C</code> LED display (<code>-18 °C</code> default), <code>0°–112°</code> door.<br /><strong>6 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>reefer</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>RAP · LD-9</code></strong><br /><sub>Twin-Fan Pharma Reefer</sub></td>
+      <td valign="top">Full-width active cold-chain container<br /><code>src/three/rap.ts</code></td>
+      <td valign="top"><code>3.18 × 2.44 × 1.62 m</code><br /><sub><code>60 mm</code> VIP sandwich wall</sub></td>
+      <td valign="top"><code>6.6 m³</code> (<code>233 ft³</code>)<br /><sub>Tare <code>450 kg</code> · Gross <code>6,033 kg</code></sub></td>
+      <td valign="top">Twin condenser fans, glycol service ports, status beacon, live setpoint readout (<code>+4 °C</code> default), double doors.<br /><strong>6 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>climate</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>PMC · P6P</code></strong><br /><sub>Main-Deck Pallet</sub></td>
+      <td valign="top">Certified <code>96 × 125 in</code> flat cargo pallet<br /><code>src/three/pmc.ts</code></td>
+      <td valign="top"><code>3.18 × 2.44 × 0.05 m</code><br /><sub><code>1.62 m</code> netted stack height</sub></td>
+      <td valign="top"><code>12.6 m³</code> netted contour<br /><sub>Tare <code>120 kg</code> · Gross <code>6,804 kg</code></sub></td>
+      <td valign="top"><code>7075-T6</code> plate, 4 seat tracks (<code>62 mm</code> scalloped slot pitch), forged corner gussets, toggleable cargo + net (<code>palletLoaded</code>).<br /><strong>4 groups:</strong> <code>deck</code>, <code>tracks</code>, <code>structure</code>, <code>contour</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="procedural-cad--pbr-kernel"></a>
+
+## `03 //` Procedural CAD &amp; PBR Kernel
+
+<p align="center">
+  <img src="assets/readme/yaslogist-pipeline-motion.svg" alt="5-Stage Procedural ULD Geometry and Canvas PBR Synthesis Pipeline" width="100%" />
+</p>
+
+### System Dataflow Architecture
+
+```mermaid
+flowchart LR
+  subgraph UI["React 19 Control Layer (src/App.tsx)"]
+    Switch["ULD Switcher\nAKE · RKN · RAP · PMC"]
+    Deck["ControlDeck\nKinematics · Finish · Camera"]
+    Inspector["SpecSheet · PartsList\nRaw TS Source (?raw)"]
+  end
+
+  subgraph Kernel["Procedural CAD & Texture Engine (src/three/)"]
+    Prim["primitives.ts\noffsetPolygon · ringSection\ncornerRailSection · RivetRun"]
+    Gen["Family Generators\nakeLD3 · rkn · rap · pmc"]
+    Tex["textures.ts\n512px Brushed PBR Maps\nIATA Placards · Reefer LED"]
+    Ann["annotations.ts\n3D Dimension Ticks\nCertification Envelope"]
+  end
+
+  subgraph Runtime["Three.js r180 WebGL2 Scene (AKEViewer.ts)"]
+    Scene["ACES Filmic Viewport\nStudio · Hangar · Dusk\nRaycast Part Highlight"]
+    Export["1:1 Metre CAD Exporters\nBinary GLB · OBJ · Binary STL"]
+  end
+
+  Switch --> Gen
+  Deck --> Scene
+  Prim --> Gen
+  Tex --> Gen
+  Gen --> Scene
+  Ann --> Scene
+  Gen --> Inspector
+  Scene --> Export
+```
+
+<details>
+<summary><strong>Deep Dive — Single-Polygon Inward Offset Mathematics (<code>src/three/primitives.ts</code>)</strong></summary>
+
+<br />
+
+Traditional procedural box modeling breaks down on angled aviation contours (such as the `16.5°` fuselage taper of an `AKE · LD-3`), where naïve per-panel boxes create V-shaped exterior gaps or self-intersecting interior seams. `src/three/primitives.ts` eliminates this class of defects by deriving every cross-section from a single CCW 2D polygon $P = \{p_0, p_1, \dots, p_{n-1}\}$:
+
+1. **Inward Edge Shifting (`offsetPolygon(pts, d)`)**: Each directed edge $e_i = p_{(i+1)\bmod n} - p_i$ has unit inward normal $n_i = \frac{(-e_{i,y},\; e_{i,x})}{\|e_i\|}$. Shifting every edge inward by distance $d$ (`wallT = 0.032 m` for structural sandwich shells, `railT = 0.015 m` for L-channel extrusions) and intersecting adjacent offset lines $i-1$ and $i$ yields exact mitered inner vertices $P'(d)$ with collinearity fallback for parallel segments.
+2. **Watertight Structural Extrusions (`ringSection` &amp; `cornerRailSection`)**:
+   - `ringSection(outer, wallT)` constructs a `THREE.Shape` with `offsetPolygon(outer, wallT)` punched as a CCW/CW interior hole, extruded along container depth $Z$.
+   - `cornerRailSection(outer, inner, idx)` bridges vertex `idx` between `outer` and `offsetPolygon(outer, railT)` via edge-projection quads so every corner rail mates flush against both adjacent walls regardless of angle.
+3. **Tangent-Normal Wall Placement (`wallBox`)**: Stiffener ribs, rub-rails, and forklift pockets are oriented via an explicit right-handed `THREE.Matrix4` basis $(\hat{t}, \hat{n}, \hat{z})$ computed directly from the segment's tangent and outward normal.
+4. **Single-Draw-Call Hardware (`RivetRun`)**: Hundreds of structural dome rivets are accumulated as `THREE.Matrix4` transforms and flushed into a single `THREE.InstancedMesh` (`flush()`), preserving high frame rates while keeping individual fasteners geometrically real in exported CAD meshes.
+
+</details>
+
+<details>
+<summary><strong>Deep Dive — Zero-Asset HTML5 Canvas PBR &amp; Dynamic Telemetry Maps (<code>src/three/textures.ts</code>)</strong></summary>
+
+<br />
+
+No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/textures.ts` synthesizes GPU textures procedurally on offscreen `<canvas>` elements:
+
+- **Anisotropic Brushed Metal Suite (`getMetalTextures`)**: Generates cached `512 × 512` `albedo`, `roughness`, and `bump` maps with directional horizontal grain strokes, rivet-line micro-scratches, and subtle industrial handling wear.
+- **5 Physical Material Presets (`FINISHES` in `primitives.ts`)**:
+  - `mill` — Brushed `6061-T6` natural aluminium (`#c8cfd6`, metalness `0.86`, roughness `0.34`)
+  - `graphite` — Anodised dark slate alloy (`#48505a`, metalness `0.78`, roughness `0.40`)
+  - `cargo` — Painted aviation safety amber/ochre (`#d28b26`, metalness `0.32`, roughness `0.52`)
+  - `airline` — Composite white polycarbonate skin with alloy frame (`#e4e8ec`, metalness `0.18`, roughness `0.38`)
+  - `titanium` — Warm aerospace titanium sheen (`#b2aba0`, metalness `0.88`, roughness `0.28`)
+- **Dynamic Operational Graphics**: `makeLabelTexture()` renders crisp IATA identification placards and weight tables; `makeReeferDisplayTexture(tempC, active)` updates live digital cold-chain readouts on `RKN` and `RAP` units whenever the user adjusts the temperature slider.
+
+</details>
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="interactive-workbench--exporters"></a>
+
+## `04 //` Interactive Workbench &amp; Exporters
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>Viewport, Kinematics &amp; Inspection</h4>
+      <ul>
+        <li><strong>5 Camera Presets + OrbitControls:</strong> Instant framing for <code>Iso</code>, <code>Front</code>, <code>Side</code>, <code>Slope</code> / <code>Back</code>, and <code>Top</code>, plus damped orbital navigation and optional turntable auto-spin.</li>
+        <li><strong>Smoothstep Exploded View:</strong> Continuous <code>0% → 100%</code> assembly separation driven by $t^2(3 - 2t)$ interpolation across each generator's named assembly vectors.</li>
+        <li><strong>Articulated Door &amp; Variant Controls:</strong> Continuous <code>0° → 112°</code> door rotation, contour overhang toggle (<code>AKE</code>), active reefer + temperature slider (<code>RKN</code> / <code>RAP</code>), and cargo stack + restraint net toggle (<code>PMC</code>).</li>
+        <li><strong>CAD Overlays &amp; Raycast Picking:</strong> Toggleable wireframe overlay, X-ray translucent hull, 3D dimension callout ticks, outer certification envelope box, 3 lighting rigs (<code>Studio</code>, <code>Hangar</code>, <code>Dusk</code>), and click-to-highlight part picking synchronized with the <code>Parts</code> bill of materials.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>1:1 CAD Mesh &amp; Source Export</h4>
+      <ul>
+        <li><strong>Binary glTF 2.0 (<code>.glb</code>):</strong> Exports the complete hierarchical scene assembly with PBR materials via <code>GLTFExporter</code> for Blender, Unreal Engine, Unity, or Omniverse.</li>
+        <li><strong>Wavefront (<code>.obj</code>):</strong> Exports clean ASCII polygon geometry via <code>OBJExporter</code> for universal DCC and CAD interchange.</li>
+        <li><strong>Binary Stereolithography (<code>.stl</code>):</strong> Exports triangulated solid geometry in metres via <code>STLExporter</code> for slicing, CFD/FEA meshing, or 3D printing.</li>
+        <li><strong>In-App TypeScript Source Inspector:</strong> Bundles raw generator modules via Vite <code>?raw</code> imports with a zero-dependency regex syntax highlighter, one-click clipboard copy, and direct <code>.ts</code> file download.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="repository-topology"></a>
+
+## `05 //` Repository Topology
+
+```text
+3D-Containers/
+├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
+├── vite.config.ts                # Vite 7 + React + Tailwind v4 + viteSingleFile() bundler
+├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
+└── src/
+    ├── main.tsx                  # React 19 root mount
+    ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
+    ├── index.css                 # Precision dark industrial @theme tokens & custom controls
+    ├── components/
+    │   ├── ControlDeck.tsx       # Parametric sliders, finish swatches & lighting selectors
+    │   ├── Panels.tsx            # SpecSheet, interactive PartsList & TS SourcePanel
+    │   └── ui.tsx                # Reusable industrial buttons, pills & section headers
+    ├── lib/
+    │   └── io.ts                 # Browser Blob & ArrayBuffer download utilities
+    └── three/
+        ├── models.ts             # Declarative MODELS registry (ake, rkn, rap, pmc)
+        ├── primitives.ts         # CCW offsetPolygon kernel, extrusions, RivetRun & FINISHES
+        ├── akeLD3.ts             # IATA AKE / LD-3 contoured lower-deck generator
+        ├── rkn.ts                # IATA RKN / LD-9 refrigerated cuboid generator
+        ├── rap.ts                # IATA RAP / LD-9 twin-fan cold-chain generator
+        ├── pmc.ts                # IATA PMC / P6P 96x125 in main-deck pallet generator
+        ├── textures.ts           # Procedural Canvas PBR maps, placards & LED displays
+        ├── annotations.ts        # 3D CAD dimension ticks, badges & envelope helpers
+        └── AKEViewer.ts          # WebGL2 orchestrator, lighting moods, raycaster & CAD I/O
+```
+
+<p align="center">
+  <img src="assets/readme/yaslogist-divider.svg" alt="" width="100%" />
+</p>
+
+<a id="quick-start"></a>
+
+## `06 //` Quick Start &amp; Engineering Status
+
+### Local Development &amp; Single-File Production Build
+
+**Prerequisites:** Node.js `>= 20` and `npm`.
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Launch the Vite development server with hot module replacement
+npm run dev
+
+# 3. Type-check with TypeScript 5.9 and compile a self-contained single-file HTML bundle
+npm run build
+
+# 4. Preview the production build locally
+npm run preview
+```
+
+> **Single-File Distribution:** `vite.config.ts` integrates `vite-plugin-singlefile`, inlining all compiled JavaScript and CSS directly into `dist/index.html` so the entire 3D ULD laboratory can be archived or opened as a standalone artifact.
+
+### Truthful Engineering Status
+
+<table>
+  <thead>
+    <tr>
+      <th align="left">Subsystem</th>
+      <th align="left">Status</th>
+      <th align="left">Implementation &amp; Verification Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Procedural ULD Generators</strong></td>
+      <td><code>Implemented</code></td>
+      <td>All 4 families (<code>AKE</code>, <code>RKN</code>, <code>RAP</code>, <code>PMC</code>) are fully implemented in <code>src/three/</code> with parametric toggles and multi-group explode trees.</td>
+    </tr>
+    <tr>
+      <td><strong>Canvas PBR &amp; Viewport</strong></td>
+      <td><code>Implemented</code></td>
+      <td>5 material finishes, 3 ACES Filmic lighting rigs, 5 camera presets, raycast part picking, and live FPS / triangle / draw-call telemetry in <code>AKEViewer.ts</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>CAD Mesh Exporters</strong></td>
+      <td><code>Implemented</code></td>
+      <td>Client-side binary <code>.glb</code>, ASCII <code>.obj</code>, and binary <code>.stl</code> export plus raw <code>.ts</code> source download wired in <code>AKEViewer.ts</code> and <code>App.tsx</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>CI Workflow Alignment</strong></td>
+      <td><code>Template Only</code></td>
+      <td><code>.github/workflows/</code> currently holds a starter GitHub Actions <em>Webpack</em> template (<code>npx webpack</code>), whereas the project builds via <strong>Vite 7</strong> (<code>npm run build</code>).</td>
+    </tr>
+  </tbody>
+</table>
+
+<br />
+
+<div align="center">
+  <a href="https://www.yaslogist.com">
+    <img src="assets/readme/yaslogist-signature.svg" alt="YASLOGIST — Spatial Computing · Procedural CAD · Living Documentation Architecture — https://www.yaslogist.com" width="100%" />
+  </a>
+  <br />
+  <sub>
+    <strong>3D-Containers</strong> &nbsp;·&nbsp; Conceived &amp; engineered under the <a href="https://www.yaslogist.com"><strong>YASLOGIST</strong></a> creative signature &nbsp;·&nbsp; <a href="https://www.yaslogist.com"><code>www.yaslogist.com</code></a>
+  </sub>
+</div>

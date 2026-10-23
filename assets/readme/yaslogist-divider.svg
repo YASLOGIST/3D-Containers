@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 34" width="1200" height="34" role="presentation">
+  <defs>
+    <linearGradient id="dv-base" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1c242d" stop-opacity="0.1"/>
+      <stop offset="20%" stop-color="#2a3542" stop-opacity="0.85"/>
+      <stop offset="50%" stop-color="#3c4b5c" stop-opacity="1"/>
+      <stop offset="80%" stop-color="#2a3542" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#1c242d" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="dv-pulse-l" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5ce1e6" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#5ce1e6" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#8ff5dc" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="dv-pulse-r" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffb020" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffb020" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#ffd479" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Main horizon axis -->
+  <line x1="20" y1="17" x2="564" y2="17" stroke="url(#dv-base)" stroke-width="1.2"/>
+  <line x1="636" y1="17" x2="1180" y2="17" stroke="url(#dv-base)" stroke-width="1.2"/>
+
+  <!-- Vernier CAD ticks -->
+  <g stroke="#2a3542" stroke-width="1">
+    <line x1="120" y1="13" x2="120" y2="21"/>
+    <line x1="240" y1="14" x2="240" y2="20"/>
+    <line x1="360" y1="13" x2="360" y2="21"/>
+    <line x1="480" y1="14" x2="480" y2="20"/>
+    <line x1="720" y1="14" x2="720" y2="20"/>
+    <line x1="840" y1="13" x2="840" y2="21"/>
+    <line x1="960" y1="14" x2="960" y2="20"/>
+    <line x1="1080" y1="13" x2="1080" y2="21"/>
+  </g>
+
+  <!-- Counter-propagating optical pulses from center node -->
+  <rect x="480" y="16" width="110" height="2" fill="url(#dv-pulse-l)">
+    <animate attributeName="x" values="460;40" dur="5.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.8;1" dur="5.2s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="610" y="16" width="110" height="2" fill="url(#dv-pulse-r)">
+    <animate attributeName="x" values="630;1050" dur="5.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.8;1" dur="5.2s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Center isometric hex reticle -->
+  <g transform="translate(600, 17)">
+    <polygon points="0,-10 9,-5 9,5 0,10 -9,5 -9,-5" fill="#0b0f14" stroke="#5ce1e6" stroke-width="1.3"/>
+    <line x1="0" y1="-10" x2="0" y2="0" stroke="#ffb020" stroke-width="1.1"/>
+    <line x1="9" y1="-5" x2="0" y2="0" stroke="#5ce1e6" stroke-width="1.1"/>
+    <line x1="-9" y1="-5" x2="0" y2="0" stroke="#5ce1e6" stroke-width="1.1"/>
+    <circle cx="0" cy="0" r="2.2" fill="#ffb020">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="-24" cy="0" r="1.8" fill="#5ce1e6" opacity="0.7"/>
+    <circle cx="24" cy="0" r="1.8" fill="#ffb020" opacity="0.7"/>
+  </g>
+</svg>

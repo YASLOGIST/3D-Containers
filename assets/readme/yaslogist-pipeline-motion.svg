@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 390" width="1200" height="390" role="img" aria-label="5-stage procedural ULD geometry and PBR synthesis pipeline">
+  <defs>
+    <linearGradient id="pl-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080b0f"/>
+      <stop offset="50%" stop-color="#0d1219"/>
+      <stop offset="100%" stop-color="#090c11"/>
+    </linearGradient>
+    <linearGradient id="pl-card" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#121821"/>
+      <stop offset="100%" stop-color="#0b0f15"/>
+    </linearGradient>
+    <pattern id="pl-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#18212c" stroke-width="0.7" opacity="0.65"/>
+    </pattern>
+  </defs>
+
+  <!-- Outer Blueprint Frame -->
+  <rect x="2" y="2" width="1196" height="386" rx="8" fill="url(#pl-bg)" stroke="#25303d" stroke-width="1.4"/>
+  <rect x="3" y="48" width="1194" height="300" fill="url(#pl-grid)"/>
+
+  <!-- Corner CAD Fiducials -->
+  <g stroke="#ffb020" stroke-width="1.6" fill="none">
+    <path d="M 14 26 L 14 14 L 26 14"/>
+    <path d="M 1186 26 L 1186 14 L 1174 14"/>
+    <path d="M 14 364 L 14 376 L 26 376"/>
+    <path d="M 1186 364 L 1186 376 L 1174 376"/>
+  </g>
+
+  <!-- Header Bar -->
+  <line x1="2" y1="48" x2="1198" y2="48" stroke="#222c38" stroke-width="1.1"/>
+  <rect x="34" y="22" width="8" height="8" rx="1.5" fill="#ffb020"/>
+  <text x="52" y="30" fill="#eef3f7" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, 'DejaVu Sans Mono', monospace" font-size="11.5" font-weight="700" letter-spacing="1.5">PROCEDURAL SYNTHESIS PIPELINE  //  SINGLE-POLYGON OFFSET TO WATERTIGHT CAD</text>
+  <text x="1164" y="30" text-anchor="end" fill="#5ce1e6" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, 'DejaVu Sans Mono', monospace" font-size="10.5" letter-spacing="1.2">1 WORLD UNIT = 1.00 METRE  ·  YASLOGIST KERNEL</text>
+
+  <!-- Connecting Signal Buses -->
+  <g stroke="#2c3947" stroke-width="2" fill="none">
+    <line x1="236" y1="202" x2="264" y2="202"/>
+    <line x1="468" y1="202" x2="496" y2="202"/>
+    <line x1="700" y1="202" x2="728" y2="202"/>
+    <line x1="932" y1="202" x2="960" y2="202"/>
+  </g>
+  <!-- Animated Signal Packets Across Buses -->
+  <circle r="3.5" fill="#5ce1e6">
+    <animateMotion path="M 236 202 L 264 202" dur="1.8s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="3.5" fill="#ffb020">
+    <animateMotion path="M 468 202 L 496 202" dur="1.8s" begin="0.45s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="3.5" fill="#5ce1e6">
+    <animateMotion path="M 700 202 L 728 202" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+  </circle>
+  <circle r="3.5" fill="#8ff5dc">
+    <animateMotion path="M 932 202 L 960 202" dur="1.8s" begin="1.35s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- ========================================================= -->
+  <!-- STAGE 01: 2D CCW PROFILE -->
+  <!-- ========================================================= -->
+  <g transform="translate(32, 70)">
+    <rect x="0" y="0" width="204" height="264" rx="6" fill="url(#pl-card)" stroke="#2b3846" stroke-width="1.2"/>
+    <rect x="0" y="0" width="204" height="3" rx="1.5" fill="#5ce1e6"/>
+    <text x="14" y="24" fill="#5ce1e6" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700" letter-spacing="1.2">STAGE 01 // CONTOUR</text>
+    <text x="14" y="43" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', sans-serif" font-size="14" font-weight="700">2D CCW Profile</text>
+
+    <!-- Visual: AKE 5-vertex Trapezoid -->
+    <g transform="translate(102, 128)">
+      <line x1="-76" y1="44" x2="76" y2="44" stroke="#253240" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="0" y1="-56" x2="0" y2="54" stroke="#253240" stroke-width="1" stroke-dasharray="3,3"/>
+      <!-- AKE CCW Polygon -->
+      <polygon points="-68,-44 68,-44 68,-8 44,44 -48,44" fill="#5ce1e6" fill-opacity="0.08" stroke="#5ce1e6" stroke-width="1.8">
+        <animate attributeName="fill-opacity" values="0.06;0.16;0.06" dur="3.6s" repeatCount="indefinite"/>
+      </polygon>
+      <!-- Taper guide line -->
+      <line x1="44" y1="44" x2="44" y2="-8" stroke="#ffb020" stroke-width="1" stroke-dasharray="2,2" opacity="0.8"/>
+      <text x="52" y="34" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" font-weight="700">16.5°</text>
+      <!-- 5 CCW Vertex Nodes -->
+      <circle cx="-48" cy="44" r="3" fill="#8ff5dc"/>
+      <circle cx="44" cy="44" r="3" fill="#ffb020">
+        <animate attributeName="r" values="2.8;4.5;2.8" dur="2.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="68" cy="-8" r="3" fill="#ffb020"/>
+      <circle cx="68" cy="-44" r="3" fill="#8ff5dc"/>
+      <circle cx="-68" cy="-44" r="3" fill="#8ff5dc"/>
+    </g>
+
+    <text x="14" y="206" fill="#9fb0be" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10">akeProfile() / cuboid</text>
+    <text x="14" y="224" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• 5-pt AKE lower-deck</text>
+    <text x="14" y="240" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• 4-pt RKN / RAP / PMC</text>
+    <text x="14" y="255" fill="#5ce1e6" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">IATA AHM / AS1811</text>
+  </g>
+
+  <!-- ========================================================= -->
+  <!-- STAGE 02: OFFSET POLYGON KERNEL -->
+  <!-- ========================================================= -->
+  <g transform="translate(264, 70)">
+    <rect x="0" y="0" width="204" height="264" rx="6" fill="url(#pl-card)" stroke="#2b3846" stroke-width="1.2"/>
+    <rect x="0" y="0" width="204" height="3" rx="1.5" fill="#ffb020"/>
+    <text x="14" y="24" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700" letter-spacing="1.2">STAGE 02 // OFFSET</text>
+    <text x="14" y="43" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', sans-serif" font-size="14" font-weight="700">offsetPolygon(pts, d)</text>
+
+    <!-- Visual: Outer + Shrunk Inner Ring + Corner Miter -->
+    <g transform="translate(102, 128)">
+      <!-- Outer ring -->
+      <polygon points="-68,-44 68,-44 68,-8 44,44 -48,44" fill="none" stroke="#5ce1e6" stroke-width="1.5" opacity="0.85"/>
+      <!-- Animated inward offset ring -->
+      <polygon points="-56,-33 56,-33 56,-6 35,33 -38,33" fill="none" stroke="#ffb020" stroke-width="1.8">
+        <animate attributeName="stroke-opacity" values="0.45;1;0.45" dur="2.6s" repeatCount="indefinite"/>
+      </polygon>
+      <!-- Corner rail miter quad -->
+      <polygon points="68,-44 56,-44 56,-33 68,-33" fill="#8ff5dc" fill-opacity="0.45" stroke="#8ff5dc" stroke-width="1"/>
+      <polygon points="44,44 35,44 35,33 46,35" fill="#ffb020" fill-opacity="0.45" stroke="#ffb020" stroke-width="1"/>
+      <!-- Normal inward vectors -->
+      <line x1="0" y1="-44" x2="0" y2="-33" stroke="#8ff5dc" stroke-width="1.4"/>
+      <line x1="56" y1="18" x2="45" y2="14" stroke="#ffb020" stroke-width="1.4"/>
+      <text x="-28" y="-2" fill="#eef3f7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" font-weight="700">d = 32mm</text>
+      <text x="-28" y="12" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">rail 15mm</text>
+    </g>
+
+    <text x="14" y="206" fill="#9fb0be" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10">primitives.ts</text>
+    <text x="14" y="224" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• ringSection() walls</text>
+    <text x="14" y="240" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• cornerRailSection()</text>
+    <text x="14" y="255" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">Zero gaps on 16.5° slope</text>
+  </g>
+
+  <!-- ========================================================= -->
+  <!-- STAGE 03: SOLID & INSTANCED ASSEMBLIES -->
+  <!-- ========================================================= -->
+  <g transform="translate(496, 70)">
+    <rect x="0" y="0" width="204" height="264" rx="6" fill="url(#pl-card)" stroke="#2b3846" stroke-width="1.2"/>
+    <rect x="0" y="0" width="204" height="3" rx="1.5" fill="#5ce1e6"/>
+    <text x="14" y="24" fill="#5ce1e6" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700" letter-spacing="1.2">STAGE 03 // SOLIDS</text>
+    <text x="14" y="43" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', sans-serif" font-size="14" font-weight="700">Extrude + Instancing</text>
+
+    <!-- Visual: Isometric Extruded Frame + RivetRun Matrix -->
+    <g transform="translate(102, 128)">
+      <!-- Back extruded face -->
+      <polygon points="-48,-46 56,-46 56,-18 36,24 -36,24" fill="none" stroke="#3c4f63" stroke-width="1.2"/>
+      <!-- Extrusion depth edges -->
+      <line x1="-64" y1="-30" x2="-48" y2="-46" stroke="#5ce1e6" stroke-width="1.2" opacity="0.65"/>
+      <line x1="40" y1="-30" x2="56" y2="-46" stroke="#5ce1e6" stroke-width="1.2" opacity="0.65"/>
+      <line x1="20" y1="40" x2="36" y2="24" stroke="#5ce1e6" stroke-width="1.2" opacity="0.65"/>
+      <!-- Front extruded face -->
+      <polygon points="-64,-30 40,-30 40,-2 20,40 -52,40" fill="#5ce1e6" fill-opacity="0.09" stroke="#eef3f7" stroke-width="1.5"/>
+      <!-- Instanced RivetRun dots -->
+      <g fill="#ffb020">
+        <circle cx="-54" cy="-24" r="2"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.0s" repeatCount="indefinite"/></circle>
+        <circle cx="-34" cy="-24" r="2"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.2s" repeatCount="indefinite"/></circle>
+        <circle cx="-14" cy="-24" r="2"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.4s" repeatCount="indefinite"/></circle>
+        <circle cx="6"   cy="-24" r="2"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.6s" repeatCount="indefinite"/></circle>
+        <circle cx="26"  cy="-24" r="2"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" begin="0.8s" repeatCount="indefinite"/></circle>
+      </g>
+      <rect x="-56" y="45" width="112" height="16" rx="3" fill="#101821" stroke="#6fbf8f" stroke-width="0.9"/>
+      <text x="0" y="56" text-anchor="middle" fill="#6fbf8f" font-family="'IBM Plex Mono', Consolas, monospace" font-size="8.5" font-weight="700">1 DRAW CALL RIVETS</text>
+    </g>
+
+    <text x="14" y="206" fill="#9fb0be" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10">Assembly Tagging</text>
+    <text x="14" y="224" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• wallBox() tangent basis</text>
+    <text x="14" y="240" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• RivetRun InstancedMesh</text>
+    <text x="14" y="255" fill="#5ce1e6" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">4–6 explode groups/unit</text>
+  </g>
+
+  <!-- ========================================================= -->
+  <!-- STAGE 04: PROCEDURAL CANVAS PBR -->
+  <!-- ========================================================= -->
+  <g transform="translate(728, 70)">
+    <rect x="0" y="0" width="204" height="264" rx="6" fill="url(#pl-card)" stroke="#2b3846" stroke-width="1.2"/>
+    <rect x="0" y="0" width="204" height="3" rx="1.5" fill="#ffb020"/>
+    <text x="14" y="24" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700" letter-spacing="1.2">STAGE 04 // SHADING</text>
+    <text x="14" y="43" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', sans-serif" font-size="14" font-weight="700">Canvas PBR Maps</text>
+
+    <!-- Visual: 3 Stacked Procedural Texture Cards -->
+    <g transform="translate(22, 68)">
+      <!-- Map 1: Albedo -->
+      <rect x="0" y="0" width="160" height="30" rx="4" fill="#17202b" stroke="#5ce1e6" stroke-width="1"/>
+      <rect x="8" y="7" width="16" height="16" rx="2" fill="#b9c2ca"/>
+      <text x="32" y="19" fill="#eef3f7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" font-weight="700">ALBEDO  · 512px</text>
+
+      <!-- Map 2: Roughness -->
+      <rect x="0" y="38" width="160" height="30" rx="4" fill="#17202b" stroke="#ffb020" stroke-width="1">
+        <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="2.8s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="8" y="45" width="16" height="16" rx="2" fill="#5a6572"/>
+      <text x="32" y="57" fill="#eef3f7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" font-weight="700">ROUGHNESS · WEAR</text>
+
+      <!-- Map 3: Bump / Placards -->
+      <rect x="0" y="76" width="160" height="30" rx="4" fill="#17202b" stroke="#8ff5dc" stroke-width="1"/>
+      <rect x="8" y="83" width="16" height="16" rx="2" fill="#ffb020"/>
+      <text x="32" y="95" fill="#eef3f7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" font-weight="700">BUMP + PLACARDS</text>
+    </g>
+
+    <text x="14" y="206" fill="#9fb0be" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10">textures.ts + FINISHES</text>
+    <text x="14" y="224" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• mill · graphite · cargo</text>
+    <text x="14" y="240" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• airline · titanium</text>
+    <text x="14" y="255" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">Data plates &amp; Reefer LED</text>
+  </g>
+
+  <!-- ========================================================= -->
+  <!-- STAGE 05: VIEWPORT & CAD EXPORTERS -->
+  <!-- ========================================================= -->
+  <g transform="translate(960, 70)">
+    <rect x="0" y="0" width="208" height="264" rx="6" fill="url(#pl-card)" stroke="#2b3846" stroke-width="1.2"/>
+    <rect x="0" y="0" width="208" height="3" rx="1.5" fill="#8ff5dc"/>
+    <text x="14" y="24" fill="#8ff5dc" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700" letter-spacing="1.2">STAGE 05 // OUTPUT</text>
+    <text x="14" y="43" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', sans-serif" font-size="14" font-weight="700">Viewport &amp; CAD I/O</text>
+
+    <!-- Visual: Viewport + 3 Export Pills -->
+    <g transform="translate(18, 66)">
+      <rect x="0" y="0" width="172" height="54" rx="4" fill="#0d151e" stroke="#5ce1e6" stroke-width="1.2"/>
+      <circle cx="16" cy="18" r="3.5" fill="#6fbf8f">
+        <animate attributeName="opacity" values="1;0.35;1" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <text x="27" y="22" fill="#eef3f7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" font-weight="700">ACES FILMIC WEBGL2</text>
+      <text x="16" y="40" fill="#8b99a7" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">Orbit · Explode · Raycast</text>
+
+      <!-- Export badges -->
+      <rect x="0" y="66" width="52" height="38" rx="4" fill="#131c26" stroke="#ffb020" stroke-width="1.1"/>
+      <text x="26" y="84" text-anchor="middle" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10.5" font-weight="700">.GLB</text>
+      <text x="26" y="97" text-anchor="middle" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="8">glTF 2</text>
+
+      <rect x="60" y="66" width="52" height="38" rx="4" fill="#131c26" stroke="#5ce1e6" stroke-width="1.1"/>
+      <text x="86" y="84" text-anchor="middle" fill="#5ce1e6" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10.5" font-weight="700">.OBJ</text>
+      <text x="86" y="97" text-anchor="middle" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="8">ASCII</text>
+
+      <rect x="120" y="66" width="52" height="38" rx="4" fill="#131c26" stroke="#8ff5dc" stroke-width="1.1"/>
+      <text x="146" y="84" text-anchor="middle" fill="#8ff5dc" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10.5" font-weight="700">.STL</text>
+      <text x="146" y="97" text-anchor="middle" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="8">Binary</text>
+    </g>
+
+    <text x="14" y="206" fill="#9fb0be" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10">AKEViewer.ts</text>
+    <text x="14" y="224" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• Studio / Hangar / Dusk</text>
+    <text x="14" y="240" fill="#7d8d9c" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5">• 5 camera presets + xray</text>
+    <text x="14" y="255" fill="#8ff5dc" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9">vite-plugin-singlefile</text>
+  </g>
+
+  <!-- Bottom Telemetry Legend -->
+  <line x1="2" y1="350" x2="1198" y2="350" stroke="#1e2732" stroke-width="1"/>
+  <text x="34" y="371" fill="#8b99a7" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace" font-size="10.5">ARCHITECTURE GUARANTEE: Every panel, corner extrusion, cam-latch rod, seat track, and rivet is synthesized in memory at runtime.</text>
+  <text x="1164" y="371" text-anchor="end" fill="#ffb020" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace" font-size="10.5" font-weight="700">YASLOGIST // WWW.YASLOGIST.COM</text>
+</svg>
