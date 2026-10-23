@@ -200,11 +200,18 @@ export interface PMCContainer extends ContainerBase {
 /* 5. The generator                                                           */
 /* ========================================================================== */
 
-export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCContainer {
+export function createPMCContainer(
+  options: Partial<BuildOptions> = {},
+): PMCContainer {
   const o: BuildOptions = { ...DEFAULT_OPTIONS, ...options };
   const { width: W, depth: D, thickness: T } = PMC_DIMENSIONS;
 
-  const { mats: mat, trackTex, trackTexShort, netTex } = createMaterials(o.finish);
+  const {
+    mats: mat,
+    trackTex,
+    trackTexShort,
+    netTex,
+  } = createMaterials(o.finish);
   const root = tag(new THREE.Group(), "PMC_P6P");
   const rivets = new RivetRun();
 
@@ -222,10 +229,30 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
   /* --- 5.1 assemblies ---------------------------------------------------- */
   const assemblies: Assembly[] = [];
   const assembly = assemblyFactory(root, assemblies);
-  const A_DECK = assembly("deck", "Base plate", "Aluminium deck, 50 mm sheet", [0, 0.34, 0]);
-  const A_TRACKS = assembly("tracks", "Seat tracks", "Continuous net-attachment rails", [0, 0.72, 0]);
-  const A_STRUCTURE = assembly("structure", "Underside", "Skids, beams, fork entry", [0, -0.62, 0]);
-  const A_CONTOUR = assembly("contour", "Cargo contour", "Netted load outline (optional)", [0, 0.9, 0]);
+  const A_DECK = assembly(
+    "deck",
+    "Base plate",
+    "Aluminium deck, 50 mm sheet",
+    [0, 0.34, 0],
+  );
+  const A_TRACKS = assembly(
+    "tracks",
+    "Seat tracks",
+    "Continuous net-attachment rails",
+    [0, 0.72, 0],
+  );
+  const A_STRUCTURE = assembly(
+    "structure",
+    "Underside",
+    "Skids, beams, fork entry",
+    [0, -0.62, 0],
+  );
+  const A_CONTOUR = assembly(
+    "contour",
+    "Cargo contour",
+    "Netted load outline (optional)",
+    [0, 0.9, 0],
+  );
 
   /* --- 5.2 base plate ---------------------------------------------------- */
   const deck = box(mat.deck, W - 0.04, T, D - 0.04, "Pallet base plate", 0.01);
@@ -234,7 +261,14 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
 
   // reinforcing ribs pressed into the underside of the plate
   for (const dz of [-0.95, -0.45, 0, 0.45, 0.95]) {
-    const rib = box(mat.deck, W - 0.3, 0.014, 0.1, "Deck stiffening rib", 0.005);
+    const rib = box(
+      mat.deck,
+      W - 0.3,
+      0.014,
+      0.1,
+      "Deck stiffening rib",
+      0.005,
+    );
     rib.position.set(0, SKID_H + 0.008, dz);
     A_DECK.group.add(rib);
   }
@@ -257,7 +291,11 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
         TRACK_T,
         sx > 0 ? nPosX : nNegX,
         upZ,
-        new THREE.Vector3(X0 + (sx > 0 ? W - RAIL_INSET : RAIL_INSET), trackY, 0),
+        new THREE.Vector3(
+          X0 + (sx > 0 ? W - RAIL_INSET : RAIL_INSET),
+          trackY,
+          0,
+        ),
         "Seat track (long edge)",
         0.004,
       ),
@@ -272,7 +310,11 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
         TRACK_T,
         sz > 0 ? nPosZ : nNegZ,
         upX,
-        new THREE.Vector3(0, trackY, Z0 + (sz > 0 ? D - RAIL_INSET : RAIL_INSET)),
+        new THREE.Vector3(
+          0,
+          trackY,
+          Z0 + (sz > 0 ? D - RAIL_INSET : RAIL_INSET),
+        ),
         "Seat track (short edge)",
         0.004,
       ),
@@ -284,17 +326,27 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
     const studs: THREE.Vector3[] = [];
     for (const sx of [-1, 1]) {
       const x = X0 + (sx > 0 ? W - RAIL_INSET : RAIL_INSET);
-      for (let i = -3; i <= 3; i++) studs.push(new THREE.Vector3(x, trackY + TRACK_T, i * 0.36));
+      for (let i = -3; i <= 3; i++)
+        studs.push(new THREE.Vector3(x, trackY + TRACK_T, i * 0.36));
     }
     for (const sz of [-1, 1]) {
       const z = Z0 + (sz > 0 ? D - RAIL_INSET : RAIL_INSET);
-      for (let i = -3; i <= 3; i++) studs.push(new THREE.Vector3(i * 0.46, trackY + TRACK_T, z));
+      for (let i = -3; i <= 3; i++)
+        studs.push(new THREE.Vector3(i * 0.46, trackY + TRACK_T, z));
     }
     for (const p of studs) {
-      const stud = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.022, 12), mat.steel, "Tie-down stud");
+      const stud = mesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.022, 12),
+        mat.steel,
+        "Tie-down stud",
+      );
       stud.position.copy(p).setY(trackY + TRACK_T + 0.008);
       A_TRACKS.group.add(stud);
-      const ring = mesh(new THREE.TorusGeometry(0.022, 0.005, 8, 16), mat.steel, "Net tie-down ring");
+      const ring = mesh(
+        new THREE.TorusGeometry(0.022, 0.005, 8, 16),
+        mat.steel,
+        "Net tie-down ring",
+      );
       ring.rotation.x = Math.PI / 2;
       ring.position.copy(p).setY(trackY + TRACK_T + 0.02);
       A_TRACKS.group.add(ring);
@@ -316,7 +368,14 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
 
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      const blk = box(mat.alloy, CORNER_BLK, T + LIP_H, CORNER_BLK, "Reinforced corner", 0.02);
+      const blk = box(
+        mat.alloy,
+        CORNER_BLK,
+        T + LIP_H,
+        CORNER_BLK,
+        "Reinforced corner",
+        0.02,
+      );
       blk.position.set(
         X0 + (sx > 0 ? W - CORNER_BLK / 2 - 0.01 : CORNER_BLK / 2 + 0.01),
         SKID_H + (T + LIP_H) / 2,
@@ -324,12 +383,15 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
       );
       A_DECK.group.add(blk);
       // corner seat-track turn: a small block where the two rails meet
-      const turn = box(mat.track, TRACK_W, TRACK_T, TRACK_W, "Track corner block", 0.003);
-      turn.position.set(
-        blk.position.x,
-        trackY,
-        blk.position.z,
+      const turn = box(
+        mat.track,
+        TRACK_W,
+        TRACK_T,
+        TRACK_W,
+        "Track corner block",
+        0.003,
       );
+      turn.position.set(blk.position.x, trackY, blk.position.z);
       A_TRACKS.group.add(turn);
     }
   }
@@ -348,12 +410,26 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
   }
   // three support beams running the full depth
   for (const bx of [X0 + 0.7, X0 + W / 2, X0 + W - 0.7]) {
-    const beam = box(mat.chassis, BEAM_W, SKID_H + 0.018, D - 0.1, "Longitudinal beam", 0.008);
+    const beam = box(
+      mat.chassis,
+      BEAM_W,
+      SKID_H + 0.018,
+      D - 0.1,
+      "Longitudinal beam",
+      0.008,
+    );
     beam.position.set(bx, (SKID_H + 0.018) / 2, 0);
     A_STRUCTURE.group.add(beam);
   }
   for (const cz of [-0.9, 0.9]) {
-    const cross = box(mat.chassis, W - 0.24, SKID_H + 0.014, 0.12, "Cross member", 0.008);
+    const cross = box(
+      mat.chassis,
+      W - 0.24,
+      SKID_H + 0.014,
+      0.12,
+      "Cross member",
+      0.008,
+    );
     cross.position.set(0, (SKID_H + 0.014) / 2, cz);
     A_STRUCTURE.group.add(cross);
   }
@@ -362,14 +438,7 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
   const forkY = SKID_H + FORK_H / 2 + 0.004;
   for (const sz of [-1, 1]) {
     for (const fx of [-0.55, 0.55]) {
-      const slot = box(
-        mat.dark,
-        0.34,
-        FORK_H,
-        0.1,
-        "Fork entry (end)",
-        0.006,
-      );
+      const slot = box(mat.dark, 0.34, FORK_H, 0.1, "Fork entry (end)", 0.006);
       slot.position.set(fx, forkY, Z0 + (sz > 0 ? D - 0.1 : 0.1));
       A_STRUCTURE.group.add(slot);
       const lip = wallBox(
@@ -401,6 +470,9 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
     id: "PMC 4127",
     carrier: "LH",
     serial: "PMC4127LH-0713",
+    tareKg: 120,
+    maxGrossKg: 6804,
+    volumeM3: W * D * CONTOUR_H,
   });
   const idMat = mat.plate.clone();
   idMat.map = idTex;
@@ -496,7 +568,11 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
 
   const outline = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(W - 0.1, 1, D - 0.1)),
-    new THREE.LineBasicMaterial({ color: "#ffb020", transparent: true, opacity: 0.55 }),
+    new THREE.LineBasicMaterial({
+      color: "#ffb020",
+      transparent: true,
+      opacity: 0.55,
+    }),
   );
   outline.name = "Contour outline";
   outline.userData.isAnnotation = true;
@@ -517,10 +593,30 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
   /* --- 5.8 rivets along the plate edges --------------------------------- */
   if (o.rivets) {
     const y = SKID_H + T;
-    rivets.line(new THREE.Vector3(X0 + 0.06, y, -D / 2 + 0.1), new THREE.Vector3(X0 + 0.06, y, D / 2 - 0.1), nNegX, 0.16);
-    rivets.line(new THREE.Vector3(X0 + W - 0.06, y, -D / 2 + 0.1), new THREE.Vector3(X0 + W - 0.06, y, D / 2 - 0.1), nPosX, 0.16);
-    rivets.line(new THREE.Vector3(-W / 2 + 0.1, y, Z0 + 0.06), new THREE.Vector3(W / 2 - 0.1, y, Z0 + 0.06), nNegZ, 0.16);
-    rivets.line(new THREE.Vector3(-W / 2 + 0.1, y, Z0 + D - 0.06), new THREE.Vector3(W / 2 - 0.1, y, Z0 + D - 0.06), nPosZ, 0.16);
+    rivets.line(
+      new THREE.Vector3(X0 + 0.06, y, -D / 2 + 0.1),
+      new THREE.Vector3(X0 + 0.06, y, D / 2 - 0.1),
+      nNegX,
+      0.16,
+    );
+    rivets.line(
+      new THREE.Vector3(X0 + W - 0.06, y, -D / 2 + 0.1),
+      new THREE.Vector3(X0 + W - 0.06, y, D / 2 - 0.1),
+      nPosX,
+      0.16,
+    );
+    rivets.line(
+      new THREE.Vector3(-W / 2 + 0.1, y, Z0 + 0.06),
+      new THREE.Vector3(W / 2 - 0.1, y, Z0 + 0.06),
+      nNegZ,
+      0.16,
+    );
+    rivets.line(
+      new THREE.Vector3(-W / 2 + 0.1, y, Z0 + D - 0.06),
+      new THREE.Vector3(W / 2 - 0.1, y, Z0 + D - 0.06),
+      nPosZ,
+      0.16,
+    );
   }
   const rivetMesh = o.rivets ? rivets.build(mat.rivet) : null;
   if (rivetMesh) A_DECK.group.add(rivetMesh);
@@ -537,7 +633,9 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
         ? (m as THREE.InstancedMesh).count
         : 1;
       const g = m.geometry;
-      const t = g.index ? g.index.count / 3 : (g.attributes.position?.count ?? 0) / 3;
+      const t = g.index
+        ? g.index.count / 3
+        : (g.attributes.position?.count ?? 0) / 3;
       const tri = Math.round(t * inst);
       triangles += tri;
       a.meshes++;
@@ -581,7 +679,8 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
     setLoad: applyLoad,
     animate(elapsed: number) {
       // the contour breathes very slightly so the net reads as a soft volume
-      contourMat.opacity = 0.05 + (o.load || 0.35) * 0.12 + Math.sin(elapsed * 1.4) * 0.015;
+      contourMat.opacity =
+        0.05 + (o.load || 0.35) * 0.12 + Math.sin(elapsed * 1.4) * 0.015;
     },
     dispose() {
       const geos = new Set<THREE.BufferGeometry>();
@@ -596,8 +695,16 @@ export function createPMCContainer(options: Partial<BuildOptions> = {}): PMCCont
       });
       mats.forEach((m) => {
         const rec = m as unknown as Record<string, unknown>;
-        for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "aoMap", "metalnessMap"]) {
-          if (rec[k] instanceof THREE.Texture) texs.add(rec[k] as THREE.Texture);
+        for (const k of [
+          "map",
+          "normalMap",
+          "roughnessMap",
+          "alphaMap",
+          "aoMap",
+          "metalnessMap",
+        ]) {
+          if (rec[k] instanceof THREE.Texture)
+            texs.add(rec[k] as THREE.Texture);
         }
         m.dispose();
       });

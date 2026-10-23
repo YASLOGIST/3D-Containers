@@ -11,7 +11,11 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-export function downloadText(text: string, filename: string, mime = "text/plain") {
+export function downloadText(
+  text: string,
+  filename: string,
+  mime = "text/plain",
+) {
   downloadBlob(new Blob([text], { type: `${mime};charset=utf-8` }), filename);
 }
 
@@ -38,6 +42,9 @@ export function highlightTS(src: string): string {
   out += esc(src.slice(last));
   return out
     .split("\n")
-    .map((line, i) => `<span class="c-ln">${String(i + 1).padStart(4, " ")}</span>${line}`)
+    .map(
+      (line, i) =>
+        `<span class="c-ln">${String(i + 1).padStart(4, " ")}</span>${line}`,
+    )
     .join("\n");
 }

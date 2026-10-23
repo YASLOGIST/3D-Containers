@@ -4,7 +4,13 @@ import type { MoodId, ViewerState } from "@/three/AKEViewer";
 import { Btn, Panel, Segmented, Slider, Toggle } from "./ui";
 import { cn } from "@/utils/cn";
 
-const FINISH_ORDER: FinishId[] = ["mill", "graphite", "cargo", "airline", "titanium"];
+const FINISH_ORDER: FinishId[] = [
+  "mill",
+  "graphite",
+  "cargo",
+  "airline",
+  "titanium",
+];
 
 export function ControlDeck({
   state,
@@ -23,7 +29,7 @@ export function ControlDeck({
   return (
     <Panel
       title={`Control deck · ${spec.code}`}
-      code={spec.id === "ake" ? "ULD-01" : "ULD-02"}
+      code={`${spec.code} / PARAMETRIC`}
       className="w-[286px] max-w-full"
       bodyClass="px-3 py-2.5 space-y-3"
     >
@@ -38,7 +44,13 @@ export function ControlDeck({
                 key={id}
                 type="button"
                 title={f.label}
-                onClick={() => set({ finish: id, metalness: f.metalness, roughness: f.roughness })}
+                onClick={() =>
+                  set({
+                    finish: id,
+                    metalness: f.metalness,
+                    roughness: f.roughness,
+                  })
+                }
                 className={cn(
                   "group relative h-8 flex-1 border transition-all duration-200",
                   active
@@ -52,7 +64,9 @@ export function ControlDeck({
                 <span
                   className={cn(
                     "absolute inset-x-0 bottom-0 h-[2px] transition-colors",
-                    active ? "bg-amber" : "bg-transparent group-hover:bg-mute/60",
+                    active
+                      ? "bg-amber"
+                      : "bg-transparent group-hover:bg-mute/60",
                   )}
                 />
               </button>
@@ -116,7 +130,7 @@ export function ControlDeck({
             min={0}
             max={1}
             onChange={(v) => set({ load: v })}
-            display={`${Math.round(state.load * 162)} cm`}
+            display={`${Math.round(state.load * (spec.dims.contourHeight ?? 1.62) * 100)} cm`}
           />
         )}
         <Slider
@@ -127,12 +141,12 @@ export function ControlDeck({
           onChange={(v) => set({ explode: v })}
           display={`${Math.round(state.explode * 100)}%`}
         />
-        {spec.reeferOption && (
+        {spec.setpointRange && (
           <Slider
-            label="set point"
+            label="setpoint"
             value={state.setpoint}
-            min={-25}
-            max={25}
+            min={spec.setpointRange.min}
+            max={spec.setpointRange.max}
             step={0.5}
             onChange={(v) => set({ setpoint: v })}
             display={`${state.setpoint.toFixed(1)} \u00B0C`}
@@ -146,7 +160,7 @@ export function ControlDeck({
           {spec.contourOption && (
             <Toggle
               label="Contour"
-              hint="2.01 m top"
+              hint={`${spec.dims.topWidth.toFixed(2)} m top`}
               value={state.contour}
               onChange={(v) => set({ contour: v })}
             />
@@ -208,6 +222,7 @@ export function ControlDeck({
         <Segmented<MoodId>
           value={state.mood}
           onChange={(v) => set({ mood: v })}
+          ariaLabel="Lighting rig"
           options={[
             { value: "hangar", label: "Hangar" },
             { value: "dusk", label: "Apron" },
@@ -236,7 +251,13 @@ export function ControlDeck({
   );
 }
 
-function Block({ label, children }: { label: string; children: React.ReactNode }) {
+function Block({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2">
@@ -252,7 +273,10 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 function shade(hex: string, amt: number) {
   const n = parseInt(hex.slice(1), 16);
   const f = (c: number) =>
-    Math.max(0, Math.min(255, Math.round(amt < 0 ? c * (1 + amt) : c + (255 - c) * amt)));
+    Math.max(
+      0,
+      Math.min(255, Math.round(amt < 0 ? c * (1 + amt) : c + (255 - c) * amt)),
+    );
   const r = f((n >> 16) & 255);
   const g = f((n >> 8) & 255);
   const b = f(n & 255);

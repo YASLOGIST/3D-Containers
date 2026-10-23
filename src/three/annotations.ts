@@ -1,12 +1,13 @@
 /**
- * annotations.ts — CAD-style dimension furniture drawn around the container.
- * Every element is real 3-D geometry (lines, cones, sprites) so the drawing
- * tracks the orbit camera instead of being a flat 2-D overlay.
+ * annotations.ts — model-aware CAD dimension furniture drawn around the
+ * active ULD. Every value comes from the selected model registry entry; no
+ * family-specific dimension is baked into the drawing layer.
  */
 import * as THREE from "three";
 
 const AMBER = new THREE.Color("#ffb020");
 const INK = new THREE.Color("#e8ecef");
+const STEEL = new THREE.Color("#79b8c9");
 
 function labelSprite(text: string, sub?: string) {
   const pad = 26;
@@ -55,6 +56,14 @@ interface DimOptions {
   /** offset of the label from the line midpoint */
   labelOffset?: THREE.Vector3;
   sub?: string;
+  /** Y plane the witness lines terminate on; defaults to the floor */
+  witnessY?: number;
+}
+
+function metric(value: number) {
+  return value < 0.1
+    ? `${(value * 1000).toFixed(0)} mm`
+    : `${value.toFixed(2)} m`;
 }
 
 function dimension(
@@ -64,30 +73,46 @@ function dimension(
   text: string,
   opts: DimOptions = {},
 ) {
-  const lineMat = new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 0.9 });
+  const lineMat = new THREE.LineBasicMaterial({
+    color: AMBER,
+    transparent: true,
+    opacity: 0.9,
+  });
   const dir = b.clone().sub(a);
   const len = dir.length();
   dir.normalize();
 
-  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lineMat));
+  group.add(
+    new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lineMat),
+  );
 
-  // arrow heads
-  const coneGeo = new THREE.ConeGeometry(0.012, 0.05, 10);
+  // Arrow geometry scales down for thin dimensions such as the 50 mm pallet.
+  const arrowLength = Math.min(0.05, Math.max(0.012, len * 0.18));
+  const arrowRadius = Math.min(0.012, Math.max(0.0035, len * 0.05));
+  const coneGeo = new THREE.ConeGeometry(arrowRadius, arrowLength, 10);
   for (const [p, sign] of [
     [a, 1],
     [b, -1],
   ] as [THREE.Vector3, number][]) {
     const cone = new THREE.Mesh(
       coneGeo,
-      new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.95 }),
+      new THREE.MeshBasicMaterial({
+        color: AMBER,
+        transparent: true,
+        opacity: 0.95,
+      }),
     );
-    cone.position.copy(p).addScaledVector(dir, sign * 0.026);
-    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().multiplyScalar(sign));
+    cone.position.copy(p).addScaledVector(dir, sign * arrowLength * 0.52);
+    cone.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir.clone().multiplyScalar(sign),
+    );
     cone.userData.isAnnotation = true;
     group.add(cone);
   }
 
-  // witness lines back to the solid
+  // Witness lines project the measured span back to an actual model plane.
+  const witnessY = opts.witnessY ?? 0.002;
   const drop = new THREE.LineDashedMaterial({
     color: AMBER,
     transparent: true,
@@ -96,9 +121,12 @@ function dimension(
     gapSize: 0.025,
   });
   for (const p of [a, b]) {
-    const target = p.clone().setY(0.002);
-    if (Math.abs(p.y) > 0.01) {
-      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([p, target]), drop);
+    const target = p.clone().setY(witnessY);
+    if (Math.abs(p.y - witnessY) > 0.01) {
+      const l = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([p, target]),
+        drop,
+      );
       l.computeLineDistances();
       group.add(l);
     }
@@ -113,95 +141,149 @@ function dimension(
   return len;
 }
 
-export interface AnnotationData {
-  group: THREE.Group;
-  envelope: THREE.LineSegments;
-}
-
-/** Builds the full drawing set for the LD-3 envelope. */
-export function createAnnotations(dims: {
+export interface AnnotationOptions {
+  code: string;
   baseWidth: number;
   baseLength: number;
   height: number;
   topWidth: number;
   x0: number;
-}): AnnotationData {
-  const { baseWidth: BW, baseLength: BL, height: H, topWidth: TW, x0 } = dims;
+  /** true only when the AKE's fuselage contour is active */
+  contour: boolean;
+  kind: "contoured" | "cuboid" | "pallet";
+  contourHeight?: number;
+}
+
+export interface AnnotationData {
+  group: THREE.Group;
+  envelope: THREE.LineSegments;
+}
+
+/** Builds the drawing set for the currently selected ULD envelope. */
+export function createAnnotations(o: AnnotationOptions): AnnotationData {
+  const { baseWidth: BW, baseLength: BL, height: H, topWidth: TW, x0 } = o;
   const group = new THREE.Group();
-  group.name = "Dimensions";
+  group.name = `${o.code} Dimensions`;
 
   const pad = 0.42;
+  const rightX = x0 + Math.max(BW, TW);
+  const contourH = o.contourHeight ?? 0;
+  const envelopeH = o.kind === "pallet" ? H + contourH : H;
+  const showContour = o.kind === "contoured" && o.contour && TW > BW + 1e-6;
 
-  // base width — front of the container
+  // Base width — in front of the container.
   dimension(
     group,
     new THREE.Vector3(x0, 0.004, BL / 2 + pad),
     new THREE.Vector3(x0 + BW, 0.004, BL / 2 + pad),
-    "1.53 m",
+    metric(BW),
     { sub: "BASE WIDTH", labelOffset: new THREE.Vector3(0, 0.09, 0.02) },
   );
 
-  // base length — right of the container
+  // Base length — to the right of the widest part of the section.
   dimension(
     group,
-    new THREE.Vector3(x0 + TW + pad * 0.8, 0.004, -BL / 2),
-    new THREE.Vector3(x0 + TW + pad * 0.8, 0.004, BL / 2),
-    "1.56 m",
+    new THREE.Vector3(rightX + pad * 0.8, 0.004, -BL / 2),
+    new THREE.Vector3(rightX + pad * 0.8, 0.004, BL / 2),
+    metric(BL),
     { sub: "BASE LENGTH", labelOffset: new THREE.Vector3(0.06, 0.09, 0) },
   );
 
-  // overall height — left of the container
-  dimension(
-    group,
-    new THREE.Vector3(x0 - pad, 0, BL / 2 + 0.12),
-    new THREE.Vector3(x0 - pad, H, BL / 2 + 0.12),
-    "1.62 m",
-    { sub: "HEIGHT", labelOffset: new THREE.Vector3(-0.16, 0, 0) },
-  );
+  // Vertical dimensions differ for a thin pallet and a full container.
+  if (o.kind === "pallet") {
+    dimension(
+      group,
+      new THREE.Vector3(x0 - pad, 0, BL / 2 + 0.12),
+      new THREE.Vector3(x0 - pad, H, BL / 2 + 0.12),
+      metric(H),
+      { sub: "DECK THICKNESS", labelOffset: new THREE.Vector3(-0.22, 0.01, 0) },
+    );
+    if (contourH > 0) {
+      dimension(
+        group,
+        new THREE.Vector3(x0 - pad, H, -BL / 2 - 0.1),
+        new THREE.Vector3(x0 - pad, H + contourH, -BL / 2 - 0.1),
+        metric(contourH),
+        {
+          sub: "NETTED CONTOUR",
+          labelOffset: new THREE.Vector3(-0.24, 0, 0),
+          witnessY: H,
+        },
+      );
+    }
+  } else {
+    dimension(
+      group,
+      new THREE.Vector3(x0 - pad, 0, BL / 2 + 0.12),
+      new THREE.Vector3(x0 - pad, H, BL / 2 + 0.12),
+      metric(H),
+      { sub: "OVERALL HEIGHT", labelOffset: new THREE.Vector3(-0.16, 0, 0) },
+    );
+  }
 
-  // upper contour — above the container
-  dimension(
-    group,
-    new THREE.Vector3(x0, H + 0.3, 0),
-    new THREE.Vector3(x0 + TW, H + 0.3, 0),
-    "2.01 m",
-    { sub: "UPPER CONTOUR", labelOffset: new THREE.Vector3(0, 0.1, 0) },
-  );
+  if (showContour) {
+    dimension(
+      group,
+      new THREE.Vector3(x0, H + 0.3, 0),
+      new THREE.Vector3(x0 + TW, H + 0.3, 0),
+      metric(TW),
+      {
+        sub: "UPPER CONTOUR",
+        labelOffset: new THREE.Vector3(0, 0.1, 0),
+        witnessY: H,
+      },
+    );
 
-  // taper witness line from the base corner to the top corner
-  const taper = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(x0 + BW, 0.004, BL / 2 + 0.16),
-      new THREE.Vector3(x0 + TW, H, BL / 2 + 0.16),
-    ]),
-    new THREE.LineDashedMaterial({
-      color: INK,
-      transparent: true,
-      opacity: 0.3,
-      dashSize: 0.05,
-      gapSize: 0.04,
-    }),
-  );
-  taper.computeLineDistances();
-  group.add(taper);
-  const taperLabel = labelSprite("16.5\u00B0", "CONTOUR TAPER");
-  taperLabel.position.set(x0 + BW + 0.3, H * 0.52, BL / 2 + 0.16);
-  group.add(taperLabel);
+    const taper = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x0 + BW, 0.004, BL / 2 + 0.16),
+        new THREE.Vector3(x0 + TW, H, BL / 2 + 0.16),
+      ]),
+      new THREE.LineDashedMaterial({
+        color: INK,
+        transparent: true,
+        opacity: 0.3,
+        dashSize: 0.05,
+        gapSize: 0.04,
+      }),
+    );
+    taper.computeLineDistances();
+    group.add(taper);
 
-  // certified envelope box (dashed)
+    const angle = THREE.MathUtils.radToDeg(Math.atan2(TW - BW, H));
+    const taperLabel = labelSprite(
+      `${angle.toFixed(1)}\u00B0`,
+      "CONTOUR TAPER",
+    );
+    taperLabel.position.set(x0 + BW + 0.3, H * 0.52, BL / 2 + 0.16);
+    group.add(taperLabel);
+  } else if (o.kind === "cuboid") {
+    const vertical = labelSprite("0.0\u00B0", "VERTICAL WALLS");
+    vertical.position.set(x0 - pad - 0.18, H * 0.58, -BL / 2 - 0.08);
+    group.add(vertical);
+  }
+
+  // Certified / nominal build envelope box.
   const box = new THREE.Box3(
     new THREE.Vector3(x0, 0, -BL / 2),
-    new THREE.Vector3(x0 + TW, H, BL / 2),
+    new THREE.Vector3(rightX, envelopeH, BL / 2),
   );
-  const envelope = new THREE.Box3Helper(box, new THREE.Color("#79b8c9"));
+  const envelope = new THREE.Box3Helper(box, STEEL);
   (envelope.material as THREE.LineBasicMaterial).transparent = true;
   (envelope.material as THREE.LineBasicMaterial).opacity = 0.35;
-  envelope.name = "Envelope";
+  envelope.name = `${o.code} Envelope`;
   group.add(envelope);
 
-  group.traverse((o) => {
-    o.userData.isAnnotation = true;
-    if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = false;
+  const id = labelSprite(
+    o.code,
+    o.kind === "pallet" ? "PALLET ENVELOPE" : "ULD ENVELOPE",
+  );
+  id.position.set(rightX - 0.2, envelopeH + 0.14, -BL / 2 - 0.14);
+  group.add(id);
+
+  group.traverse((obj) => {
+    obj.userData.isAnnotation = true;
+    if ((obj as THREE.Mesh).isMesh) (obj as THREE.Mesh).castShadow = false;
   });
 
   return { group, envelope };

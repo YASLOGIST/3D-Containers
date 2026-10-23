@@ -211,7 +211,9 @@ export interface RKNContainer extends ContainerBase {
 /* 5. The generator                                                           */
 /* ========================================================================== */
 
-export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNContainer {
+export function createRKNContainer(
+  options: Partial<BuildOptions> = {},
+): RKNContainer {
   const o: BuildOptions = { ...DEFAULT_OPTIONS, ...options };
   const { width: W, depth: D, height: H } = RKN_DIMENSIONS;
 
@@ -244,12 +246,42 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   /* --- 5.2 assemblies ---------------------------------------------------- */
   const assemblies: Assembly[] = [];
   const assembly = assemblyFactory(root, assemblies);
-  const A_HULL = assembly("hull", "Hull shell", "Insulated cuboid tube, 32 mm wall", [0, 0.3, 0]);
-  const A_FRAME = assembly("frame", "Edge frame", "Aluminium extrusions + rivets", [0, 0.66, 0]);
-  const A_BASE = assembly("base", "Base chassis", "Skid frame, castings, fork pockets", [0, -0.62, 0]);
-  const A_DOOR = assembly("door", "Door assembly", "Hinged leaf, cam latch rods", [0, 0, 0.9]);
-  const A_REEFER = assembly("reefer", "Refrigeration unit", "Condenser, fan, control panel", [0, 0.34, 1.5]);
-  const A_END = assembly("blind", "Blind end", "Closed end panel + livery", [0, 0, -0.9]);
+  const A_HULL = assembly(
+    "hull",
+    "Hull shell",
+    "Insulated cuboid tube, 32 mm wall",
+    [0, 0.3, 0],
+  );
+  const A_FRAME = assembly(
+    "frame",
+    "Edge frame",
+    "Aluminium extrusions + rivets",
+    [0, 0.66, 0],
+  );
+  const A_BASE = assembly(
+    "base",
+    "Base chassis",
+    "Skid frame, castings, fork pockets",
+    [0, -0.62, 0],
+  );
+  const A_DOOR = assembly(
+    "door",
+    "Door assembly",
+    "Hinged leaf, cam latch rods",
+    [0, 0, 0.9],
+  );
+  const A_REEFER = assembly(
+    "reefer",
+    "Refrigeration unit",
+    "Condenser, fan, control panel",
+    [0, 0.34, 1.5],
+  );
+  const A_END = assembly(
+    "blind",
+    "Blind end",
+    "Closed end panel + livery",
+    [0, 0, -0.9],
+  );
 
   /* --- 5.3 hull: hollow rectangular tube, open at both ends -------------- */
   const hullLen = D - END_FRAME * 2;
@@ -272,7 +304,14 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   // interior fit-out, visible with the door open
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.34, 0, 0.34]) {
-    const strip = box(mat.hullInner, W - 0.26, 0.008, 0.1, "Floor wear strip", 0.003);
+    const strip = box(
+      mat.hullInner,
+      W - 0.26,
+      0.008,
+      0.1,
+      "Floor wear strip",
+      0.003,
+    );
     strip.position.set(0, floorY + 0.005, dz);
     A_HULL.group.add(strip);
   }
@@ -379,10 +418,21 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     const cavityWall = X0 + RAIL_T + WALL;
     for (const ty of [0.44, 0.96]) {
       for (const tz of [-0.4, 0.4]) {
-        const pocket = box(mat.dark, 0.014, 0.06, 0.07, "Tie-down pocket", 0.004);
+        const pocket = box(
+          mat.dark,
+          0.014,
+          0.06,
+          0.07,
+          "Tie-down pocket",
+          0.004,
+        );
         pocket.position.set(cavityWall + 0.007, ty, tz);
         A_HULL.group.add(pocket);
-        const ring = mesh(new THREE.TorusGeometry(0.019, 0.005, 8, 18), mat.steel, "Tie-down ring");
+        const ring = mesh(
+          new THREE.TorusGeometry(0.019, 0.005, 8, 18),
+          mat.steel,
+          "Tie-down ring",
+        );
         ring.rotation.y = Math.PI / 2;
         ring.position.set(cavityWall + 0.02, ty, tz);
         A_HULL.group.add(ring);
@@ -393,7 +443,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     const drain = box(mat.steel, 0.05, 0.03, 0.05, "Condensate drain", 0.006);
     drain.position.set(X0 + W - 0.42, 0.016, D / 2 - END_FRAME - 0.12);
     A_HULL.group.add(drain);
-    const drainPipe = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.05, 12), mat.steel, "Drain pipe");
+    const drainPipe = mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 0.05, 12),
+      mat.steel,
+      "Drain pipe",
+    );
     drainPipe.rotation.x = Math.PI / 2;
     drainPipe.position.copy(drain.position).setY(0.021);
     A_HULL.group.add(drainPipe);
@@ -407,7 +461,14 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   nominal.forEach((p, i) => {
     const prev = nominal[(i - 1 + N) % N];
     const next = nominal[(i + 1) % N];
-    const { shape, leg } = cornerRailSection(p, prev, next, CORNER_R, RAIL_T, RAIL_W);
+    const { shape, leg } = cornerRailSection(
+      p,
+      prev,
+      next,
+      CORNER_R,
+      RAIL_T,
+      RAIL_W,
+    );
     legs.push(leg);
     const geo = new THREE.ExtrudeGeometry(shape, {
       depth: D,
@@ -428,7 +489,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     const n = new THREE.Vector3(d.y, -d.x, 0); // outward (CCW section)
     const span = edgeLen - legs[i] - legs[(i + 1) % N];
     if (span < 0.06) return;
-    const mid = new THREE.Vector3((p.x + q.x) / 2, (p.y + q.y) / 2, 0).addScaledVector(n, -RAIL_T / 2);
+    const mid = new THREE.Vector3(
+      (p.x + q.x) / 2,
+      (p.y + q.y) / 2,
+      0,
+    ).addScaledVector(n, -RAIL_T / 2);
     A_FRAME.group.add(
       wallBox(
         mat.alloy,
@@ -453,13 +518,27 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   });
 
   /* --- 5.6 base chassis, corner castings, fork pockets ------------------ */
-  const chassis = box(mat.chassis, W - 0.04, CHASSIS, D - 0.04, "Skid frame", 0.012);
+  const chassis = box(
+    mat.chassis,
+    W - 0.04,
+    CHASSIS,
+    D - 0.04,
+    "Skid frame",
+    0.012,
+  );
   chassis.position.set(0, CHASSIS / 2, 0);
   A_BASE.group.add(chassis);
 
   for (const sx of [-0.68, 0.68]) {
     const bh = CHASSIS + 0.004;
-    const beam = box(mat.chassis, 0.14, bh, D - 0.02, "Longitudinal beam", 0.008);
+    const beam = box(
+      mat.chassis,
+      0.14,
+      bh,
+      D - 0.02,
+      "Longitudinal beam",
+      0.008,
+    );
     beam.position.set(sx, bh / 2, 0);
     A_BASE.group.add(beam);
   }
@@ -467,10 +546,21 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   // lower corner castings with the cargo-system locating bore
   for (const cx of [X0 + 0.1, X0 + W - 0.1]) {
     for (const cz of [-D / 2 + 0.1, D / 2 - 0.1]) {
-      const c = box(mat.alloy, 0.18, CHASSIS + 0.006, 0.18, "Corner casting", 0.022);
+      const c = box(
+        mat.alloy,
+        0.18,
+        CHASSIS + 0.006,
+        0.18,
+        "Corner casting",
+        0.022,
+      );
       c.position.set(cx, (CHASSIS + 0.006) / 2, cz);
       A_BASE.group.add(c);
-      const bore = mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.02, 20), mat.dark, "Casting bore");
+      const bore = mesh(
+        new THREE.CylinderGeometry(0.036, 0.036, 0.02, 20),
+        mat.dark,
+        "Casting bore",
+      );
       bore.position.set(cx, 0.013, cz);
       A_BASE.group.add(bore);
     }
@@ -533,8 +623,20 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   );
   const ringShiftDoor = D / 2 - (END_FRAME - RING_BEV);
   const ringShiftBlind = -D / 2 + RING_BEV;
-  A_DOOR.group.add(mesh(ringGeo.clone().translate(0, 0, ringShiftDoor), mat.alloy, "Door end frame"));
-  A_END.group.add(mesh(ringGeo.clone().translate(0, 0, ringShiftBlind), mat.alloy, "Blind end frame"));
+  A_DOOR.group.add(
+    mesh(
+      ringGeo.clone().translate(0, 0, ringShiftDoor),
+      mat.alloy,
+      "Door end frame",
+    ),
+  );
+  A_END.group.add(
+    mesh(
+      ringGeo.clone().translate(0, 0, ringShiftBlind),
+      mat.alloy,
+      "Blind end frame",
+    ),
+  );
 
   if (o.rivets) {
     // rivet circle on the flat face of each end frame, clear of the fillets
@@ -542,10 +644,23 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     circle.forEach((p, i) => {
       const q = circle[(i + 1) % circle.length];
       const d = new THREE.Vector2(q.x - p.x, q.y - p.y).normalize();
-      const a = new THREE.Vector3(p.x + d.x * 0.07, p.y + d.y * 0.07, D / 2 - 0.012);
-      const b = new THREE.Vector3(q.x - d.x * 0.07, q.y - d.y * 0.07, D / 2 - 0.012);
+      const a = new THREE.Vector3(
+        p.x + d.x * 0.07,
+        p.y + d.y * 0.07,
+        D / 2 - 0.012,
+      );
+      const b = new THREE.Vector3(
+        q.x - d.x * 0.07,
+        q.y - d.y * 0.07,
+        D / 2 - 0.012,
+      );
       rivets.line(a, b, nDoor, 0.16);
-      rivets.line(a.clone().setZ(-D / 2 + 0.012), b.clone().setZ(-D / 2 + 0.012), nBlind, 0.16);
+      rivets.line(
+        a.clone().setZ(-D / 2 + 0.012),
+        b.clone().setZ(-D / 2 + 0.012),
+        nBlind,
+        0.16,
+      );
     });
   }
 
@@ -569,6 +684,8 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     code: "RKN",
     type: "LD-9 REEFER",
     tag: `${W.toFixed(2)} \u00D7 ${D.toFixed(2)} \u00D7 ${H.toFixed(2)} M`,
+    profileLabel: `${W.toFixed(2)} \u00D7 ${H.toFixed(2)} M`,
+    section: "cuboid",
   });
   const idTex = makeIdPlate({
     width: 0.36,
@@ -576,6 +693,9 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     id: "RKN 4127",
     carrier: "LH",
     serial: "RKN4127LH-0713",
+    tareKg: 285,
+    maxGrossKg: 3500,
+    volumeM3: RKN_DIMENSIONS.interiorVolume,
   });
   const liveryEndMat = mat.decal.clone();
   liveryEndMat.map = liveryEnd;
@@ -688,7 +808,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
 
   // hinges on the -X side: pin on the axis, one strap each side
   for (const hy of [CHASSIS + 0.22, CHASSIS + (H - CHASSIS) / 2, H - 0.24]) {
-    const pin = mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14), mat.steel, "Hinge pin");
+    const pin = mesh(
+      new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14),
+      mat.steel,
+      "Hinge pin",
+    );
     pin.position.set(HINGE_X, hy, HINGE_Z);
     A_DOOR.group.add(pin);
     const leafArm = box(mat.steel, 0.09, 0.1, 0.014, "Hinge strap", 0.005);
@@ -738,7 +862,14 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   const unitCy = CHASSIS + (H - CHASSIS) * 0.56;
 
   // brushed stainless bezel plate, bolted to the leaf
-  const bezel = box(mat.bezel, unitW + 0.06, unitH + 0.06, 0.016, "Reefer bezel", 0.02);
+  const bezel = box(
+    mat.bezel,
+    unitW + 0.06,
+    unitH + 0.06,
+    0.016,
+    "Reefer bezel",
+    0.02,
+  );
   bezel.position.set(px(unitCx), unitCy, FACE + 0.006);
   A_REEFER.group.add(bezel);
 
@@ -774,7 +905,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   shroud.position.set(px(unitCx), unitCy + unitH * 0.26, UNIT_FACE - 0.016);
   A_REEFER.group.add(shroud);
 
-  const hub = mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.026, 18), mat.steel, "Fan hub");
+  const hub = mesh(
+    new THREE.CylinderGeometry(0.032, 0.032, 0.026, 18),
+    mat.steel,
+    "Fan hub",
+  );
   hub.rotation.x = Math.PI / 2;
   hub.position.set(px(unitCx), unitCy + unitH * 0.26, UNIT_FACE - 0.016);
   A_REEFER.group.add(hub);
@@ -796,7 +931,15 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   // ---- flat front control panel: the non-metallic fascia -----------------
   // A moulded composite panel on a brushed-steel sub-frame — a completely
   // different material response from the aluminium hull and frame.
-  const panelTex = makeReeferPanel();
+  const panelTex = makeReeferPanel({
+    code: "RKN",
+    designation: "LD-9 · REEFER",
+    tempRange: "-25 °C … +25 °C",
+    minC: -25,
+    maxC: 25,
+    defaultC: o.setpoint,
+    serial: "RKN-4127-07",
+  });
   const panelMat = mat.panel.clone();
   panelMat.map = panelTex.texture;
   const panelW = 0.44;
@@ -804,7 +947,14 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   const panelCx = unitCx + 0.32;
   const panelCy = unitCy - unitH * 0.3;
 
-  const subFrame = box(mat.bezel, panelW + 0.05, panelH + 0.05, 0.018, "Panel sub-frame", 0.006);
+  const subFrame = box(
+    mat.bezel,
+    panelW + 0.05,
+    panelH + 0.05,
+    0.018,
+    "Panel sub-frame",
+    0.006,
+  );
   subFrame.position.set(px(panelCx), panelCy, FACE + 0.012);
   A_REEFER.group.add(subFrame);
 
@@ -836,7 +986,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
       0.004,
       nDoor,
       upY,
-      new THREE.Vector3(px(panelCx) - panelW * 0.252, panelCy + panelH * 0.267, UNIT_FACE - 0.002),
+      new THREE.Vector3(
+        px(panelCx) - panelW * 0.252,
+        panelCy + panelH * 0.267,
+        UNIT_FACE - 0.002,
+      ),
       "LCD readout",
       0.002,
     ),
@@ -870,12 +1024,23 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
   inletPins.position.set(px(inletX), inletY, UNIT_FACE - 0.004);
   A_REEFER.group.add(inletPins);
 
-  const hook = mesh(new THREE.TorusGeometry(0.028, 0.005, 8, 16), mat.steel, "Cable hook");
+  const hook = mesh(
+    new THREE.TorusGeometry(0.028, 0.005, 8, 16),
+    mat.steel,
+    "Cable hook",
+  );
   hook.position.set(px(inletX) - 0.07, inletY + 0.16, UNIT_FACE - 0.014);
   A_REEFER.group.add(hook);
 
   // service stripe + unit stencil, both on the bezel
-  const stripe = box(mat.accent, unitW + 0.08, 0.012, 0.02, "Unit service stripe", 0.004);
+  const stripe = box(
+    mat.accent,
+    unitW + 0.08,
+    0.012,
+    0.02,
+    "Unit service stripe",
+    0.004,
+  );
   stripe.position.set(px(unitCx), unitCy - unitH / 2 - 0.032, FACE + 0.008);
   A_REEFER.group.add(stripe);
 
@@ -887,7 +1052,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
       0.26,
       0.066,
       nDoor,
-      new THREE.Vector3(px(unitCx) - unitW / 2 + 0.15, unitCy + 0.02, UNIT_FACE - 0.0125),
+      new THREE.Vector3(
+        px(unitCx) - unitW / 2 + 0.15,
+        unitCy + 0.02,
+        UNIT_FACE - 0.0125,
+      ),
       reeferTagMat,
       "Unit stencil",
     ),
@@ -898,6 +1067,8 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     code: "RKN",
     type: "LD-9 COLD CHAIN",
     tag: "-25\u00B0C \u2026 +25\u00B0C \u00B7 3.6 M\u00B3",
+    profileLabel: "0\u00B0 \u00B7 UNIFORM",
+    section: "cuboid",
   });
   const sideMat = mat.decal.clone();
   sideMat.map = liverySide;
@@ -906,7 +1077,11 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
       1.0,
       0.6,
       nPosX,
-      new THREE.Vector3(X0 + W - RAIL_T + 0.002, CHASSIS + (H - CHASSIS) * 0.58, 0),
+      new THREE.Vector3(
+        X0 + W - RAIL_T + 0.002,
+        CHASSIS + (H - CHASSIS) * 0.58,
+        0,
+      ),
       sideMat,
       "Side livery decal",
     ),
@@ -937,6 +1112,7 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
     // and whether the condenser blower turns (see animate() below)
     lcdMat.emissiveIntensity = on ? 0.75 : 0.1;
     mat.lcd.emissiveIntensity = on ? 0.75 : 0.1;
+    panelTex.setActive(on);
   };
   setReefer(reeferOn);
   panelTex.setSetpoint(o.setpoint);
@@ -955,7 +1131,9 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
         ? (m as THREE.InstancedMesh).count
         : 1;
       const g = m.geometry;
-      const t = g.index ? g.index.count / 3 : (g.attributes.position?.count ?? 0) / 3;
+      const t = g.index
+        ? g.index.count / 3
+        : (g.attributes.position?.count ?? 0) / 3;
       const tri = Math.round(t * inst);
       triangles += tri;
       a.meshes++;
@@ -1021,8 +1199,16 @@ export function createRKNContainer(options: Partial<BuildOptions> = {}): RKNCont
       });
       mats.forEach((m) => {
         const rec = m as unknown as Record<string, unknown>;
-        for (const k of ["map", "normalMap", "roughnessMap", "emissiveMap", "aoMap", "metalnessMap"]) {
-          if (rec[k] instanceof THREE.Texture) texs.add(rec[k] as THREE.Texture);
+        for (const k of [
+          "map",
+          "normalMap",
+          "roughnessMap",
+          "emissiveMap",
+          "aoMap",
+          "metalnessMap",
+        ]) {
+          if (rec[k] instanceof THREE.Texture)
+            texs.add(rec[k] as THREE.Texture);
         }
         m.dispose();
       });

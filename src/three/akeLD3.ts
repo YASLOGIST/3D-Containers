@@ -86,7 +86,6 @@ const LEAF_CLEAR = 0.005; // radial gap between leaf and frame opening
 const LEAF_RECESS = 0.036; // door face sits this far behind the envelope
 const MAX_DOOR = THREE.MathUtils.degToRad(112);
 
-
 /** The LD-3 cross-section: right trapezoid, vertical on the -X side. */
 export function contourProfile(contour: boolean): V2[] {
   const { baseWidth: BW, height: H, topWidth: TW } = AKE_DIMENSIONS;
@@ -112,11 +111,9 @@ function slantNormal(p: V2[]) {
   return new THREE.Vector3(d.y, -d.x, 0).normalize();
 }
 
-
 /* ========================================================================== */
 /* 6. Build result                                                            */
 /* ========================================================================== */
-
 
 export interface AKEContainer extends ContainerBase {
   materials: AKEMaterials;
@@ -163,7 +160,9 @@ export const DEFAULT_OPTIONS: BuildOptions = {
 /* 7. The generator                                                           */
 /* ========================================================================== */
 
-export function createAKEContainer(options: Partial<BuildOptions> = {}): AKEContainer {
+export function createAKEContainer(
+  options: Partial<BuildOptions> = {},
+): AKEContainer {
   const o: BuildOptions = { ...DEFAULT_OPTIONS, ...options };
   const { baseWidth: BW, baseLength: BL, height: H } = AKE_DIMENSIONS;
 
@@ -187,11 +186,20 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   const nInner = new THREE.Vector3(-1, 0, 0); // centreline wall normal
   const nDoor = new THREE.Vector3(0, 0, 1);
   const nBlind = new THREE.Vector3(0, 0, -1);
-  const slantUp = new THREE.Vector3(nominal[2].x - nominal[1].x, AKE_DIMENSIONS.height - CHASSIS, 0).normalize();
+  const slantUp = new THREE.Vector3(
+    nominal[2].x - nominal[1].x,
+    AKE_DIMENSIONS.height - CHASSIS,
+    0,
+  ).normalize();
 
   /* --- 7.2 assemblies ---------------------------------------------------- */
   const assemblies: Assembly[] = [];
-  const assembly = (id: string, label: string, note: string, dir: [number, number, number]) => {
+  const assembly = (
+    id: string,
+    label: string,
+    note: string,
+    dir: [number, number, number],
+  ) => {
     const g = new THREE.Group();
     g.name = label;
     root.add(g);
@@ -208,11 +216,36 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     assemblies.push(a);
     return a;
   };
-  const A_HULL = assembly("hull", "Hull shell", "Contour tube, 32 mm wall", [0, 0.3, 0]);
-  const A_FRAME = assembly("frame", "Edge frame", "Aluminium extrusions + rivets", [0, 0.66, 0]);
-  const A_BASE = assembly("base", "Base chassis", "Skid frame, castings, fork pockets", [0, -0.62, 0]);
-  const A_DOOR = assembly("door", "Door assembly", "Hinged leaf, cam latch rods", [0, 0, 0.9]);
-  const A_END = assembly("blind", "Blind end", "Closed end panel + livery", [0, 0, -0.9]);
+  const A_HULL = assembly(
+    "hull",
+    "Hull shell",
+    "Contour tube, 32 mm wall",
+    [0, 0.3, 0],
+  );
+  const A_FRAME = assembly(
+    "frame",
+    "Edge frame",
+    "Aluminium extrusions + rivets",
+    [0, 0.66, 0],
+  );
+  const A_BASE = assembly(
+    "base",
+    "Base chassis",
+    "Skid frame, castings, fork pockets",
+    [0, -0.62, 0],
+  );
+  const A_DOOR = assembly(
+    "door",
+    "Door assembly",
+    "Hinged leaf, cam latch rods",
+    [0, 0, 0.9],
+  );
+  const A_END = assembly(
+    "blind",
+    "Blind end",
+    "Closed end panel + livery",
+    [0, 0, -0.9],
+  );
 
   /* --- 7.3 hull: hollow contour tube, open at both ends ----------------- */
   const hullLen = BL - END_FRAME * 2;
@@ -235,14 +268,28 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   topPanel.position.set((nominal[2].x + nominal[3].x) / 2, H - RAIL_T / 2, 0);
   A_HULL.group.add(topPanel);
 
-  const belly = box(mat.chassis, BW - 0.16, 0.012, BL - 0.2, "Belly pan", 0.004);
+  const belly = box(
+    mat.chassis,
+    BW - 0.16,
+    0.012,
+    BL - 0.2,
+    "Belly pan",
+    0.004,
+  );
   belly.position.set(X0 + BW / 2, 0.006, 0);
   A_HULL.group.add(belly);
 
   // interior fit-out, visible with the door open
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.36, 0, 0.36]) {
-    const strip = box(mat.hullInner, BW - 0.26, 0.008, 0.1, "Floor wear strip", 0.003);
+    const strip = box(
+      mat.hullInner,
+      BW - 0.26,
+      0.008,
+      0.1,
+      "Floor wear strip",
+      0.003,
+    );
     strip.position.set(X0 + BW / 2, floorY + 0.005, dz);
     A_HULL.group.add(strip);
   }
@@ -342,10 +389,21 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     const cavityWall = X0 + RAIL_T + WALL;
     for (const ty of [0.42, 0.94]) {
       for (const tz of [-0.44, 0.44]) {
-        const pocket = box(mat.dark, 0.014, 0.06, 0.07, "Tie-down pocket", 0.004);
+        const pocket = box(
+          mat.dark,
+          0.014,
+          0.06,
+          0.07,
+          "Tie-down pocket",
+          0.004,
+        );
         pocket.position.set(cavityWall + 0.007, ty, tz);
         A_HULL.group.add(pocket);
-        const ring = mesh(new THREE.TorusGeometry(0.019, 0.005, 8, 18), mat.steel, "Tie-down ring");
+        const ring = mesh(
+          new THREE.TorusGeometry(0.019, 0.005, 8, 18),
+          mat.steel,
+          "Tie-down ring",
+        );
         ring.rotation.y = Math.PI / 2;
         ring.position.set(cavityWall + 0.02, ty, tz);
         A_HULL.group.add(ring);
@@ -361,7 +419,14 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   nominal.forEach((p, i) => {
     const prev = nominal[(i - 1 + N) % N];
     const next = nominal[(i + 1) % N];
-    const { shape, leg } = cornerRailSection(p, prev, next, CORNER_R, RAIL_T, RAIL_W);
+    const { shape, leg } = cornerRailSection(
+      p,
+      prev,
+      next,
+      CORNER_R,
+      RAIL_T,
+      RAIL_W,
+    );
     legs.push(leg);
     const geo = new THREE.ExtrudeGeometry(shape, {
       depth: BL,
@@ -382,7 +447,11 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     const n = new THREE.Vector3(d.y, -d.x, 0); // outward (CCW section)
     const span = edgeLen - legs[i] - legs[(i + 1) % N];
     if (span < 0.06) return;
-    const mid = new THREE.Vector3((p.x + q.x) / 2, (p.y + q.y) / 2, 0).addScaledVector(n, -RAIL_T / 2);
+    const mid = new THREE.Vector3(
+      (p.x + q.x) / 2,
+      (p.y + q.y) / 2,
+      0,
+    ).addScaledVector(n, -RAIL_T / 2);
     A_FRAME.group.add(
       wallBox(
         mat.alloy,
@@ -407,13 +476,27 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   });
 
   /* --- 7.6 base chassis, corner castings, fork pockets ----------------- */
-  const chassis = box(mat.chassis, BW - 0.04, CHASSIS, BL - 0.04, "Skid frame", 0.012);
+  const chassis = box(
+    mat.chassis,
+    BW - 0.04,
+    CHASSIS,
+    BL - 0.04,
+    "Skid frame",
+    0.012,
+  );
   chassis.position.set(X0 + BW / 2, CHASSIS / 2, 0);
   A_BASE.group.add(chassis);
 
   for (const sx of [-0.44, 0.44]) {
     const bh = CHASSIS + 0.004;
-    const beam = box(mat.chassis, 0.14, bh, BL - 0.02, "Longitudinal beam", 0.008);
+    const beam = box(
+      mat.chassis,
+      0.14,
+      bh,
+      BL - 0.02,
+      "Longitudinal beam",
+      0.008,
+    );
     beam.position.set(X0 + BW / 2 + sx, bh / 2, 0);
     A_BASE.group.add(beam);
   }
@@ -421,10 +504,21 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   // lower corner castings with the cargo-system locating bore
   for (const cx of [X0 + 0.1, X0 + BW - 0.1]) {
     for (const cz of [-BL / 2 + 0.1, BL / 2 - 0.1]) {
-      const c = box(mat.alloy, 0.18, CHASSIS + 0.006, 0.18, "Corner casting", 0.022);
+      const c = box(
+        mat.alloy,
+        0.18,
+        CHASSIS + 0.006,
+        0.18,
+        "Corner casting",
+        0.022,
+      );
       c.position.set(cx, (CHASSIS + 0.006) / 2, cz);
       A_BASE.group.add(c);
-      const bore = mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.02, 20), mat.dark, "Casting bore");
+      const bore = mesh(
+        new THREE.CylinderGeometry(0.036, 0.036, 0.02, 20),
+        mat.dark,
+        "Casting bore",
+      );
       bore.position.set(cx, 0.013, cz);
       A_BASE.group.add(bore);
     }
@@ -490,9 +584,17 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
   const ringShiftDoor = BL / 2 - (END_FRAME - 0.008);
   const ringShiftBlind = -BL / 2 + 0.008;
 
-  const ringDoor = mesh(ringGeo.clone().translate(0, 0, ringShiftDoor), mat.alloy, "Door end frame");
+  const ringDoor = mesh(
+    ringGeo.clone().translate(0, 0, ringShiftDoor),
+    mat.alloy,
+    "Door end frame",
+  );
   A_DOOR.group.add(ringDoor);
-  const ringBlind = mesh(ringGeo.clone().translate(0, 0, ringShiftBlind), mat.alloy, "Blind end frame");
+  const ringBlind = mesh(
+    ringGeo.clone().translate(0, 0, ringShiftBlind),
+    mat.alloy,
+    "Blind end frame",
+  );
   A_END.group.add(ringBlind);
 
   if (o.rivets) {
@@ -501,10 +603,23 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     circle.forEach((p, i) => {
       const q = circle[(i + 1) % circle.length];
       const d = new THREE.Vector2(q.x - p.x, q.y - p.y).normalize();
-      const a = new THREE.Vector3(p.x + d.x * 0.07, p.y + d.y * 0.07, BL / 2 - 0.012);
-      const b = new THREE.Vector3(q.x - d.x * 0.07, q.y - d.y * 0.07, BL / 2 - 0.012);
+      const a = new THREE.Vector3(
+        p.x + d.x * 0.07,
+        p.y + d.y * 0.07,
+        BL / 2 - 0.012,
+      );
+      const b = new THREE.Vector3(
+        q.x - d.x * 0.07,
+        q.y - d.y * 0.07,
+        BL / 2 - 0.012,
+      );
       rivets.line(a, b, nDoor, 0.16);
-      rivets.line(a.clone().setZ(-BL / 2 + 0.012), b.clone().setZ(-BL / 2 + 0.012), nBlind, 0.16);
+      rivets.line(
+        a.clone().setZ(-BL / 2 + 0.012),
+        b.clone().setZ(-BL / 2 + 0.012),
+        nBlind,
+        0.16,
+      );
     });
   }
 
@@ -528,6 +643,8 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     code: "AKE",
     type: "LD-3 LOWER DECK",
     tag: `${BW.toFixed(2)} \u00D7 ${BL.toFixed(2)} \u00D7 ${H.toFixed(2)} M`,
+    profileLabel: `${BW.toFixed(2)} / ${AKE_DIMENSIONS.topWidth.toFixed(2)} M`,
+    section: "contour",
   });
   const idTex = makeIdPlate({
     width: 0.36,
@@ -535,6 +652,9 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     id: "AKE 4127",
     carrier: "BA",
     serial: "AKE4127BA-0713",
+    tareKg: 92,
+    maxGrossKg: 1588,
+    volumeM3: 4.3,
   });
   const liveryEndMat = mat.decal.clone();
   liveryEndMat.map = liveryEnd;
@@ -547,7 +667,11 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
       1.14,
       0.92,
       nBlind,
-      new THREE.Vector3(blindCx, CHASSIS + (H - CHASSIS) * 0.6, blindFaceZ - 0.002),
+      new THREE.Vector3(
+        blindCx,
+        CHASSIS + (H - CHASSIS) * 0.6,
+        blindFaceZ - 0.002,
+      ),
       liveryEndMat,
       "End livery decal",
     ),
@@ -618,7 +742,12 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
 
   // rubber gasket on the leaf's inner face
   const sealGeo = new THREE.ExtrudeGeometry(
-    ringSection(offsetPolygon(leaf, 0.012), offsetPolygon(leaf, 0.05), rLeaf, Math.max(rLeaf - 0.04, 0.01)),
+    ringSection(
+      offsetPolygon(leaf, 0.012),
+      offsetPolygon(leaf, 0.05),
+      rLeaf,
+      Math.max(rLeaf - 0.04, 0.01),
+    ),
     { depth: 0.016, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.017);
@@ -659,7 +788,11 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
 
   // hinges on the centreline side: pin on the axis, one strap each side
   for (const hy of [CHASSIS + 0.22, CHASSIS + (H - CHASSIS) / 2, H - 0.24]) {
-    const pin = mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14), mat.steel, "Hinge pin");
+    const pin = mesh(
+      new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14),
+      mat.steel,
+      "Hinge pin",
+    );
     pin.position.set(HINGE_X, hy, HINGE_Z);
     A_DOOR.group.add(pin);
     const leafArm = box(mat.steel, 0.09, 0.1, 0.014, "Hinge strap", 0.005);
@@ -708,6 +841,8 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
     code: "AKE",
     type: "LD-3 CONTOURED ULD",
     tag: "MAX GROSS 1588 KG \u00B7 4.3 M\u00B3",
+    profileLabel: "16.5\u00B0 TAPER",
+    section: "contour",
   });
   const sideMat = mat.decal.clone();
   sideMat.map = liverySide;
@@ -756,7 +891,9 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
         ? (m as THREE.InstancedMesh).count
         : 1;
       const g = m.geometry;
-      const t = g.index ? g.index.count / 3 : (g.attributes.position?.count ?? 0) / 3;
+      const t = g.index
+        ? g.index.count / 3
+        : (g.attributes.position?.count ?? 0) / 3;
       const tri = Math.round(t * inst);
       triangles += tri;
       a.meshes++;
@@ -809,8 +946,15 @@ export function createAKEContainer(options: Partial<BuildOptions> = {}): AKECont
       });
       mats.forEach((m) => {
         const rec = m as unknown as Record<string, unknown>;
-        for (const k of ["map", "normalMap", "roughnessMap", "aoMap", "metalnessMap"]) {
-          if (rec[k] instanceof THREE.Texture) texs.add(rec[k] as THREE.Texture);
+        for (const k of [
+          "map",
+          "normalMap",
+          "roughnessMap",
+          "aoMap",
+          "metalnessMap",
+        ]) {
+          if (rec[k] instanceof THREE.Texture)
+            texs.add(rec[k] as THREE.Texture);
         }
         m.dispose();
       });
