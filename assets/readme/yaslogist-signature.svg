@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 212" width="1200" height="212" role="img" aria-label="YASLOGIST closing architectural signature — www.yaslogist.com">
+  <defs>
+    <linearGradient id="sg-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07090d"/>
+      <stop offset="50%" stop-color="#0e141d"/>
+      <stop offset="100%" stop-color="#07090d"/>
+    </linearGradient>
+    <linearGradient id="sg-sheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#eef3f7"/>
+      <stop offset="45%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#ffd479"/>
+      <stop offset="100%" stop-color="#eef3f7"/>
+      <animate attributeName="x1" values="-80%;120%" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="0%;200%" dur="6s" repeatCount="indefinite"/>
+    </linearGradient>
+    <linearGradient id="sg-beam" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5ce1e6" stop-opacity="0"/>
+      <stop offset="35%" stop-color="#5ce1e6" stop-opacity="0.8"/>
+      <stop offset="65%" stop-color="#ffb020" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffb020" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="sg-glow" cx="50%" cy="46%" r="42%">
+      <stop offset="0%" stop-color="#5ce1e6" stop-opacity="0.14"/>
+      <stop offset="55%" stop-color="#ffb020" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#07090d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Outer Frame -->
+  <rect x="2" y="2" width="1196" height="208" rx="8" fill="url(#sg-bg)" stroke="#24303d" stroke-width="1.4"/>
+  <rect x="2" y="2" width="1196" height="208" rx="8" fill="url(#sg-glow)"/>
+
+  <!-- Subtle Horizon Grid Lines -->
+  <line x1="40" y1="42" x2="1160" y2="42" stroke="#161f29" stroke-width="1"/>
+  <line x1="40" y1="170" x2="1160" y2="170" stroke="#161f29" stroke-width="1"/>
+
+  <!-- Corner Brackets -->
+  <g stroke="#ffb020" stroke-width="1.6" fill="none">
+    <path d="M 16 30 L 16 16 L 30 16"/>
+    <path d="M 1184 30 L 1184 16 L 1170 16"/>
+    <path d="M 16 182 L 16 196 L 30 196"/>
+    <path d="M 1184 182 L 1184 196 L 1170 196"/>
+  </g>
+
+  <!-- Animated Horizon Beam -->
+  <rect x="340" y="169" width="520" height="2" fill="url(#sg-beam)">
+    <animate attributeName="opacity" values="0.35;1;0.35" dur="4.2s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Center Isometric YASLOGIST Cube-Hex Emblem -->
+  <g transform="translate(600, 56)">
+    <circle cx="0" cy="0" r="26" fill="none" stroke="#1e2a38" stroke-width="1" stroke-dasharray="3,3">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="28s" repeatCount="indefinite"/>
+    </circle>
+    <polygon points="0,-20 17.3,-10 17.3,10 0,20 -17.3,10 -17.3,-10" fill="#0b1118" stroke="#5ce1e6" stroke-width="1.7">
+      <animate attributeName="stroke-opacity" values="0.7;1;0.7" dur="3.5s" repeatCount="indefinite"/>
+    </polygon>
+    <!-- Internal Isometric Y-Vector -->
+    <line x1="0" y1="-20" x2="0" y2="0" stroke="#ffb020" stroke-width="1.6"/>
+    <line x1="17.3" y1="-10" x2="0" y2="0" stroke="#8ff5dc" stroke-width="1.6"/>
+    <line x1="-17.3" y1="-10" x2="0" y2="0" stroke="#8ff5dc" stroke-width="1.6"/>
+    <line x1="0" y1="0" x2="0" y2="20" stroke="#ffb020" stroke-width="1.6"/>
+    <circle cx="0" cy="0" r="3" fill="#ffb020">
+      <animate attributeName="r" values="2.4;3.8;2.4" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- YASLOGIST Primary Wordmark -->
+  <text x="600" y="114" text-anchor="middle" fill="url(#sg-sheen)" font-family="'Chakra Petch', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="26" font-weight="800" letter-spacing="8">YASLOGIST</text>
+
+  <!-- Creative Engineering Subtitle -->
+  <text x="600" y="136" text-anchor="middle" fill="#9fb0be" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, 'DejaVu Sans Mono', monospace" font-size="10.5" letter-spacing="2.4">SPATIAL COMPUTING  ·  PROCEDURAL CAD  ·  LIVING DOCUMENTATION ARCHITECTURE</text>
+
+  <!-- Clickable-Visual Domain Pill -->
+  <g transform="translate(600, 154)">
+    <rect x="-118" y="-11" width="236" height="22" rx="11" fill="#0f1722" stroke="#5ce1e6" stroke-width="1.1"/>
+    <circle cx="-98" cy="0" r="3.2" fill="#6fbf8f">
+      <animate attributeName="opacity" values="1;0.35;1" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="6" y="4" text-anchor="middle" fill="#eef3f7" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace" font-size="10.5" font-weight="700" letter-spacing="1.6">HTTPS://WWW.YASLOGIST.COM</text>
+  </g>
+
+  <!-- Footer Telemetry Corners -->
+  <text x="42" y="191" fill="#6f8090" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" letter-spacing="1.1">REPOSITORY // 3D-CONTAINERS · AVIATION ULD LAB</text>
+  <text x="1158" y="191" text-anchor="end" fill="#ffb020" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" letter-spacing="1.1">CRAFTED UNDER THE YASLOGIST SIGNATURE</text>
+</svg>
