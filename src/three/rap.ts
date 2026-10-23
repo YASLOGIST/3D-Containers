@@ -24,7 +24,13 @@
  * ============================================================================
  */
 import * as THREE from "three";
-import { makeCondenserGrille, makeIdPlate, makeLivery, makeReeferPanel, makeStencil } from "./textures";
+import {
+  makeCondenserGrille,
+  makeIdPlate,
+  makeLivery,
+  makeReeferPanel,
+  makeStencil,
+} from "./textures";
 import {
   ContainerBase,
   FINISHES,
@@ -216,7 +222,9 @@ export interface RAPContainer extends ContainerBase {
 /* 5. The generator                                                           */
 /* ========================================================================== */
 
-export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPContainer {
+export function createRAPContainer(
+  options: Partial<BuildOptions> = {},
+): RAPContainer {
   const o: BuildOptions = { ...DEFAULT_OPTIONS, ...options };
   const { width: W, depth: D, height: H } = RAP_DIMENSIONS;
 
@@ -245,12 +253,42 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   /* --- 5.2 assemblies ---------------------------------------------------- */
   const assemblies: Assembly[] = [];
   const assembly = assemblyFactory(root, assemblies);
-  const A_HULL = assembly("hull", "Hull shell", "Insulated panels, 60 mm wall", [0, 0.3, 0]);
-  const A_FRAME = assembly("frame", "Edge frame", "Extrusions + reinforced posts", [0, 0.7, 0]);
-  const A_BASE = assembly("base", "Base chassis", "Skid frame, castings, fork pockets", [0, -0.7, 0]);
-  const A_DOOR = assembly("door", "Door assembly", "Hinged leaf, 4 cam latch rods", [0, 0, 1.1]);
-  const A_CLIMATE = assembly("climate", "Climate unit", "Condenser, twin fans, controller", [0, 0.4, 1.8]);
-  const A_END = assembly("blind", "Blind end", "Closed end panel + livery", [0, 0, -1.1]);
+  const A_HULL = assembly(
+    "hull",
+    "Hull shell",
+    "Insulated panels, 60 mm wall",
+    [0, 0.3, 0],
+  );
+  const A_FRAME = assembly(
+    "frame",
+    "Edge frame",
+    "Extrusions + reinforced posts",
+    [0, 0.7, 0],
+  );
+  const A_BASE = assembly(
+    "base",
+    "Base chassis",
+    "Skid frame, castings, fork pockets",
+    [0, -0.7, 0],
+  );
+  const A_DOOR = assembly(
+    "door",
+    "Door assembly",
+    "Hinged leaf, 4 cam latch rods",
+    [0, 0, 1.1],
+  );
+  const A_CLIMATE = assembly(
+    "climate",
+    "Climate unit",
+    "Condenser, twin fans, controller",
+    [0, 0.4, 1.8],
+  );
+  const A_END = assembly(
+    "blind",
+    "Blind end",
+    "Closed end panel + livery",
+    [0, 0, -1.1],
+  );
 
   /* --- 5.3 hull: hollow rectangular tube of insulated panels ------------- */
   const hullLen = D - END_FRAME * 2;
@@ -273,7 +311,14 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   // interior fit-out, visible with the door open
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.8, -0.4, 0, 0.4, 0.8]) {
-    const strip = box(mat.hullInner, W - 0.3, 0.01, 0.12, "Floor wear strip", 0.004);
+    const strip = box(
+      mat.hullInner,
+      W - 0.3,
+      0.01,
+      0.12,
+      "Floor wear strip",
+      0.004,
+    );
     strip.position.set(0, floorY + 0.006, dz);
     A_HULL.group.add(strip);
   }
@@ -298,7 +343,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   duct.position.set(0, H - RAIL_T - WALL - 0.07, -hullLen / 2 + 0.35);
   A_HULL.group.add(duct);
   for (const pz of [-0.5, 0, 0.5]) {
-    const probe = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.07, 12), mat.steel, "Temp probe");
+    const probe = mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.07, 12),
+      mat.steel,
+      "Temp probe",
+    );
     probe.position.set(X0 + W * 0.5, floorY + 0.05, pz);
     A_HULL.group.add(probe);
   }
@@ -308,7 +357,14 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     // heavy vertical corner posts, inset so their outer faces sit on the
     // certified envelope
     for (const cx of [X0 + POST_W / 2, X0 + W - POST_W / 2]) {
-      const post = box(mat.alloy, POST_W, H - CHASSIS - RAIL_T, POST_W, "Corner post", 0.02);
+      const post = box(
+        mat.alloy,
+        POST_W,
+        H - CHASSIS - RAIL_T,
+        POST_W,
+        "Corner post",
+        0.02,
+      );
       post.position.set(cx, (H + CHASSIS - RAIL_T) / 2, 0);
       A_FRAME.group.add(post);
       if (o.rivets) {
@@ -331,7 +387,14 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     const gussetW = POST_W + 0.1;
     for (const cx of [X0 + gussetW / 2, X0 + W - gussetW / 2]) {
       for (const cz of [-D / 2 + END_FRAME + 0.1, 0, D / 2 - END_FRAME - 0.1]) {
-        const g = box(mat.alloy, gussetW, 0.022, gussetW, "Corner gusset", 0.008);
+        const g = box(
+          mat.alloy,
+          gussetW,
+          0.022,
+          gussetW,
+          "Corner gusset",
+          0.008,
+        );
         g.position.set(cx, H - RAIL_T - 0.008, cz);
         A_FRAME.group.add(g);
       }
@@ -412,7 +475,14 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   nominal.forEach((p, i) => {
     const prev = nominal[(i - 1 + N) % N];
     const next = nominal[(i + 1) % N];
-    const { shape, leg } = cornerRailSection(p, prev, next, CORNER_R, RAIL_T, RAIL_W);
+    const { shape, leg } = cornerRailSection(
+      p,
+      prev,
+      next,
+      CORNER_R,
+      RAIL_T,
+      RAIL_W,
+    );
     legs.push(leg);
     const geo = new THREE.ExtrudeGeometry(shape, {
       depth: D,
@@ -433,7 +503,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     const n = new THREE.Vector3(d.y, -d.x, 0); // outward (CCW section)
     const span = edgeLen - legs[i] - legs[(i + 1) % N];
     if (span < 0.06) return;
-    const mid = new THREE.Vector3((p.x + q.x) / 2, (p.y + q.y) / 2, 0).addScaledVector(n, -RAIL_T / 2);
+    const mid = new THREE.Vector3(
+      (p.x + q.x) / 2,
+      (p.y + q.y) / 2,
+      0,
+    ).addScaledVector(n, -RAIL_T / 2);
     A_FRAME.group.add(
       wallBox(
         mat.alloy,
@@ -458,13 +532,27 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   });
 
   /* --- 5.6 base chassis, heavy castings, fork pockets -------------------- */
-  const chassis = box(mat.chassis, W - 0.05, CHASSIS, D - 0.05, "Skid frame", 0.014);
+  const chassis = box(
+    mat.chassis,
+    W - 0.05,
+    CHASSIS,
+    D - 0.05,
+    "Skid frame",
+    0.014,
+  );
   chassis.position.set(0, CHASSIS / 2, 0);
   A_BASE.group.add(chassis);
 
   for (const sx of [-1.15, -0.4, 0.4, 1.15]) {
     const bh = CHASSIS + 0.006;
-    const beam = box(mat.chassis, 0.17, bh, D - 0.03, "Longitudinal beam", 0.01);
+    const beam = box(
+      mat.chassis,
+      0.17,
+      bh,
+      D - 0.03,
+      "Longitudinal beam",
+      0.01,
+    );
     beam.position.set(sx, bh / 2, 0);
     A_BASE.group.add(beam);
   }
@@ -477,10 +565,21 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   // lower corner castings with the cargo-system locating bore
   for (const cx of [X0 + 0.13, X0 + W - 0.13]) {
     for (const cz of [-D / 2 + 0.13, D / 2 - 0.13]) {
-      const c = box(mat.alloy, 0.24, CHASSIS + 0.008, 0.24, "Corner casting", 0.03);
+      const c = box(
+        mat.alloy,
+        0.24,
+        CHASSIS + 0.008,
+        0.24,
+        "Corner casting",
+        0.03,
+      );
       c.position.set(cx, (CHASSIS + 0.008) / 2, cz);
       A_BASE.group.add(c);
-      const bore = mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.024, 20), mat.dark, "Casting bore");
+      const bore = mesh(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.024, 20),
+        mat.dark,
+        "Casting bore",
+      );
       bore.position.set(cx, 0.016, cz);
       A_BASE.group.add(bore);
     }
@@ -490,7 +589,8 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   for (const z of [-0.55, 0.55]) {
     const y = CHASSIS * 0.55;
     for (const n of [nNegX, nPosX]) {
-      const faceX = (n === nNegX ? X0 : X0 + W) + (n === nNegX ? 0.024 : -0.024);
+      const faceX =
+        (n === nNegX ? X0 : X0 + W) + (n === nNegX ? 0.024 : -0.024);
       A_BASE.group.add(
         wallBox(
           mat.dark,
@@ -540,18 +640,43 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   );
   const ringShiftDoor = D / 2 - (END_FRAME - LEAF_BEVEL);
   const ringShiftBlind = -D / 2 + LEAF_BEVEL;
-  A_DOOR.group.add(mesh(ringGeo.clone().translate(0, 0, ringShiftDoor), mat.alloy, "Door end frame"));
-  A_END.group.add(mesh(ringGeo.clone().translate(0, 0, ringShiftBlind), mat.alloy, "Blind end frame"));
+  A_DOOR.group.add(
+    mesh(
+      ringGeo.clone().translate(0, 0, ringShiftDoor),
+      mat.alloy,
+      "Door end frame",
+    ),
+  );
+  A_END.group.add(
+    mesh(
+      ringGeo.clone().translate(0, 0, ringShiftBlind),
+      mat.alloy,
+      "Blind end frame",
+    ),
+  );
 
   if (o.rivets) {
     const circle = offsetPolygon(nominal, 0.04);
     circle.forEach((p, i) => {
       const q = circle[(i + 1) % circle.length];
       const d = new THREE.Vector2(q.x - p.x, q.y - p.y).normalize();
-      const a = new THREE.Vector3(p.x + d.x * 0.09, p.y + d.y * 0.09, D / 2 - 0.014);
-      const b = new THREE.Vector3(q.x - d.x * 0.09, q.y - d.y * 0.09, D / 2 - 0.014);
+      const a = new THREE.Vector3(
+        p.x + d.x * 0.09,
+        p.y + d.y * 0.09,
+        D / 2 - 0.014,
+      );
+      const b = new THREE.Vector3(
+        q.x - d.x * 0.09,
+        q.y - d.y * 0.09,
+        D / 2 - 0.014,
+      );
       rivets.line(a, b, nDoor, 0.18);
-      rivets.line(a.clone().setZ(-D / 2 + 0.014), b.clone().setZ(-D / 2 + 0.014), nBlind, 0.18);
+      rivets.line(
+        a.clone().setZ(-D / 2 + 0.014),
+        b.clone().setZ(-D / 2 + 0.014),
+        nBlind,
+        0.18,
+      );
     });
   }
 
@@ -575,6 +700,8 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     code: "RAP",
     type: "LD-9 REEFER",
     tag: `${W.toFixed(2)} \u00D7 ${D.toFixed(2)} \u00D7 ${H.toFixed(2)} M`,
+    profileLabel: `${W.toFixed(2)} \u00D7 ${H.toFixed(2)} M`,
+    section: "cuboid",
   });
   const idTex = makeIdPlate({
     width: 0.44,
@@ -582,6 +709,9 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     id: "RAP 4127",
     carrier: "LH",
     serial: "RAP4127LH-0713",
+    tareKg: 450,
+    maxGrossKg: 6033,
+    volumeM3: RAP_DIMENSIONS.interiorVolume,
   });
   const liveryEndMat = mat.decal.clone();
   liveryEndMat.map = liveryEnd;
@@ -632,7 +762,12 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
 
   // leaf stiffeners
   const leafH = H - CHASSIS - 0.24;
-  for (const dx of [X0 + FRAME_W + 0.11, X0 + W * 0.32, X0 + W * 0.68, X0 + W - 0.13]) {
+  for (const dx of [
+    X0 + FRAME_W + 0.11,
+    X0 + W * 0.32,
+    X0 + W * 0.68,
+    X0 + W - 0.13,
+  ]) {
     doorPivot.add(
       wallBox(
         mat.insulated,
@@ -661,7 +796,12 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   doorPivot.add(mesh(sealGeo, mat.dark, "Door gasket", false));
 
   // four cam latch rods with fold-flat handles, clear of the climate unit
-  for (const rx of [X0 + FRAME_W + 0.08, X0 + W * 0.28, X0 + W * 0.72, X0 + W - 0.12]) {
+  for (const rx of [
+    X0 + FRAME_W + 0.08,
+    X0 + W * 0.28,
+    X0 + W * 0.72,
+    X0 + W - 0.12,
+  ]) {
     const rodLen = H - CHASSIS - 0.24;
     const rod = mesh(
       new THREE.CylinderGeometry(0.014, 0.014, rodLen, 14),
@@ -671,7 +811,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     rod.position.set(px(rx), CHASSIS + rodLen / 2 + 0.12, FACE + 0.015);
     doorPivot.add(rod);
 
-    for (const hy of [CHASSIS + 0.24, CHASSIS + (H - CHASSIS) * 0.5, H - 0.24]) {
+    for (const hy of [
+      CHASSIS + 0.24,
+      CHASSIS + (H - CHASSIS) * 0.5,
+      H - 0.24,
+    ]) {
       const hub = box(mat.steel, 0.055, 0.058, 0.046, "Latch hub", 0.012);
       hub.position.set(px(rx), hy, FACE + 0.015);
       doorPivot.add(hub);
@@ -683,7 +827,12 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   }
 
   // keepers belong to the frame, not the leaf
-  for (const rx of [X0 + FRAME_W + 0.08, X0 + W * 0.28, X0 + W * 0.72, X0 + W - 0.12]) {
+  for (const rx of [
+    X0 + FRAME_W + 0.08,
+    X0 + W * 0.28,
+    X0 + W * 0.72,
+    X0 + W - 0.12,
+  ]) {
     for (const ky of [CHASSIS + 0.16, H - 0.16]) {
       const k = box(mat.alloy, 0.07, 0.062, 0.05, "Latch keeper", 0.01);
       k.position.set(rx, ky, D / 2 - 0.034);
@@ -693,7 +842,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
 
   // hinges on the -X side
   for (const hy of [CHASSIS + 0.28, CHASSIS + (H - CHASSIS) / 2, H - 0.3]) {
-    const pin = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.15, 14), mat.steel, "Hinge pin");
+    const pin = mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 0.15, 14),
+      mat.steel,
+      "Hinge pin",
+    );
     pin.position.set(HINGE_X, hy, HINGE_Z);
     A_DOOR.group.add(pin);
     const leafArm = box(mat.steel, 0.1, 0.11, 0.016, "Hinge strap", 0.006);
@@ -742,12 +895,26 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     new THREE.Vector3(px(unitCx + ux), unitCy + uy, z);
 
   // brushed stainless bezel plate, bolted to the leaf
-  const bezel = box(mat.bezel, unitW + 0.08, unitH + 0.08, 0.02, "Climate unit bezel", 0.025);
+  const bezel = box(
+    mat.bezel,
+    unitW + 0.08,
+    unitH + 0.08,
+    0.02,
+    "Climate unit bezel",
+    0.025,
+  );
   bezel.position.set(px(unitCx), unitCy, FACE + 0.008);
   A_CLIMATE.group.add(bezel);
 
   // ducted housing behind the face
-  const housing = box(mat.shroud, unitW, unitH, 0.03, "Climate unit housing", 0.015);
+  const housing = box(
+    mat.shroud,
+    unitW,
+    unitH,
+    0.03,
+    "Climate unit housing",
+    0.015,
+  );
   housing.position.set(px(unitCx), unitCy, FACE + 0.023);
   A_CLIMATE.group.add(housing);
 
@@ -781,7 +948,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     shroud.position.copy(at(fx, fanY, UNIT_FACE - 0.018));
     A_CLIMATE.group.add(shroud);
 
-    const hub = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 18), mat.steel, "Fan hub");
+    const hub = mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.03, 18),
+      mat.steel,
+      "Fan hub",
+    );
     hub.rotation.x = Math.PI / 2;
     hub.position.copy(at(fx, fanY, UNIT_FACE - 0.018));
     A_CLIMATE.group.add(hub);
@@ -803,7 +974,15 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   }
 
   // ---- flat front control panel: the non-metallic fascia -----------------
-  const panelTex = makeReeferPanel();
+  const panelTex = makeReeferPanel({
+    code: "RAP",
+    designation: "LD-9 · REEFER",
+    tempRange: "-20 °C … +30 °C",
+    minC: -20,
+    maxC: 30,
+    defaultC: o.setpoint,
+    serial: "RAP-4127-07",
+  });
   const panelMat = mat.panel.clone();
   panelMat.map = panelTex.texture;
   const panelW = 0.66;
@@ -811,7 +990,14 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   const panelUx = unitW / 2 - panelW / 2 - 0.09;
   const panelUy = -unitH * 0.28;
 
-  const subFrame = box(mat.bezel, panelW + 0.06, panelH + 0.06, 0.02, "Panel sub-frame", 0.008);
+  const subFrame = box(
+    mat.bezel,
+    panelW + 0.06,
+    panelH + 0.06,
+    0.02,
+    "Panel sub-frame",
+    0.008,
+  );
   subFrame.position.copy(at(panelUx, panelUy, FACE + 0.014));
   A_CLIMATE.group.add(subFrame);
 
@@ -874,19 +1060,32 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
   inletPins.position.copy(at(inletUx, inletUy, UNIT_FACE - 0.005));
   A_CLIMATE.group.add(inletPins);
 
-  const hook = mesh(new THREE.TorusGeometry(0.034, 0.006, 8, 16), mat.steel, "Cable hook");
+  const hook = mesh(
+    new THREE.TorusGeometry(0.034, 0.006, 8, 16),
+    mat.steel,
+    "Cable hook",
+  );
   hook.position.copy(at(inletUx - 0.09, inletUy + 0.19, UNIT_FACE - 0.017));
   A_CLIMATE.group.add(hook);
 
   // condenser coil fins along the top of the unit
   for (let i = 0; i < 12; i++) {
     const fin = box(mat.steel, unitW * 0.8, 0.05, 0.02, "Coil fin", 0.002);
-    fin.position.copy(at(-unitW * 0.4 + (i * unitW * 0.8) / 11, unitH / 2 - 0.01, FACE + 0.03));
+    fin.position.copy(
+      at(-unitW * 0.4 + (i * unitW * 0.8) / 11, unitH / 2 - 0.01, FACE + 0.03),
+    );
     A_CLIMATE.group.add(fin);
   }
 
   // service stripe + unit stencils on the bezel
-  const stripe = box(mat.accent, unitW + 0.1, 0.014, 0.024, "Unit service stripe", 0.005);
+  const stripe = box(
+    mat.accent,
+    unitW + 0.1,
+    0.014,
+    0.024,
+    "Unit service stripe",
+    0.005,
+  );
   stripe.position.copy(at(0, -unitH / 2 - 0.04, FACE + 0.01));
   A_CLIMATE.group.add(stripe);
 
@@ -909,6 +1108,8 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     code: "RAP",
     type: "LD-9 COLD CHAIN",
     tag: "-20\u00B0C \u2026 +30\u00B0C \u00B7 6.6 M\u00B3",
+    profileLabel: "0\u00B0 \u00B7 UNIFORM",
+    section: "cuboid",
   });
   const sideMat = mat.decal.clone();
   sideMat.map = liverySide;
@@ -917,7 +1118,11 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
       1.16,
       0.7,
       nPosX,
-      new THREE.Vector3(X0 + W - RAIL_T + 0.002, CHASSIS + (H - CHASSIS) * 0.58, 0),
+      new THREE.Vector3(
+        X0 + W - RAIL_T + 0.002,
+        CHASSIS + (H - CHASSIS) * 0.58,
+        0,
+      ),
       sideMat,
       "Side livery decal",
     ),
@@ -948,6 +1153,7 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
     // whether the condenser blowers turn (see animate() below)
     lcdMat.emissiveIntensity = on ? 0.75 : 0.1;
     mat.lcd.emissiveIntensity = on ? 0.75 : 0.1;
+    panelTex.setActive(on);
   };
   setReefer(reeferOn);
   panelTex.setSetpoint(o.setpoint);
@@ -965,7 +1171,9 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
         ? (m as THREE.InstancedMesh).count
         : 1;
       const g = m.geometry;
-      const t = g.index ? g.index.count / 3 : (g.attributes.position?.count ?? 0) / 3;
+      const t = g.index
+        ? g.index.count / 3
+        : (g.attributes.position?.count ?? 0) / 3;
       const tri = Math.round(t * inst);
       triangles += tri;
       a.meshes++;
@@ -1034,8 +1242,16 @@ export function createRAPContainer(options: Partial<BuildOptions> = {}): RAPCont
       });
       mats.forEach((m) => {
         const rec = m as unknown as Record<string, unknown>;
-        for (const k of ["map", "normalMap", "roughnessMap", "emissiveMap", "aoMap", "metalnessMap"]) {
-          if (rec[k] instanceof THREE.Texture) texs.add(rec[k] as THREE.Texture);
+        for (const k of [
+          "map",
+          "normalMap",
+          "roughnessMap",
+          "emissiveMap",
+          "aoMap",
+          "metalnessMap",
+        ]) {
+          if (rec[k] instanceof THREE.Texture)
+            texs.add(rec[k] as THREE.Texture);
         }
         m.dispose();
       });

@@ -8,7 +8,12 @@
  *  then add a single entry here. No viewer, exporter or UI logic changes.
  * ============================================================================
  */
-import type { ContainerBase, ContainerStats, FinishId, ViewerContainer } from "./primitives";
+import type {
+  ContainerBase,
+  ContainerStats,
+  FinishId,
+  ViewerContainer,
+} from "./primitives";
 import { AKE_DIMENSIONS, createAKEContainer } from "./akeLD3";
 import { RKN_DIMENSIONS, createRKNContainer } from "./rkn";
 import { RAP_DIMENSIONS, createRAPContainer } from "./rap";
@@ -45,7 +50,22 @@ export interface ModelInfo {
     height: number;
     /** width at the top of the envelope (differs from width only on the AKE) */
     topWidth: number;
+    /** nominal netted cargo build height above a pallet deck, if applicable */
+    contourHeight?: number;
   };
+  /** generator module shown by the in-app source inspector */
+  sourceFile: string;
+  /** model-specific capability line for the status marquee */
+  featureLabel: string;
+  /** numeric ratings shared by the specification sheet and 3-D data plates */
+  ratings: {
+    tareKg: number;
+    maxGrossKg: number;
+    payloadKg: number;
+    volumeM3: number;
+  };
+  /** certified controller range for active refrigeration models */
+  setpointRange?: { min: number; max: number; default: number };
   /** does the contour toggle apply to this model? */
   contourOption: boolean;
   /** does the refrigeration panel apply to this model? */
@@ -77,6 +97,9 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     reeferOption: false,
     palletOption: false,
     volumeLabel: "4.3 m³ · 152 ft³",
+    sourceFile: "akeLD3.ts",
+    featureLabel: "cam-latch plug door · 112° swing",
+    ratings: { tareKg: 92, maxGrossKg: 1588, payloadKg: 1496, volumeM3: 4.3 },
     specs: [
       { k: "Upper contour", v: "2.01 m", tone: "steel" },
       { k: "Taper angle", v: "16.5°", tone: "steel" },
@@ -85,7 +108,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Max gross", v: "1588 kg", tone: "amber" },
       { k: "Net payload", v: "1496 kg" },
     ],
-    build: (o) => createAKEContainer(o) as unknown as ViewerContainer,
+    build: (o) => createAKEContainer(o),
   },
   rkn: {
     id: "rkn",
@@ -104,6 +127,10 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     reeferOption: true,
     palletOption: false,
     volumeLabel: "3.6 m³ internal",
+    sourceFile: "rkn.ts",
+    featureLabel: "active reefer · condenser fan · live setpoint",
+    ratings: { tareKg: 285, maxGrossKg: 3500, payloadKg: 3215, volumeM3: 3.6 },
+    setpointRange: { min: -25, max: 25, default: -18 },
     specs: [
       { k: "Section", v: "uniform cuboid", tone: "steel" },
       { k: "Taper angle", v: "0.0° — no slope", tone: "steel" },
@@ -112,7 +139,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Tare mass", v: "285 kg" },
       { k: "Max gross", v: "3500 kg", tone: "amber" },
     ],
-    build: (o) => createRKNContainer(o) as unknown as ViewerContainer,
+    build: (o) => createRKNContainer(o),
   },
   rap: {
     id: "rap",
@@ -131,6 +158,10 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     reeferOption: true,
     palletOption: false,
     volumeLabel: "6.6 m³ internal",
+    sourceFile: "rap.ts",
+    featureLabel: "twin-fan climate unit · glycol service ports",
+    ratings: { tareKg: 450, maxGrossKg: 6033, payloadKg: 5583, volumeM3: 6.6 },
+    setpointRange: { min: -20, max: 30, default: 4 },
     specs: [
       { k: "Section", v: "uniform cuboid", tone: "steel" },
       { k: "Taper angle", v: "0.0° — no slope", tone: "steel" },
@@ -139,7 +170,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Tare mass", v: "450 kg" },
       { k: "Max gross", v: "6033 kg", tone: "amber" },
     ],
-    build: (o) => createRAPContainer(o) as unknown as ViewerContainer,
+    build: (o) => createRAPContainer(o),
   },
   pmc: {
     id: "pmc",
@@ -153,20 +184,27 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       depth: PMC_DIMENSIONS.depth,
       height: PMC_DIMENSIONS.thickness,
       topWidth: PMC_DIMENSIONS.width,
+      contourHeight: PMC_DIMENSIONS.contourHeight,
     },
     contourOption: false,
     reeferOption: false,
     palletOption: true,
     volumeLabel: "12.6 m³ netted contour",
+    sourceFile: "pmc.ts",
+    featureLabel: "96 × 125 in pallet · 62 mm seat-track pitch",
+    ratings: { tareKg: 120, maxGrossKg: 6804, payloadKg: 6684, volumeM3: 12.6 },
     specs: [
       { k: "Section", v: "flat plate, 50 mm", tone: "steel" },
       { k: "Taper angle", v: "0.0° — flat", tone: "steel" },
-      { k: "Cargo contour", v: `1.62 m · ${(PMC_DIMENSIONS.width * PMC_DIMENSIONS.depth * 1.62).toFixed(1)} m³` },
+      {
+        k: "Cargo contour",
+        v: `1.62 m · ${(PMC_DIMENSIONS.width * PMC_DIMENSIONS.depth * 1.62).toFixed(1)} m³`,
+      },
       { k: "Seat tracks", v: "4 continuous, 62 mm pitch", tone: "amber" },
       { k: "Tare mass", v: "120 kg" },
       { k: "Max gross", v: "6804 kg", tone: "amber" },
     ],
-    build: (o) => createPMCContainer(o) as unknown as ViewerContainer,
+    build: (o) => createPMCContainer(o),
   },
 };
 
@@ -178,7 +216,9 @@ export interface ReeferControls {
 
 export type ContainerWithOptionalReefer = ContainerBase & ReeferControls;
 
-export function isReefer(c: ContainerBase | null): c is ContainerWithOptionalReefer {
+export function isReefer(
+  c: ContainerBase | null,
+): c is ContainerWithOptionalReefer {
   return !!c && typeof (c as ReeferControls).setReefer === "function";
 }
 

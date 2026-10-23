@@ -111,7 +111,12 @@ export const ULD_CONSTANTS = {
  * builds the same exploded-view structure.
  */
 export function assemblyFactory(root: THREE.Group, out: Assembly[]) {
-  return (id: string, label: string, note: string, dir: [number, number, number]) => {
+  return (
+    id: string,
+    label: string,
+    note: string,
+    dir: [number, number, number],
+  ) => {
     const g = new THREE.Group();
     g.name = label;
     root.add(g);
@@ -187,9 +192,16 @@ export function roundedShape(pts: V2[], radius: number): THREE.Shape {
 }
 
 /** Ring-shaped section: outer polygon with a concentric inner hole. */
-export function ringSection(outer: V2[], inner: V2[], rOuter: number, rInner: number) {
+export function ringSection(
+  outer: V2[],
+  inner: V2[],
+  rOuter: number,
+  rInner: number,
+) {
   const shape = roundedShape(outer, rOuter);
-  shape.holes.push(new THREE.Path(roundedShape(inner, rInner).getPoints(40).reverse()));
+  shape.holes.push(
+    new THREE.Path(roundedShape(inner, rInner).getPoints(40).reverse()),
+  );
   return shape;
 }
 
@@ -232,7 +244,8 @@ export function cornerRailSection(
   const a1 = Math.atan2(T1.y - C.y, T1.x - C.x);
   const a2 = Math.atan2(T2.y - C.y, T2.x - C.x);
   const am = Math.atan2(P.y - C.y, P.x - C.x); // arc mid-point faces the corner
-  const norm = (v: number) => ((v % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const norm = (v: number) =>
+    ((v % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   const ccw = norm(am - a1) < norm(a2 - a1); // does a CCW sweep pass through am?
 
   const s = new THREE.Shape();
@@ -242,7 +255,14 @@ export function cornerRailSection(
   s.lineTo(E2.x, E2.y);
   s.lineTo(E2i.x, E2i.y);
   s.lineTo(i2.x, i2.y);
-  s.absarc(C.x, C.y, Ri, Math.atan2(i2.y - C.y, i2.x - C.x), Math.atan2(i1.y - C.y, i1.x - C.x), ccw);
+  s.absarc(
+    C.x,
+    C.y,
+    Ri,
+    Math.atan2(i2.y - C.y, i2.x - C.x),
+    Math.atan2(i1.y - C.y, i1.x - C.x),
+    ccw,
+  );
   s.lineTo(i1.x, i1.y);
   s.lineTo(E1i.x, E1i.y);
   s.closePath();
@@ -321,7 +341,17 @@ export function decal(
   mat: THREE.Material,
   part: string,
 ) {
-  const m = wallBox(mat, w, h, 0.0006, normal, new THREE.Vector3(0, 1, 0), at, part, 0.0002);
+  const m = wallBox(
+    mat,
+    w,
+    h,
+    0.0006,
+    normal,
+    new THREE.Vector3(0, 1, 0),
+    at,
+    part,
+    0.0002,
+  );
   m.castShadow = false;
   m.receiveShadow = false;
   return m;
@@ -335,7 +365,12 @@ export class RivetRun {
   private s = new THREE.Vector3(1, 0.55, 1);
 
   /** A run of rivets from a to b, sitting on the surface offset by `normal`. */
-  line(a: THREE.Vector3, b: THREE.Vector3, normal: THREE.Vector3, spacing = 0.13) {
+  line(
+    a: THREE.Vector3,
+    b: THREE.Vector3,
+    normal: THREE.Vector3,
+    spacing = 0.13,
+  ) {
     const len = a.distanceTo(b);
     const count = Math.max(2, Math.round(len / spacing));
     const dir = b.clone().sub(a).normalize();

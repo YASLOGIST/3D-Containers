@@ -16,6 +16,11 @@ import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture } from "./textures";
 
+const reducedMotionPreferred = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export type MoodId = "hangar" | "dusk" | "studio";
 
 export interface ViewerState {
@@ -55,7 +60,7 @@ export const DEFAULT_STATE: ViewerState = {
   envIntensity: 1,
   wireframe: false,
   dimensions: true,
-  autoRotate: true,
+  autoRotate: !reducedMotionPreferred(),
   mood: "hangar",
   reefer: true,
   setpoint: -18,
@@ -166,6 +171,16 @@ export class AKEViewer {
   private elapsed = 0;
   private intro = 0;
   private disposed = false;
+  private reducedMotion = false;
+  private baseDpr = 1;
+  private dprScale = 1;
+  private lowFpsTime = 0;
+  private recoveredTime = 0;
+  private pickTimer = 0;
+  private homeTarget = new THREE.Vector3(0, 0.72, 0);
+  private homeCamera = new THREE.Vector3(4.4, 2.9, 4.6);
+  private introFrom = new THREE.Vector3();
+  private readonly introTo = new THREE.Vector3();
   private ro: ResizeObserver;
 
   constructor(
@@ -175,13 +190,19 @@ export class AKEViewer {
       onHover?: (h: HoverInfo | null) => void;
       onPerf?: (p: PerfInfo) => void;
       onBuild?: (c: ViewerContainer) => void;
+      onError?: (message: string | null) => void;
     } = {},
   ) {
     this.host = host;
     this.state = { ...state };
+    this.reducedMotion = reducedMotionPreferred();
+    this.baseDpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
+    this.renderer.setPixelRatio(this.baseDpr);
     this.renderer.setSize(host.clientWidth || 800, host.clientHeight || 600);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -190,6 +211,8 @@ export class AKEViewer {
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
     this.renderer.domElement.style.touchAction = "none";
+    this.renderer.domElement.tabIndex = 0;
+    this.renderer.domElement.setAttribute("role", "application");
     host.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(38, this.aspect(), 0.05, 120);
@@ -200,9 +223,10 @@ export class AKEViewer {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
     this.controls.minDistance = 1.4;
-    this.controls.maxDistance = 14;
+    this.controls.maxDistance = 18;
     this.controls.maxPolarAngle = Math.PI * 0.495;
     this.controls.autoRotateSpeed = 0.55;
+    this.controls.listenToKeyEvents(this.renderer.domElement);
 
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
     this.buildLights();
@@ -210,7 +234,11 @@ export class AKEViewer {
 
     this.highlightBox = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
-      new THREE.LineBasicMaterial({ color: "#ffb020", transparent: true, opacity: 0.9 }),
+      new THREE.LineBasicMaterial({
+        color: "#ffb020",
+        transparent: true,
+        opacity: 0.9,
+      }),
     );
     this.highlightBox.visible = false;
     this.highlightBox.renderOrder = 998;
@@ -229,9 +257,21 @@ export class AKEViewer {
     const el = this.renderer.domElement;
     el.addEventListener("pointermove", this.onPointerMove);
     el.addEventListener("pointerleave", this.onPointerLeave);
+    el.addEventListener("webglcontextlost", this.onContextLost);
+    el.addEventListener("webglcontextrestored", this.onContextRestored);
 
-    this.intro = 1;
-    this.camera.position.set(6.6, 4.6, 7.4);
+    this.updateHomePose();
+    this.introTo.copy(this.homeCamera);
+    this.introFrom
+      .copy(this.homeCamera)
+      .sub(this.homeTarget)
+      .multiplyScalar(1.34)
+      .add(this.homeTarget)
+      .add(new THREE.Vector3(0, 0.24, 0));
+    this.intro = this.reducedMotion ? 0 : 1;
+    this.controls.target.copy(this.homeTarget);
+    this.camera.position.copy(this.intro > 0 ? this.introFrom : this.introTo);
+    this.updateCanvasLabel();
     this.loop();
   }
 
@@ -287,7 +327,10 @@ export class AKEViewer {
       metalness: 0.06,
       envMapIntensity: 0.35,
     });
-    this.floor = new THREE.Mesh(new THREE.CircleGeometry(18, 96), this.floorMat);
+    this.floor = new THREE.Mesh(
+      new THREE.CircleGeometry(18, 96),
+      this.floorMat,
+    );
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
@@ -334,23 +377,14 @@ export class AKEViewer {
 
   /* ---------------- model lifecycle ---------------- */
 
-  rebuild() {
+  rebuild(refitCamera = false) {
+    this.highlight(null);
     if (this.container) {
       this.modelRoot.remove(this.container.group);
       this.container.dispose();
       this.container = null;
     }
-    if (this.annot) {
-      this.scene.remove(this.annot.group);
-      this.annot.group.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.geometry) m.geometry.dispose();
-        const mm = m.material as THREE.Material | THREE.Material[] | undefined;
-        if (Array.isArray(mm)) mm.forEach((x) => x.dispose());
-        else if (mm) mm.dispose();
-      });
-      this.annot = null;
-    }
+    this.disposeAnnotations();
 
     const spec = MODELS[this.state.model];
     this.container = spec.build({
@@ -369,16 +403,69 @@ export class AKEViewer {
 
     const x0 = this.container.profile[0].x;
     this.annot = createAnnotations({
+      code: spec.code,
       baseWidth: spec.dims.width,
       baseLength: spec.dims.depth,
       height: spec.dims.height,
-      topWidth: this.state.contour ? spec.dims.topWidth : spec.dims.width,
+      topWidth:
+        spec.contourOption && this.state.contour
+          ? spec.dims.topWidth
+          : spec.dims.width,
+      contourHeight: spec.dims.contourHeight,
       x0,
+      contour: spec.contourOption && this.state.contour,
+      kind: spec.palletOption
+        ? "pallet"
+        : spec.contourOption
+          ? "contoured"
+          : "cuboid",
     });
     this.annot.group.visible = this.state.dimensions;
     this.scene.add(this.annot.group);
 
+    this.updateCanvasLabel();
+    this.updateHomePose();
+    if (refitCamera) this.flyToPose(this.homeTarget, this.homeCamera);
     this.cb.onBuild?.(this.container);
+  }
+
+  private disposeAnnotations() {
+    if (!this.annot) return;
+    this.scene.remove(this.annot.group);
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
+    this.annot.group.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.isMesh && mesh.geometry) geometries.add(mesh.geometry);
+      const line = obj as THREE.Line;
+      if (line.isLine && line.geometry) geometries.add(line.geometry);
+      const mm = (obj as THREE.Mesh).material as
+        | THREE.Material
+        | THREE.Material[]
+        | undefined;
+      if (Array.isArray(mm)) mm.forEach((m) => materials.add(m));
+      else if (mm) materials.add(mm);
+    });
+    materials.forEach((material) => {
+      const rec = material as unknown as Record<string, unknown>;
+      for (const key of ["map", "alphaMap"]) {
+        const value = rec[key];
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+      material.dispose();
+    });
+    geometries.forEach((geometry) => geometry.dispose());
+    textures.forEach((texture) => texture.dispose());
+    this.annot = null;
+  }
+
+  private updateCanvasLabel() {
+    const spec = MODELS[this.state.model];
+    this.renderer.domElement.setAttribute(
+      "aria-label",
+      `${spec.name} interactive 3D model. Drag to orbit, scroll to zoom, or focus the canvas and use arrow keys to pan.`,
+    );
   }
 
   private eachMaterial(fn: (m: THREE.Material) => void) {
@@ -398,7 +485,8 @@ export class AKEViewer {
       const std = m as THREE.MeshStandardMaterial;
       if ("wireframe" in std) std.wireframe = this.state.wireframe;
       std.envMapIntensity =
-        (std.userData.baseEnv ??= std.envMapIntensity ?? 1) * this.state.envIntensity;
+        (std.userData.baseEnv ??= std.envMapIntensity ?? 1) *
+        this.state.envIntensity;
     });
   }
 
@@ -420,7 +508,7 @@ export class AKEViewer {
     if (patch.mood && patch.mood !== prev.mood) this.applyMood(patch.mood);
 
     if (patch.model && patch.model !== prev.model) {
-      this.rebuild();
+      this.rebuild(true);
       this.setSurface(this.state.metalness, this.state.roughness);
       return;
     }
@@ -438,7 +526,8 @@ export class AKEViewer {
     if (patch.finish) this.container?.setFinish(patch.finish);
     if (patch.door !== undefined) this.container?.setDoorOpen(patch.door);
     if (patch.explode !== undefined) this.applyExplode();
-    if (patch.dimensions !== undefined && this.annot) this.annot.group.visible = patch.dimensions;
+    if (patch.dimensions !== undefined && this.annot)
+      this.annot.group.visible = patch.dimensions;
     if (
       patch.wireframe !== undefined ||
       patch.envIntensity !== undefined ||
@@ -446,11 +535,17 @@ export class AKEViewer {
     ) {
       this.applyMaterialState();
     }
-    if (patch.metalness !== undefined || patch.roughness !== undefined || patch.finish) {
+    if (
+      patch.metalness !== undefined ||
+      patch.roughness !== undefined ||
+      patch.finish
+    ) {
       this.setSurface(this.state.metalness, this.state.roughness);
     }
-    if (patch.reefer !== undefined) reeferOf(this.container)?.setReefer?.(patch.reefer);
-    if (patch.setpoint !== undefined) reeferOf(this.container)?.setSetpoint?.(patch.setpoint);
+    if (patch.reefer !== undefined)
+      reeferOf(this.container)?.setReefer?.(patch.reefer);
+    if (patch.setpoint !== undefined)
+      reeferOf(this.container)?.setSetpoint?.(patch.setpoint);
     if (patch.load !== undefined) this.container?.setLoad?.(patch.load);
   }
 
@@ -490,14 +585,19 @@ export class AKEViewer {
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
       this.highlightTag = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }),
+        new THREE.SpriteMaterial({
+          map: tex,
+          depthTest: false,
+          transparent: true,
+        }),
       );
       this.highlightTag.scale.set(0.62, 0.12, 1);
       this.highlightTag.renderOrder = 999;
       this.highlightTag.userData.isAnnotation = true;
       this.scene.add(this.highlightTag);
     }
-    const cv = (this.highlightTag.material as THREE.SpriteMaterial).map!.image as HTMLCanvasElement;
+    const cv = (this.highlightTag.material as THREE.SpriteMaterial).map!
+      .image as HTMLCanvasElement;
     const ctx = cv.getContext("2d")!;
     ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.fillStyle = "rgba(255,176,32,0.14)";
@@ -509,60 +609,151 @@ export class AKEViewer {
     ctx.font = "600 40px 'Chakra Petch', sans-serif";
     ctx.textBaseline = "middle";
     ctx.fillText(a.label.toUpperCase(), 20, 50);
-    (this.highlightTag.material as THREE.SpriteMaterial).map!.needsUpdate = true;
+    (this.highlightTag.material as THREE.SpriteMaterial).map!.needsUpdate =
+      true;
     this.highlightTag.visible = true;
     this.highlightTag.position.set(center.x, box.max.y + 0.16, center.z);
   }
 
-  focus(assemblyId: string | null) {
-    if (!this.container) return;
-    const target = new THREE.Vector3(0, 0.72, 0);
-    let dist = 4.6;
-    if (assemblyId) {
-      const a = this.container.assemblies.find((x) => x.id === assemblyId);
-      if (a) {
-        const box = new THREE.Box3().setFromObject(a.group);
-        box.getCenter(target);
-        dist = Math.max(box.getSize(new THREE.Vector3()).length() * 1.5, 1.6);
-      }
-    }
-    this.flyTo(target, dist);
-  }
-
-  private flyTo(target: THREE.Vector3, distance: number) {
-    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
-    this.tweenCam = {
-      t: 0,
-      fromTarget: this.controls.target.clone(),
-      toTarget: target.clone(),
-      fromPos: this.camera.position.clone(),
-      toPos: target.clone().addScaledVector(dir, distance),
-    };
-  }
   private tweenCam: {
     t: number;
+    duration: number;
     fromTarget: THREE.Vector3;
     toTarget: THREE.Vector3;
     fromPos: THREE.Vector3;
     toPos: THREE.Vector3;
   } | null = null;
 
-  frameAll() {
-    this.flyTo(new THREE.Vector3(0, 0.72, 0), 4.8);
+  /** Bounds of the active generated model, not the dimension furniture. */
+  private modelBox() {
+    const fallback = new THREE.Box3(
+      new THREE.Vector3(-1, 0, -1),
+      new THREE.Vector3(1, 1.6, 1),
+    );
+    if (!this.container) return fallback;
+    const box = new THREE.Box3().setFromObject(this.container.group);
+    return box.isEmpty() ? fallback : box;
   }
 
-  setView(v: "front" | "top" | "contour" | "iso") {
-    const t = new THREE.Vector3(0, 0.72, 0);
-    const pos =
-      v === "front"
-        ? new THREE.Vector3(0.1, 0.85, 5.2)
-        : v === "top"
-          ? new THREE.Vector3(0.05, 6.2, 0.35)
-          : v === "contour"
-            ? new THREE.Vector3(5.1, 1.25, 0.25)
-            : new THREE.Vector3(3.5, 2.3, 3.9);
-    this.tweenCam = { t: 0, fromTarget: this.controls.target.clone(), toTarget: t, fromPos: this.camera.position.clone(), toPos: pos };
+  /** Perspective distance that fits a bounding sphere in both view axes. */
+  private fitDistance(box: THREE.Box3, margin = 1.1) {
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const horizontalFov =
+      2 *
+      Math.atan(Math.tan(verticalFov / 2) * Math.max(this.camera.aspect, 0.1));
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const distance = (sphere.radius / Math.sin(limitingFov / 2)) * margin;
+    return THREE.MathUtils.clamp(
+      distance,
+      this.controls.minDistance + 0.05,
+      this.controls.maxDistance - 0.05,
+    );
   }
+
+  private currentDirection() {
+    const dir = this.camera.position.clone().sub(this.controls.target);
+    return dir.lengthSq() > 1e-8
+      ? dir.normalize()
+      : new THREE.Vector3(0.62, 0.42, 0.78).normalize();
+  }
+
+  /** Recompute the home pose whenever the generated envelope changes. */
+  private updateHomePose() {
+    const box = this.modelBox();
+    const target = box.getCenter(new THREE.Vector3());
+    const dir = new THREE.Vector3(0.62, 0.42, 0.78).normalize();
+    this.homeTarget.copy(target);
+    this.homeCamera
+      .copy(target)
+      .addScaledVector(dir, this.fitDistance(box, 1.18));
+  }
+
+  private flyToPose(
+    target: THREE.Vector3,
+    position: THREE.Vector3,
+    duration = 0.85,
+  ) {
+    if (duration <= 0 || this.reducedMotion) {
+      this.controls.target.copy(target);
+      this.camera.position.copy(position);
+      this.tweenCam = null;
+      return;
+    }
+    this.tweenCam = {
+      t: 0,
+      duration,
+      fromTarget: this.controls.target.clone(),
+      toTarget: target.clone(),
+      fromPos: this.camera.position.clone(),
+      toPos: position.clone(),
+    };
+  }
+
+  focus(assemblyId: string | null) {
+    if (!assemblyId) {
+      this.frameAll();
+      return;
+    }
+    const assembly = this.container?.assemblies.find(
+      (a) => a.id === assemblyId,
+    );
+    if (!assembly) return;
+    const box = new THREE.Box3().setFromObject(assembly.group);
+    if (box.isEmpty()) return;
+    const target = box.getCenter(new THREE.Vector3());
+    const dir = this.currentDirection();
+    const position = target
+      .clone()
+      .addScaledVector(dir, this.fitDistance(box, 1.42));
+    this.flyToPose(target, position);
+  }
+
+  frameAll() {
+    const box = this.modelBox();
+    const target = box.getCenter(new THREE.Vector3());
+    const dir = this.currentDirection();
+    const position = target
+      .clone()
+      .addScaledVector(dir, this.fitDistance(box, 1.18));
+    this.flyToPose(target, position);
+  }
+
+  setView(view: "front" | "top" | "contour" | "iso") {
+    const box = this.modelBox();
+    const target = box.getCenter(new THREE.Vector3());
+    const dir =
+      view === "front"
+        ? new THREE.Vector3(0.02, 0.06, 1)
+        : view === "top"
+          ? new THREE.Vector3(0.02, 1, 0.06)
+          : view === "contour"
+            ? new THREE.Vector3(1, 0.08, 0.04)
+            : new THREE.Vector3(0.62, 0.42, 0.78);
+    dir.normalize();
+    const position = target
+      .clone()
+      .addScaledVector(dir, this.fitDistance(box, 1.18));
+    this.flyToPose(target, position);
+  }
+
+  private onContextLost = (event: Event) => {
+    event.preventDefault();
+    this.cb.onError?.(
+      "WebGL context lost — waiting for the browser to restore it",
+    );
+  };
+
+  private onContextRestored = () => {
+    // PMREM outputs are context-owned; regenerate them after driver recovery.
+    this.skyEnvs.forEach((texture) => texture.dispose());
+    this.skyEnvs.clear();
+    this.roomEnv?.dispose();
+    this.roomEnv = null;
+    this.applyMood(this.state.mood);
+    this.applyMaterialState();
+    this.cb.onError?.(null);
+  };
 
   /* ---------------- picking ---------------- */
 
@@ -573,6 +764,7 @@ export class AKEViewer {
       -((e.clientY - r.top) / r.height) * 2 + 1,
     );
     this.pointerActive = true;
+    this.pickTimer = 0;
   };
 
   private onPointerLeave = () => {
@@ -581,7 +773,11 @@ export class AKEViewer {
   };
 
   private setHover(h: HoverInfo | null) {
-    if (h?.part === this.hovered?.part && h?.assemblyId === this.hovered?.assemblyId) return;
+    if (
+      h?.part === this.hovered?.part &&
+      h?.assemblyId === this.hovered?.assemblyId
+    )
+      return;
     this.hovered = h;
     this.renderer.domElement.style.cursor = h ? "crosshair" : "grab";
     this.cb.onHover?.(h);
@@ -595,7 +791,9 @@ export class AKEViewer {
     }
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObject(this.container.group, true);
-    const hit = hits.find((h) => h.object.visible && (h.object as THREE.Mesh).isMesh);
+    const hit = hits.find(
+      (h) => h.object.visible && (h.object as THREE.Mesh).isMesh,
+    );
     if (!hit) {
       this.setHover(null);
       return;
@@ -608,8 +806,9 @@ export class AKEViewer {
       o = o.parent;
     }
     this.setHover({
-      part: (hit.object.userData.part as string) ?? hit.object.name ?? "Component",
-      assembly: assembly?.label ?? "AKE / LD-3",
+      part:
+        (hit.object.userData.part as string) ?? hit.object.name ?? "Component",
+      assembly: assembly?.label ?? MODELS[this.state.model].name,
       assemblyId: assembly?.id ?? "",
     });
   }
@@ -626,19 +825,40 @@ export class AKEViewer {
       this.intro = Math.max(0, this.intro - dt / 1.9);
       const k = 1 - this.intro;
       const e = 1 - Math.pow(1 - k, 3);
-      this.camera.position.lerpVectors(new THREE.Vector3(6.6, 4.6, 7.4), new THREE.Vector3(4.4, 2.9, 4.6), e);
+      this.camera.position.lerpVectors(this.introFrom, this.introTo, e);
     } else if (this.tweenCam) {
-      this.tweenCam.t = Math.min(1, this.tweenCam.t + dt / 0.85);
+      this.tweenCam.t = Math.min(
+        1,
+        this.tweenCam.t + dt / this.tweenCam.duration,
+      );
       const e = 1 - Math.pow(1 - this.tweenCam.t, 3);
-      this.controls.target.lerpVectors(this.tweenCam.fromTarget, this.tweenCam.toTarget, e);
-      this.camera.position.lerpVectors(this.tweenCam.fromPos, this.tweenCam.toPos, e);
+      this.controls.target.lerpVectors(
+        this.tweenCam.fromTarget,
+        this.tweenCam.toTarget,
+        e,
+      );
+      this.camera.position.lerpVectors(
+        this.tweenCam.fromPos,
+        this.tweenCam.toPos,
+        e,
+      );
       if (this.tweenCam.t >= 1) this.tweenCam = null;
     }
 
-    this.controls.autoRotate = this.state.autoRotate && this.intro === 0 && !this.tweenCam;
+    this.controls.autoRotate =
+      this.state.autoRotate &&
+      !this.reducedMotion &&
+      this.intro === 0 &&
+      !this.tweenCam;
     this.controls.update();
-    this.pick();
-    this.container?.animate?.(this.elapsed, dt);
+
+    // Picking is bounded to ~20 Hz; it is unnecessary work at display rate.
+    this.pickTimer -= dt;
+    if (this.pointerActive && this.pickTimer <= 0) {
+      this.pick();
+      this.pickTimer = 0.05;
+    }
+    if (!this.reducedMotion) this.container?.animate?.(this.elapsed, dt);
 
     const mat = this.highlightBox.material as THREE.LineBasicMaterial;
     if (this.highlightBox.visible) {
@@ -646,7 +866,9 @@ export class AKEViewer {
       const key = `${this.highlighted}|${this.state.explode.toFixed(2)}|${this.state.door.toFixed(2)}`;
       if (key !== this.highlightKey && this.highlighted && this.container) {
         this.highlightKey = key;
-        const a = this.container.assemblies.find((x) => x.id === this.highlighted);
+        const a = this.container.assemblies.find(
+          (x) => x.id === this.highlighted,
+        );
         if (a) this.frameAssemblyBox(a);
       }
     }
@@ -656,15 +878,42 @@ export class AKEViewer {
     this.frames++;
     this.acc += dt;
     if (this.acc > 0.5) {
+      const fps = Math.round(this.frames / this.acc);
       this.cb.onPerf?.({
-        fps: Math.round(this.frames / this.acc),
+        fps,
         triangles: this.renderer.info.render.triangles,
         calls: this.renderer.info.render.calls,
       });
+      this.adaptResolution(fps, this.acc);
       this.frames = 0;
       this.acc = 0;
     }
   };
+
+  /** Deliberately hysteretic DPR control: stable quality, no visible hunting. */
+  private adaptResolution(fps: number, sampleSeconds: number) {
+    if (document.hidden || this.baseDpr <= 1) return;
+    if (fps < 42) {
+      this.lowFpsTime += sampleSeconds;
+      this.recoveredTime = 0;
+    } else if (fps > 55) {
+      this.recoveredTime += sampleSeconds;
+      this.lowFpsTime = 0;
+    } else {
+      this.lowFpsTime = 0;
+      this.recoveredTime = 0;
+    }
+
+    if (this.lowFpsTime > 1.5 && this.dprScale > 0.65) {
+      this.dprScale = Math.max(0.65, this.dprScale - 0.15);
+      this.lowFpsTime = 0;
+      this.resize();
+    } else if (this.recoveredTime > 8 && this.dprScale < 1) {
+      this.dprScale = Math.min(1, this.dprScale + 0.1);
+      this.recoveredTime = 0;
+      this.resize();
+    }
+  }
 
   private resize = () => {
     const w = this.host.clientWidth;
@@ -672,7 +921,7 @@ export class AKEViewer {
     if (!w || !h) return;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this.baseDpr * this.dprScale);
     this.renderer.setSize(w, h, false);
   };
 
@@ -697,7 +946,9 @@ export class AKEViewer {
   }
 
   exportSTL(): DataView {
-    return new STLExporter().parse(this.exportRoot(), { binary: true }) as DataView;
+    return new STLExporter().parse(this.exportRoot(), {
+      binary: true,
+    }) as DataView;
   }
 
   /** Measured envelope of the generated solid. */
@@ -715,8 +966,11 @@ export class AKEViewer {
     const el = this.renderer.domElement;
     el.removeEventListener("pointermove", this.onPointerMove);
     el.removeEventListener("pointerleave", this.onPointerLeave);
+    el.removeEventListener("webglcontextlost", this.onContextLost);
+    el.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.controls.dispose();
     this.container?.dispose();
+    this.disposeAnnotations();
     this.skyBgs.forEach((t) => t.dispose());
     this.skyEnvs.forEach((t) => t.dispose());
     this.roomEnv?.dispose();
@@ -725,8 +979,13 @@ export class AKEViewer {
     this.floorMat.dispose();
     this.highlightBox.geometry.dispose();
     (this.highlightBox.material as THREE.Material).dispose();
+    if (this.highlightTag) {
+      (this.highlightTag.material as THREE.SpriteMaterial).map?.dispose();
+      (this.highlightTag.material as THREE.Material).dispose();
+    }
     this.pmrem.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     if (el.parentElement) el.parentElement.removeChild(el);
   }
 }

@@ -12,8 +12,8 @@
   --color-line: #2a323b;
   --color-line-soft: #1f262d;
   --color-ink: #e8ecef;
-  --color-mute: #94a0ab;
-  --color-dim: #65717c;
+  --color-mute: #a7b2bc;
+  --color-dim: #84919d;
 
   --color-amber: #ffb020;
   --color-amber-deep: #c2790a;
@@ -43,12 +43,52 @@
     background: var(--color-amber);
     color: #101316;
   }
+
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+  }
+
+  .range-uld:focus-visible {
+    outline-offset: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .marquee-track {
+    transform: none !important;
+  }
+
+  .blink {
+    opacity: 1 !important;
+  }
 }
 
 @layer utilities {
   .panel-surface {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 42%),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.045),
+        rgba(255, 255, 255, 0) 42%
+      ),
       linear-gradient(180deg, #171c22 0%, #11151a 100%);
     border: 1px solid var(--color-line);
     box-shadow:

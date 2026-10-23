@@ -3,15 +3,29 @@ import * as THREE from "three";
 
 import akeSource from "./three/akeLD3.ts?raw";
 import rknSource from "./three/rkn.ts?raw";
+import rapSource from "./three/rap.ts?raw";
+import pmcSource from "./three/pmc.ts?raw";
 import primitivesSource from "./three/primitives.ts?raw";
 import viewerSource from "./three/AKEViewer.ts?raw";
 import textureSource from "./three/textures.ts?raw";
+import modelsSource from "./three/models.ts?raw";
+import annotationsSource from "./three/annotations.ts?raw";
 
-import { AKEViewer, DEFAULT_STATE, type HoverInfo, type ViewerState } from "@/three/AKEViewer";
+import {
+  AKEViewer,
+  DEFAULT_STATE,
+  type HoverInfo,
+  type ViewerState,
+} from "@/three/AKEViewer";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
 import { ControlDeck } from "@/components/ControlDeck";
-import { PartsList, SourcePanel, SpecSheet, type Stats } from "@/components/Panels";
+import {
+  PartsList,
+  SourcePanel,
+  SpecSheet,
+  type Stats,
+} from "@/components/Panels";
 import { Btn, Chip, Panel } from "@/components/ui";
 import { downloadBlob, downloadText } from "@/lib/io";
 import { cn } from "@/utils/cn";
@@ -19,11 +33,67 @@ import { cn } from "@/utils/cn";
 const SOURCES = {
   "akeLD3.ts": akeSource,
   "rkn.ts": rknSource,
+  "rap.ts": rapSource,
+  "pmc.ts": pmcSource,
+  "models.ts": modelsSource,
   "primitives.ts": primitivesSource,
   "AKEViewer.ts": viewerSource,
   "textures.ts": textureSource,
+  "annotations.ts": annotationsSource,
 } as const;
+
 type SourceName = keyof typeof SOURCES;
+
+const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
+  {
+    "akeLD3.ts": {
+      entry: "createAKEContainer()",
+      description:
+        "Contoured LD-3 generator: one offset polygon drives hull, frames, door and hardware.",
+    },
+    "rkn.ts": {
+      entry: "createRKNContainer()",
+      description:
+        "Uniform refrigerated LD-9 generator with articulated door and live controller artwork.",
+    },
+    "rap.ts": {
+      entry: "createRAPContainer()",
+      description:
+        "Full-width cold-chain generator with insulated panels and twin condenser fans.",
+    },
+    "pmc.ts": {
+      entry: "createPMCContainer()",
+      description:
+        "Main-deck pallet generator with seat tracks, underside structure and load contour.",
+    },
+    "models.ts": {
+      entry: "MODELS",
+      description:
+        "Declarative ULD registry: dimensions, ratings, controls and generator bindings.",
+    },
+    "primitives.ts": {
+      entry: "offsetPolygon / ringSection",
+      description:
+        "Shared CAD kernel, material palette, instanced rivets and container contract.",
+    },
+    "AKEViewer.ts": {
+      entry: "AKEViewer",
+      description:
+        "Renderer lifecycle, model-aware camera framing, lighting, picking and mesh exports.",
+    },
+    "textures.ts": {
+      entry: "makeBrushedMetal / makeReeferPanel",
+      description:
+        "Deterministic cached Canvas PBR maps, placards, stencils and controller readouts.",
+    },
+    "annotations.ts": {
+      entry: "createAnnotations()",
+      description:
+        "Model-aware 3D dimension furniture generated from registry measurements.",
+    },
+  };
+
+const isSourceName = (value: string): value is SourceName => value in SOURCES;
 
 type Tab = "spec" | "parts" | "source";
 
@@ -34,13 +104,19 @@ export default function App() {
   const [state, setState] = useState<ViewerState>(DEFAULT_STATE);
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
-  const [measured, setMeasured] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [measured, setMeasured] = useState<{
+    x: number;
+    y: number;
+    z: number;
+  } | null>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [perf, setPerf] = useState({ fps: 0, triangles: 0, calls: 0 });
   const [tab, setTab] = useState<Tab>("spec");
   const [source, setSource] = useState<SourceName>("akeLD3.ts");
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
 
@@ -51,22 +127,36 @@ export default function App() {
 
     const boot = () => {
       if (!live || !host.current) return;
-      v = new AKEViewer(host.current, DEFAULT_STATE, {
-        onBuild: (c) => {
-          setStats(c.stats as Stats);
-          setAssemblies([...c.assemblies]);
-          const box = new THREE.Box3().setFromObject(c.group);
-          const s = box.getSize(new THREE.Vector3());
-          setMeasured({ x: s.x, y: s.y, z: s.z });
-          setReady(true);
-        },
-        onHover: setHover,
-        onPerf: setPerf,
-      });
-      viewer.current = v;
+      try {
+        v = new AKEViewer(host.current, DEFAULT_STATE, {
+          onBuild: (c) => {
+            setStats(c.stats as Stats);
+            setAssemblies([...c.assemblies]);
+            const box = new THREE.Box3().setFromObject(c.group);
+            const size = box.getSize(new THREE.Vector3());
+            setMeasured({ x: size.x, y: size.y, z: size.z });
+            setError(null);
+            setReady(true);
+          },
+          onHover: setHover,
+          onPerf: setPerf,
+          onError: (message) => {
+            setError(message);
+            if (message) setReady(true);
+          },
+        });
+        viewer.current = v;
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? `WebGL could not start: ${cause.message}`
+            : "WebGL could not start on this device.",
+        );
+        setReady(true);
+      }
     };
 
-    // canvas-drawn placards need the webfonts resolved before the first bake
+    // Canvas-drawn placards need the webfonts resolved before the first bake.
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (fonts?.ready) fonts.ready.then(boot).catch(boot);
     else boot();
@@ -78,36 +168,65 @@ export default function App() {
     };
   }, []);
 
-  const patch = useCallback((p: Partial<ViewerState>) => {
-    setState((s) => ({ ...s, ...p }));
-    viewer.current?.setState(p);
+  const patch = useCallback((next: Partial<ViewerState>) => {
+    setState((s) => ({ ...s, ...next }));
+    viewer.current?.setState(next);
   }, []);
 
-  const notify = (msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast((t) => (t === msg ? null : t)), 2600);
+  const notify = (message: string) => {
+    setToast(message);
+    window.setTimeout(
+      () => setToast((current) => (current === message ? null : current)),
+      2600,
+    );
+  };
+
+  const selectModel = (id: ModelId) => {
+    const next = MODELS[id];
+    patch({
+      model: id,
+      setpoint: next.setpointRange?.default ?? state.setpoint,
+    });
+    if (isSourceName(next.sourceFile)) setSource(next.sourceFile);
+    setHighlight(null);
+    setHover(null);
   };
 
   /* ---------------- exports ---------------- */
   const doExport = async (kind: "glb" | "obj" | "stl") => {
     const v = viewer.current;
-    if (!v) return;
-    const stamp = `ake-ld3-${kind}`;
-    if (kind === "glb") {
-      const blob = await v.exportGLB();
-      downloadBlob(blob, `${stamp}.glb`);
-      notify(`GLB written · ${(blob.size / 1024).toFixed(0)} KB`);
-    } else if (kind === "obj") {
-      const text = v.exportOBJ();
-      downloadText(text, `${stamp}.obj`, "text/plain");
-      notify(`OBJ written · ${(text.length / 1024).toFixed(0)} KB`);
-    } else {
-      const data = v.exportSTL();
-      downloadBlob(
-        new Blob([data as unknown as BlobPart], { type: "model/stl" }),
-        `${stamp}.stl`,
+    if (!v || exporting) return;
+    setExporting(true);
+    const stamp = MODELS[state.model].name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    try {
+      if (kind === "glb") {
+        const blob = await v.exportGLB();
+        downloadBlob(blob, `${stamp}.glb`);
+        notify(`GLB written · ${(blob.size / 1024).toFixed(0)} KB`);
+      } else if (kind === "obj") {
+        const text = v.exportOBJ();
+        downloadText(text, `${stamp}.obj`, "text/plain");
+        notify(`OBJ written · ${(text.length / 1024).toFixed(0)} KB`);
+      } else {
+        const data = v.exportSTL();
+        const buffer = data.buffer.slice(
+          data.byteOffset,
+          data.byteOffset + data.byteLength,
+        ) as ArrayBuffer;
+        downloadBlob(new Blob([buffer], { type: "model/stl" }), `${stamp}.stl`);
+        notify(`STL written · ${(data.byteLength / 1024).toFixed(0)} KB`);
+      }
+    } catch (cause) {
+      notify(
+        cause instanceof Error
+          ? `${kind.toUpperCase()} export failed · ${cause.message.slice(0, 60)}`
+          : `${kind.toUpperCase()} export failed`,
       );
-      notify(`STL written · ${(data.byteLength / 1024).toFixed(0)} KB`);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -117,24 +236,49 @@ export default function App() {
   };
 
   const spec = MODELS[state.model];
-  const dimsLabel = `${spec.dims.width.toFixed(2)} × ${spec.dims.depth.toFixed(2)} × ${spec.dims.height.toFixed(2)} m`;
+  const dimsLabel = spec.palletOption
+    ? `${spec.dims.width.toFixed(2)} × ${spec.dims.depth.toFixed(2)} m deck · ${(spec.dims.contourHeight ?? 0).toFixed(2)} m contour`
+    : `${spec.dims.width.toFixed(2)} × ${spec.dims.depth.toFixed(2)} × ${spec.dims.height.toFixed(2)} m`;
+  const taperDegrees =
+    Math.atan2(spec.dims.topWidth - spec.dims.width, spec.dims.height) *
+    (180 / Math.PI);
+  const sectionLabel = spec.contourOption
+    ? state.contour
+      ? `upper contour ${(spec.dims.topWidth * 1000).toFixed(0)} mm · ${taperDegrees.toFixed(1)}° taper`
+      : "prismatic base section · contour disabled"
+    : spec.palletOption
+      ? "96 × 125 in pallet · netted build contour"
+      : "uniform cuboid · no slope";
   const marquee = [
     `${spec.name} · ${spec.family}`,
     `width ${(spec.dims.width * 1000).toFixed(0)} mm`,
     `depth ${(spec.dims.depth * 1000).toFixed(0)} mm`,
-    `height ${(spec.dims.height * 1000).toFixed(0)} mm`,
-    spec.contourOption ? `upper contour ${(spec.dims.topWidth * 1000).toFixed(0)} mm · 16.5° taper` : "uniform cuboid · no slope",
-    ...spec.specs.map((r) => `${r.k} ${r.v}`),
-    "cam-latch plug door · 112° swing",
+    spec.palletOption
+      ? `deck ${(spec.dims.height * 1000).toFixed(0)} mm`
+      : `height ${(spec.dims.height * 1000).toFixed(0)} mm`,
+    sectionLabel,
+    ...spec.specs.map((row) => `${row.k} ${row.v}`),
+    spec.featureLabel,
+    `generator ${spec.sourceFile}`,
     "generated at runtime · no mesh assets",
   ];
+  const activeSource = SOURCE_META[source];
 
   return (
     <div className="relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
       {/* ---------------- 3-D viewport ---------------- */}
-      <div ref={host} className="absolute inset-0" />
+      <div
+        ref={host}
+        className="absolute inset-0"
+        aria-label="Interactive 3D viewport"
+      />
+      <p className="sr-only">
+        Interactive aviation ULD model. Drag to orbit, scroll to zoom, and use
+        the control deck or assembly tree to inspect parts. Focus the 3D canvas
+        and use arrow keys to pan.
+      </p>
 
-      {/* ambient overlays: vignette, sweep, scanlines */}
+      {/* ambient overlays: vignette + scanlines */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -171,15 +315,20 @@ export default function App() {
             <Chip tone="amber">{dimsLabel}</Chip>
             <Chip tone="steel">metallic pbr</Chip>
           </div>
-          <div className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm">
+          <div
+            role="group"
+            aria-label="Select ULD model"
+            className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
+          >
             {(Object.keys(MODELS) as ModelId[]).map((id) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => patch({ model: id })}
+                onClick={() => selectModel(id)}
                 title={MODELS[id].family}
+                aria-pressed={state.model === id}
                 className={cn(
-                  "px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors",
+                  "px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
                   state.model === id
                     ? "bg-amber text-void shadow-[0_0_14px_-4px_rgba(255,176,32,0.9)]"
                     : "text-dim hover:bg-raise hover:text-ink",
@@ -189,13 +338,25 @@ export default function App() {
               </button>
             ))}
           </div>
-          <Btn onClick={() => doExport("glb")} title="Binary glTF — drops into any viewer">
+          <Btn
+            onClick={() => doExport("glb")}
+            disabled={!ready || !!error || exporting}
+            title="Binary glTF — drops into any viewer"
+          >
             <DlIcon /> glb
           </Btn>
-          <Btn onClick={() => doExport("obj")} title="Wavefront OBJ">
+          <Btn
+            onClick={() => doExport("obj")}
+            disabled={!ready || !!error || exporting}
+            title="Wavefront OBJ"
+          >
             <DlIcon /> obj
           </Btn>
-          <Btn onClick={() => doExport("stl")} title="Binary STL for print / CAD">
+          <Btn
+            onClick={() => doExport("stl")}
+            disabled={!ready || !!error || exporting}
+            title="Binary STL for print / CAD"
+          >
             <DlIcon /> stl
           </Btn>
           <Btn
@@ -217,7 +378,7 @@ export default function App() {
           <ControlDeck
             state={state}
             set={patch}
-            onView={(v) => viewer.current?.setView(v)}
+            onView={(view) => viewer.current?.setView(view)}
             onFrame={() => viewer.current?.frameAll()}
           />
         </div>
@@ -226,18 +387,26 @@ export default function App() {
       {/* ---------------- right: instrument stack ---------------- */}
       <aside className="anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4">
         <div className="pointer-events-auto">
-          <div className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm">
-            {(["spec", "parts", "source"] as Tab[]).map((t) => (
+          <div
+            role="tablist"
+            aria-label="Inspector view"
+            className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
+          >
+            {(["spec", "parts", "source"] as Tab[]).map((item) => (
               <button
-                key={t}
+                key={item}
                 type="button"
-                onClick={() => setTab(t)}
+                role="tab"
+                aria-selected={tab === item}
+                onClick={() => setTab(item)}
                 className={cn(
-                  "flex-1 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors",
-                  tab === t ? "bg-amber text-void" : "text-dim hover:bg-raise hover:text-ink",
+                  "flex-1 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
+                  tab === item
+                    ? "bg-amber text-void"
+                    : "text-dim hover:bg-raise hover:text-ink",
                 )}
               >
-                {t}
+                {item}
               </button>
             ))}
           </div>
@@ -245,12 +414,20 @@ export default function App() {
 
         <div className="pointer-events-auto min-h-0 flex-1 overflow-hidden">
           {tab === "spec" && (
-            <Panel title="Specification" code="IATA AHM / AS1811" className="h-full overflow-y-auto scroll-slim">
+            <Panel
+              title="Specification"
+              code={`${spec.code} envelope`}
+              className="h-full overflow-y-auto scroll-slim"
+            >
               <SpecSheet stats={stats} measured={measured} model={spec} />
             </Panel>
           )}
           {tab === "parts" && (
-            <Panel title="Assembly tree" code={`${assemblies.length} groups`} className="h-full overflow-y-auto scroll-slim">
+            <Panel
+              title="Assembly tree"
+              code={`${assemblies.length} groups`}
+              className="h-full overflow-y-auto scroll-slim"
+            >
               <PartsList
                 assemblies={assemblies}
                 hovered={highlight}
@@ -260,21 +437,35 @@ export default function App() {
             </Panel>
           )}
           {tab === "source" && (
-            <Panel title="Generator source" code="three.js" className="flex h-full flex-col" bodyClass="min-h-0 flex-1 px-3 py-2.5">
-              <div className="mb-2 flex gap-1">
-                {(Object.keys(SOURCES) as SourceName[]).map((n) => (
-                  <Btn key={n} active={source === n} onClick={() => setSource(n)}>
-                    {n}
+            <Panel
+              title="Repository source"
+              code="typescript"
+              className="flex h-full flex-col"
+              bodyClass="min-h-0 flex-1 px-3 py-2.5"
+            >
+              <div className="mb-2 flex flex-wrap gap-1">
+                {(Object.keys(SOURCES) as SourceName[]).map((name) => (
+                  <Btn
+                    key={name}
+                    active={source === name}
+                    onClick={() => setSource(name)}
+                  >
+                    {name}
                   </Btn>
                 ))}
               </div>
               <SourcePanel
                 source={SOURCES[source]}
                 filename={source}
+                entry={activeSource.entry}
+                description={activeSource.description}
                 onDownload={() => {
                   downloadText(SOURCES[source], source, "text/typescript");
                   notify(`${source} downloaded`);
                 }}
+                onCopy={(ok) =>
+                  notify(ok ? `${source} copied` : "Clipboard unavailable")
+                }
               />
             </Panel>
           )}
@@ -284,28 +475,46 @@ export default function App() {
       {/* ---------------- bottom status strip ---------------- */}
       <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 backdrop-blur-sm">
         <div className="flex items-center gap-3 overflow-hidden px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
-          <span className="flex items-center gap-1.5 text-jade">
-            <span className="blink h-1.5 w-1.5 rounded-full bg-jade" />
-            {ready ? "geometry live" : "building"}
+          <span
+            className={cn(
+              "flex items-center gap-1.5",
+              error ? "text-signal" : "text-jade",
+            )}
+          >
+            <span
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                error ? "bg-signal" : "blink bg-jade",
+              )}
+            />
+            {error
+              ? "viewport unavailable"
+              : ready
+                ? "geometry live"
+                : "building"}
           </span>
           <span className="text-dim">
-            {perf.fps} fps · {(perf.triangles / 1000).toFixed(1)}k tris · {perf.calls} calls
+            {perf.fps} fps · {(perf.triangles / 1000).toFixed(1)}k tris ·{" "}
+            {perf.calls} calls
           </span>
           <span className="hidden text-dim sm:inline">
-            meshes {stats?.meshes ?? "—"} · vol {stats?.volumeM3.toFixed(2) ?? "—"} m³
+            meshes {stats?.meshes ?? "—"} · vol{" "}
+            {stats?.volumeM3.toFixed(2) ?? "—"} m³
           </span>
           <span className="hidden text-dim lg:inline">{spec.name}</span>
           <span className="ml-auto hidden max-w-[38%] truncate text-amber md:inline">
-            {hover ? `${hover.assembly} → ${hover.part}` : "hover the model to identify components"}
+            {hover
+              ? `${hover.assembly} → ${hover.part}`
+              : "hover the model to identify components"}
           </span>
         </div>
         <div className="relative h-[18px] overflow-hidden border-t border-line-soft/70 bg-void/60">
           <div className="marquee-track absolute flex whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.2em] text-dim">
-            {[0, 1].map((k) => (
-              <span key={k} className="flex">
-                {marquee.map((t) => (
-                  <span key={t} className="px-6">
-                    {t} <span className="text-amber/60">/</span>
+            {[0, 1].map((copy) => (
+              <span key={copy} className="flex">
+                {marquee.map((text) => (
+                  <span key={text} className="px-6">
+                    {text} <span className="text-amber/60">/</span>
                   </span>
                 ))}
               </span>
@@ -317,13 +526,34 @@ export default function App() {
       {/* ---------------- mobile sheet ---------------- */}
       <div className="pointer-events-auto absolute inset-x-0 bottom-[38px] z-30 lg:hidden">
         <div className="flex items-center justify-center gap-1.5 px-3 pb-2">
-          <Btn active={sheet && tab === "spec"} onClick={() => { setTab("spec"); setSheet(true); }}>
+          <Btn
+            active={sheet && tab === "spec"}
+            onClick={() => {
+              setTab("spec");
+              setSheet(true);
+            }}
+          >
             spec
           </Btn>
-          <Btn active={sheet && tab === "parts"} onClick={() => { setTab("parts"); setSheet(true); }}>
+          <Btn
+            active={sheet && tab === "parts"}
+            onClick={() => {
+              setTab("parts");
+              setSheet(true);
+            }}
+          >
             parts
           </Btn>
-          <Btn active={sheet} onClick={() => setSheet((s) => !s)}>
+          <Btn
+            active={sheet && tab === "source"}
+            onClick={() => {
+              setTab("source");
+              setSheet(true);
+            }}
+          >
+            source
+          </Btn>
+          <Btn active={sheet} onClick={() => setSheet((open) => !open)}>
             {sheet ? "hide" : "controls"}
           </Btn>
         </div>
@@ -345,7 +575,15 @@ export default function App() {
                 <SourcePanel
                   source={SOURCES[source]}
                   filename={source}
-                  onDownload={() => downloadText(SOURCES[source], source, "text/typescript")}
+                  entry={activeSource.entry}
+                  description={activeSource.description}
+                  onDownload={() => {
+                    downloadText(SOURCES[source], source, "text/typescript");
+                    notify(`${source} downloaded`);
+                  }}
+                  onCopy={(ok) =>
+                    notify(ok ? `${source} copied` : "Clipboard unavailable")
+                  }
                 />
               </div>
             )}
@@ -353,7 +591,7 @@ export default function App() {
               <ControlDeck
                 state={state}
                 set={patch}
-                onView={(v) => viewer.current?.setView(v)}
+                onView={(view) => viewer.current?.setView(view)}
                 onFrame={() => viewer.current?.frameAll()}
               />
             </div>
@@ -363,6 +601,8 @@ export default function App() {
 
       {/* ---------------- toast ---------------- */}
       <div
+        role="status"
+        aria-live="polite"
         className={cn(
           "pointer-events-none absolute bottom-[70px] left-1/2 z-40 -translate-x-1/2 border border-amber/50 bg-panel/95 px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-amber transition-all duration-300",
           toast ? "opacity-100" : "translate-y-2 opacity-0",
@@ -371,15 +611,36 @@ export default function App() {
         {toast ?? ""}
       </div>
 
+      {/* ---------------- WebGL failure state ---------------- */}
+      {error && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-void/95 p-6 text-center">
+          <div className="max-w-md border border-signal/50 bg-panel/90 p-6">
+            <div className="stencil text-[11px] text-signal">
+              viewport offline
+            </div>
+            <h2 className="mt-3 font-display text-xl font-bold text-ink">
+              3D preview unavailable
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-mute">{error}</p>
+            <Btn className="mt-5" onClick={() => window.location.reload()}>
+              reload viewer
+            </Btn>
+          </div>
+        </div>
+      )}
+
       {/* ---------------- boot veil ---------------- */}
       <div
+        aria-hidden={ready}
         className={cn(
           "pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-void transition-opacity duration-700",
           ready ? "opacity-0" : "opacity-100",
         )}
       >
         <div className="text-center">
-          <div className="stencil text-[11px] text-amber">extruding contour section</div>
+          <div className="stencil text-[11px] text-amber">
+            extruding contour section
+          </div>
           <div className="mx-auto mt-3 h-[2px] w-52 overflow-hidden bg-line">
             <div className="h-full w-1/3 animate-[slide_1.1s_linear_infinite] bg-amber" />
           </div>
@@ -401,11 +662,20 @@ function Mark() {
         </linearGradient>
       </defs>
       {/* isometric LD-3 silhouette: vertical back wall, leaning contour wall */}
-      <path d="M6 34 L6 12 L26 6 L38 10 L38 30 L18 36 Z" fill="#151a20" stroke="#39434d" strokeWidth="1.2" />
+      <path
+        d="M6 34 L6 12 L26 6 L38 10 L38 30 L18 36 Z"
+        fill="#151a20"
+        stroke="#39434d"
+        strokeWidth="1.2"
+      />
       <path d="M6 12 L26 6 L26 28 L6 34 Z" fill="url(#mk)" opacity="0.9" />
       <path d="M26 6 L38 10 L38 30 L26 28 Z" fill="#8d959c" opacity="0.55" />
       <path d="M6 34 L18 36 L38 30 L26 28 Z" fill="#0e1216" />
-      <path d="M10 16 L22 12 M10 21 L22 17 M10 26 L22 22" stroke="#2b333b" strokeWidth="1" />
+      <path
+        d="M10 16 L22 12 M10 21 L22 17 M10 26 L22 22"
+        stroke="#2b333b"
+        strokeWidth="1"
+      />
       <circle cx="32" cy="20" r="1.6" fill="#ffb020" />
     </svg>
   );
@@ -413,8 +683,18 @@ function Mark() {
 
 function DlIcon() {
   return (
-    <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.4">
-      <path d="M6 1v7M3 5.5 6 8.5 9 5.5M1.5 10.5h9" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      viewBox="0 0 12 12"
+      className="h-3 w-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+    >
+      <path
+        d="M6 1v7M3 5.5 6 8.5 9 5.5M1.5 10.5h9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

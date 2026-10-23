@@ -172,14 +172,14 @@ Traditional procedural box modeling breaks down on angled aviation contours (suc
 
 No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/textures.ts` synthesizes GPU textures procedurally on offscreen `<canvas>` elements:
 
-- **Anisotropic Brushed Metal Suite (`getMetalTextures`)**: Generates cached `512 × 512` `albedo`, `roughness`, and `bump` maps with directional horizontal grain strokes, rivet-line micro-scratches, and subtle industrial handling wear.
+- **Anisotropic Brushed Metal Suite (`makeBrushedMetal`)**: Generates deterministic, cached `1024 × 1024` roughness and Sobel-derived normal maps with directional horizontal grain strokes. Source canvases are cloned per material, so repeated model rebuilds do not re-rasterise the expensive pair.
 - **5 Physical Material Presets (`FINISHES` in `primitives.ts`)**:
-  - `mill` — Brushed `6061-T6` natural aluminium (`#c8cfd6`, metalness `0.86`, roughness `0.34`)
-  - `graphite` — Anodised dark slate alloy (`#48505a`, metalness `0.78`, roughness `0.40`)
-  - `cargo` — Painted aviation safety amber/ochre (`#d28b26`, metalness `0.32`, roughness `0.52`)
-  - `airline` — Composite white polycarbonate skin with alloy frame (`#e4e8ec`, metalness `0.18`, roughness `0.38`)
-  - `titanium` — Warm aerospace titanium sheen (`#b2aba0`, metalness `0.88`, roughness `0.28`)
-- **Dynamic Operational Graphics**: `makeLabelTexture()` renders crisp IATA identification placards and weight tables; `makeReeferDisplayTexture(tempC, active)` updates live digital cold-chain readouts on `RKN` and `RAP` units whenever the user adjusts the temperature slider.
+  - `mill` — Bare mill aluminium (`#b8bec4`, metalness `1.00`, roughness `0.33`)
+  - `graphite` — Type II anodised graphite (`#59616a`, metalness `1.00`, roughness `0.26`)
+  - `cargo` — Ramp-handling safety yellow (`#e9a516`, metalness `0.72`, roughness `0.29`)
+  - `airline` — Two-pack airline blue enamel (`#1e5f8c`, metalness `0.66`, roughness `0.24`)
+  - `titanium` — Bead-blasted warm titanium (`#9a8f7d`, metalness `1.00`, roughness `0.52`)
+- **Model-Truthful Graphics**: `makeIdPlate()` and `makeLivery()` render each family's actual ratings and section geometry; `makeReeferPanel()` paints model-specific RKN/RAP controller ranges. The readout is explicitly labelled `SIMULATED` and represents the UI set point — never measured return-air telemetry.
 
 </details>
 
@@ -196,10 +196,10 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
     <td width="50%" valign="top">
       <h4>Viewport, Kinematics &amp; Inspection</h4>
       <ul>
-        <li><strong>5 Camera Presets + OrbitControls:</strong> Instant framing for <code>Iso</code>, <code>Front</code>, <code>Side</code>, <code>Slope</code> / <code>Back</code>, and <code>Top</code>, plus damped orbital navigation and optional turntable auto-spin.</li>
+        <li><strong>Model-Aware Camera + OrbitControls:</strong> Four directional presets (<code>Iso</code>, <code>Front</code>, <code>Side</code>, <code>Top</code>) and <code>Fit</code> compute distance from the active model's bounding sphere and viewport aspect. Drag, scroll, or focus the canvas and use arrow keys to pan.</li>
         <li><strong>Smoothstep Exploded View:</strong> Continuous <code>0% → 100%</code> assembly separation driven by $t^2(3 - 2t)$ interpolation across each generator's named assembly vectors.</li>
         <li><strong>Articulated Door &amp; Variant Controls:</strong> Continuous <code>0° → 112°</code> door rotation, contour overhang toggle (<code>AKE</code>), active reefer + temperature slider (<code>RKN</code> / <code>RAP</code>), and cargo stack + restraint net toggle (<code>PMC</code>).</li>
-        <li><strong>CAD Overlays &amp; Raycast Picking:</strong> Toggleable wireframe overlay, X-ray translucent hull, 3D dimension callout ticks, outer certification envelope box, 3 lighting rigs (<code>Studio</code>, <code>Hangar</code>, <code>Dusk</code>), and click-to-highlight part picking synchronized with the <code>Parts</code> bill of materials.</li>
+        <li><strong>CAD Overlays &amp; Raycast Picking:</strong> Toggleable wireframe, model-specific 3D dimensions, nominal envelope box, three lighting rigs, and throttled raycast picking synchronized with the keyboard-accessible assembly tree. Adaptive DPR preserves interaction on weaker GPUs.</li>
       </ul>
     </td>
     <td width="50%" valign="top">
@@ -208,7 +208,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         <li><strong>Binary glTF 2.0 (<code>.glb</code>):</strong> Exports the complete hierarchical scene assembly with PBR materials via <code>GLTFExporter</code> for Blender, Unreal Engine, Unity, or Omniverse.</li>
         <li><strong>Wavefront (<code>.obj</code>):</strong> Exports clean ASCII polygon geometry via <code>OBJExporter</code> for universal DCC and CAD interchange.</li>
         <li><strong>Binary Stereolithography (<code>.stl</code>):</strong> Exports triangulated solid geometry in metres via <code>STLExporter</code> for slicing, CFD/FEA meshing, or 3D printing.</li>
-        <li><strong>In-App TypeScript Source Inspector:</strong> Bundles raw generator modules via Vite <code>?raw</code> imports with a zero-dependency regex syntax highlighter, one-click clipboard copy, and direct <code>.ts</code> file download.</li>
+        <li><strong>In-App TypeScript Source Inspector:</strong> Bundles all four generators plus the registry, CAD kernel, renderer, textures and annotations via Vite <code>?raw</code> imports, with copy feedback and direct <code>.ts</code> download.</li>
       </ul>
     </td>
   </tr>
@@ -225,8 +225,9 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ```text
 3D-Containers/
 ├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
-├── vite.config.ts                # Vite 7 + React + Tailwind v4 + viteSingleFile() bundler
+├── vite.config.ts                # Vite 8 + React + Tailwind v4 + viteSingleFile() bundler
 ├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
+├── tests/                        # Geometry kernel and model-registry invariant checks
 └── src/
     ├── main.tsx                  # React 19 root mount
     ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
@@ -245,7 +246,8 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         ├── rap.ts                # IATA RAP / LD-9 twin-fan cold-chain generator
         ├── pmc.ts                # IATA PMC / P6P 96x125 in main-deck pallet generator
         ├── textures.ts           # Procedural Canvas PBR maps, placards & LED displays
-        ├── annotations.ts        # 3D CAD dimension ticks, badges & envelope helpers
+        ├── annotations.ts        # Model-aware CAD dimensions, badges & envelope helpers
+        ├── textureSupport.ts     # Deterministic PRNG and clone-safe Canvas texture cache
         └── AKEViewer.ts          # WebGL2 orchestrator, lighting moods, raycaster & CAD I/O
 ```
 
@@ -259,23 +261,23 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 
 ### Local Development &amp; Single-File Production Build
 
-**Prerequisites:** Node.js `>= 20` and `npm`.
+**Prerequisites:** Node.js `>= 20.19` and `npm`.
 
 ```bash
 # 1. Install dependencies
-npm install
+npm ci
 
 # 2. Launch the Vite development server with hot module replacement
 npm run dev
 
-# 3. Type-check with TypeScript 5.9 and compile a self-contained single-file HTML bundle
-npm run build
+# 3. Run geometry/registry tests, type-check, and build a single-file HTML bundle
+npm run verify
 
 # 4. Preview the production build locally
 npm run preview
 ```
 
-> **Single-File Distribution:** `vite.config.ts` integrates `vite-plugin-singlefile`, inlining all compiled JavaScript and CSS directly into `dist/index.html` so the entire 3D ULD laboratory can be archived or opened as a standalone artifact.
+> **Single-File Distribution:** `vite.config.ts` integrates `vite-plugin-singlefile`, inlining all compiled JavaScript and CSS directly into `dist/index.html`. All geometry, PBR maps and application code are self-contained; display fonts load from Google Fonts when online and fall back to system fonts offline.
 
 ### Truthful Engineering Status
 
@@ -296,7 +298,7 @@ npm run preview
     <tr>
       <td><strong>Canvas PBR &amp; Viewport</strong></td>
       <td><code>Implemented</code></td>
-      <td>5 material finishes, 3 ACES Filmic lighting rigs, 5 camera presets, raycast part picking, and live FPS / triangle / draw-call telemetry in <code>AKEViewer.ts</code>.</td>
+      <td>5 material finishes, deterministic cached Canvas PBR, 3 ACES Filmic lighting rigs, model-aware camera fitting, throttled raycast picking, reduced-motion support, adaptive DPR and live render telemetry.</td>
     </tr>
     <tr>
       <td><strong>CAD Mesh Exporters</strong></td>
@@ -304,9 +306,9 @@ npm run preview
       <td>Client-side binary <code>.glb</code>, ASCII <code>.obj</code>, and binary <code>.stl</code> export plus raw <code>.ts</code> source download wired in <code>AKEViewer.ts</code> and <code>App.tsx</code>.</td>
     </tr>
     <tr>
-      <td><strong>CI Workflow Alignment</strong></td>
-      <td><code>Template Only</code></td>
-      <td><code>.github/workflows/</code> currently holds a starter GitHub Actions <em>Webpack</em> template (<code>npx webpack</code>), whereas the project builds via <strong>Vite 7</strong> (<code>npm run build</code>).</td>
+      <td><strong>Automated Verification</strong></td>
+      <td><code>Enabled</code></td>
+      <td>GitHub Actions runs Node 20.19/22 checks: <code>npm test</code>, TypeScript, the Vite 8 single-file build, a high-severity dependency audit, and artifact upload.</td>
     </tr>
   </tbody>
 </table>
