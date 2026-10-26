@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import type { Assembly } from "@/three/primitives";
 import { highlightTS } from "@/lib/io";
+import { computePlan } from "@/lib/planner";
+import { kgToLb } from "@/lib/units";
 import type { ModelInfo } from "@/three/models";
-import { Btn, Chip, Row } from "./ui";
+import { Btn, Chip, Row, Segmented, Slider } from "./ui";
 import { cn } from "@/utils/cn";
 
 /* ------------------------------------------------------------------ */
@@ -21,7 +23,7 @@ export type Stats = {
   [extra: string]: number | string;
 };
 
-export function SpecSheet({
+function SpecSheetBase({
   stats,
   measured,
   model,
@@ -110,6 +112,160 @@ export function SpecSheet({
       <p className="border-t border-line-soft pt-2 text-[10.5px] leading-relaxed text-mute">
         {model.blurb}
       </p>
+
+      <LoadPlanner key={model.id} model={model} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Load planner — estimated payload / volume utilisation               */
+/* ------------------------------------------------------------------ */
+
+function LoadPlanner({ model }: { model: ModelInfo }) {
+  const { ratings } = model;
+  const [cargoKg, setCargoKg] = useState(() => Math.round(ratings.payloadKg / 2));
+  const [cargoM3, setCargoM3] = useState(() => Math.round(ratings.volumeM3 * 50) / 100);
+  const [divisor, setDivisor] = useState<"6000" | "5000">("6000");
+  const plan = computePlan({
+    ...ratings,
+    cargoKg,
+    cargoM3,
+    divisor: Number(divisor),
+  });
+  const maxKg = Math.ceil(ratings.payloadKg * 1.25);
+  const maxM3 = Math.round(ratings.volumeM3 * 125) / 100;
+  const over = plan.status !== "ok" && plan.status !== "empty";
+  const statusText =
+    plan.status === "empty"
+      ? "NO CARGO ENTERED"
+      : plan.status === "ok"
+        ? "WITHIN CERTIFIED LIMITS"
+        : plan.status === "overweight"
+          ? `OVERWEIGHT BY ${Math.abs(Math.round(plan.remainingKg))} KG`
+          : plan.status === "overvolume"
+            ? `OVER VOLUME BY ${(cargoM3 - ratings.volumeM3).toFixed(2)} M³`
+            : "OVERWEIGHT AND OVER VOLUME";
+
+  return (
+    <div className="border-t border-line-soft pt-2">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 bg-amber" />
+        <span className="stencil text-[9.5px] text-dim">load planner</span>
+        <span className="ml-auto font-mono text-[9px] uppercase tracking-[0.14em] text-dim">
+          estimated
+        </span>
+      </div>
+
+      <Slider
+        label="cargo mass"
+        value={cargoKg}
+        min={0}
+        max={maxKg}
+        step={5}
+        onChange={setCargoKg}
+        display={`${cargoKg.toLocaleString()} kg`}
+      />
+      <Slider
+        label="cargo volume"
+        value={cargoM3}
+        min={0}
+        max={maxM3}
+        step={0.05}
+        onChange={setCargoM3}
+        display={`${cargoM3.toFixed(2)} m³`}
+      />
+
+      <PlanBar label="payload" pct={plan.payloadPct} />
+      <PlanBar label="volume" pct={plan.volumePct} />
+
+      <div
+        role="status"
+        className={cn(
+          "mt-2 border px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]",
+          plan.status === "ok"
+            ? "border-jade/50 bg-jade/10 text-jade"
+            : over
+              ? "border-signal/60 bg-signal/10 text-signal"
+              : "border-line bg-void/40 text-dim",
+        )}
+      >
+        {over ? "! " : ""}
+        {statusText}
+      </div>
+
+      <div className="mt-1">
+        <Row k="Gross (tare + cargo)" v={`${plan.grossKg.toLocaleString()} kg`} tone="amber" />
+        <Row
+          k="Payload remaining"
+          v={`${Math.round(plan.remainingKg).toLocaleString()} kg`}
+        />
+        <Row
+          k="Volumetric weight"
+          v={`${Math.round(plan.volumetricKg).toLocaleString()} kg`}
+        />
+        <Row
+          k="Chargeable weight"
+          v={`${Math.round(plan.chargeableKg).toLocaleString()} kg · ${Math.round(kgToLb(plan.chargeableKg)).toLocaleString()} lb`}
+          tone="steel"
+        />
+        <Row
+          k="Cargo density"
+          v={
+            plan.densityKgM3 === null
+              ? "—"
+              : `${Math.round(plan.densityKgM3)} kg/m³ · ${plan.limiting}-limited`
+          }
+        />
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-dim">
+          volumetric divisor cm³/kg
+        </span>
+        <Segmented
+          value={divisor}
+          onChange={setDivisor}
+          ariaLabel="Volumetric divisor"
+          options={[
+            { value: "6000", label: "6000" },
+            { value: "5000", label: "5000" },
+          ]}
+        />
+      </div>
+      <p className="mt-1.5 text-[9.5px] leading-relaxed text-dim">
+        Estimated from certified ratings only. Real limits also depend on
+        aircraft position, restraint and contour — verify against the load
+        sheet before flying freight.
+      </p>
+    </div>
+  );
+}
+
+function PlanBar({ label, pct }: { label: string; pct: number }) {
+  const clamped = Math.min(pct, 100);
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <span className="w-14 font-mono text-[9.5px] uppercase tracking-[0.1em] text-dim">
+        {label}
+      </span>
+      <span className="relative h-[6px] flex-1 bg-line">
+        <span
+          className={cn(
+            "absolute inset-y-0 left-0 transition-all duration-200",
+            pct > 100 ? "bg-signal" : pct > 85 ? "bg-amber" : "bg-jade",
+          )}
+          style={{ width: `${clamped}%` }}
+        />
+      </span>
+      <span
+        className={cn(
+          "w-12 text-right font-mono text-[10.5px] tabular-nums",
+          pct > 100 ? "text-signal" : "text-mute",
+        )}
+      >
+        {pct.toFixed(0)}%
+      </span>
     </div>
   );
 }
@@ -118,7 +274,9 @@ export function SpecSheet({
 /* Parts list                                                          */
 /* ------------------------------------------------------------------ */
 
-export function PartsList({
+export const SpecSheet = memo(SpecSheetBase);
+
+function PartsListBase({
   assemblies,
   hovered,
   onHover,
@@ -193,7 +351,9 @@ export function PartsList({
 /* Source drawer                                                       */
 /* ------------------------------------------------------------------ */
 
-export function SourcePanel({
+export const PartsList = memo(PartsListBase);
+
+function SourcePanelBase({
   source,
   filename,
   entry,
@@ -249,3 +409,5 @@ export function SourcePanel({
     </div>
   );
 }
+
+export const SourcePanel = memo(SourcePanelBase);

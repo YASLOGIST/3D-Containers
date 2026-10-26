@@ -66,6 +66,7 @@ export function Btn({
   title,
   className,
   tone = "neutral",
+  pressed,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -74,6 +75,8 @@ export function Btn({
   title?: string;
   className?: string;
   tone?: "neutral" | "amber" | "ghost";
+  /** set when the button toggles a persistent on/off selection */
+  pressed?: boolean;
 }) {
   return (
     <button
@@ -81,6 +84,7 @@ export function Btn({
       title={title}
       disabled={disabled}
       onClick={onClick}
+      aria-pressed={pressed}
       className={cn(
         "group relative inline-flex items-center justify-center gap-1.5 border px-2.5 py-1.5",
         "font-mono text-[10.5px] uppercase tracking-[0.14em] transition-all duration-200",
@@ -226,6 +230,7 @@ export function Slider({
         type="range"
         className="range-uld -mt-[11px] block w-full"
         aria-label={label}
+        aria-valuetext={display}
         min={min}
         max={max}
         step={step}

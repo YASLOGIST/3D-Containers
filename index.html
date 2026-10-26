@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#08090b" />
     <meta name="color-scheme" content="dark" />
     <meta
@@ -10,6 +13,20 @@
       content="Procedural Three.js aviation ULD geometry lab for AKE, RKN, RAP and PMC containers — metallic PBR materials, articulated assemblies, live dimensions, and GLB / OBJ / STL export."
     />
     <title>Procedural ULD Geometry Lab — AKE · RKN · RAP · PMC</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 40'%3E%3Cpath d='M6 34 L6 12 L26 6 L38 10 L38 30 L18 36 Z' fill='%23151a20' stroke='%23ffb020' stroke-width='2'/%3E%3Cpath d='M6 12 L26 6 L26 28 L6 34 Z' fill='%23ffb020'/%3E%3C/svg%3E"
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Procedural ULD Geometry Lab — AKE · RKN · RAP · PMC"
+    />
+    <meta
+      property="og:description"
+      content="Zero-asset procedural aviation ULD geometry: section cuts, point-to-point measurement, orthographic engineering views, load planning, and 1:1 GLB / OBJ / STL export."
+    />
+    <meta name="twitter:card" content="summary" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,6 +36,25 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div
+        style="
+          margin: 10vh auto;
+          max-width: 32rem;
+          padding: 1.5rem;
+          background: #14181d;
+          color: #e8ecef;
+          font-family: system-ui, sans-serif;
+          border: 1px solid #2a323b;
+        "
+      >
+        <strong>Procedural ULD Geometry Lab</strong>
+        <p>
+          This workbench generates its 3D geometry in the browser and needs
+          JavaScript (with WebGL) enabled. No data leaves your device.
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

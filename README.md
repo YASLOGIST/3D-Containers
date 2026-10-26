@@ -200,6 +200,8 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         <li><strong>Smoothstep Exploded View:</strong> Continuous <code>0% → 100%</code> assembly separation driven by $t^2(3 - 2t)$ interpolation across each generator's named assembly vectors.</li>
         <li><strong>Articulated Door &amp; Variant Controls:</strong> Continuous <code>0° → 112°</code> door rotation, contour overhang toggle (<code>AKE</code>), active reefer + temperature slider (<code>RKN</code> / <code>RAP</code>), and cargo stack + restraint net toggle (<code>PMC</code>).</li>
         <li><strong>CAD Overlays &amp; Raycast Picking:</strong> Toggleable wireframe, model-specific 3D dimensions, nominal envelope box, three lighting rigs, and throttled raycast picking synchronized with the keyboard-accessible assembly tree. Adaptive DPR preserves interaction on weaker GPUs.</li>
+        <li><strong>Inspection Tools:</strong> True-scale <strong>orthographic</strong> engineering projection alongside perspective; a draggable <strong>section cut</strong> (local clipping plane on X/Y/Z with flip and closed <strong>stencil caps</strong> on the cut faces, revealing real wall and cavity construction — view-only, exports stay whole); <strong>point-to-point measurement</strong> with metre/inch readout and per-axis deltas; and a <strong>compare envelope</strong> overlaying any other family's certified box, base-centre aligned.</li>
+        <li><strong>Load Planner, Share Links &amp; Snapshots:</strong> The spec sheet estimates payload/volume utilisation, volumetric (chargeable) weight at the 6000/5000 divisors and overweight status from certified ratings. The full workbench state round-trips through a shareable URL hash, the viewport saves as PNG, and keyboard shortcuts (<code>1–4</code>, <code>F</code>, <code>O</code>, <code>M</code>, <code>S</code>, <code>D</code>) drive models, framing and inspection tools.</li>
       </ul>
     </td>
     <td width="50%" valign="top">
@@ -227,7 +229,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
 ├── vite.config.ts                # Vite 8 + React + Tailwind v4 + viteSingleFile() bundler
 ├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
-├── tests/                        # Geometry kernel and model-registry invariant checks
+├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (19 checks)
 └── src/
     ├── main.tsx                  # React 19 root mount
     ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
@@ -237,7 +239,10 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
     │   ├── Panels.tsx            # SpecSheet, interactive PartsList & TS SourcePanel
     │   └── ui.tsx                # Reusable industrial buttons, pills & section headers
     ├── lib/
-    │   └── io.ts                 # Browser Blob & ArrayBuffer download utilities
+    │   ├── io.ts                 # Browser Blob & ArrayBuffer download utilities
+    │   ├── planner.ts            # Pure load-planning arithmetic (utilisation, volumetric weight)
+    │   ├── state.ts              # Shareable URL-hash state codec with defensive decoding
+    │   └── units.ts              # Metric/imperial conversions for CAD readouts
     └── three/
         ├── models.ts             # Declarative MODELS registry (ake, rkn, rap, pmc)
         ├── primitives.ts         # CCW offsetPolygon kernel, extrusions, RivetRun & FINISHES
@@ -298,7 +303,7 @@ npm run preview
     <tr>
       <td><strong>Canvas PBR &amp; Viewport</strong></td>
       <td><code>Implemented</code></td>
-      <td>5 material finishes, deterministic cached Canvas PBR, 3 ACES Filmic lighting rigs, model-aware camera fitting, throttled raycast picking, reduced-motion support, adaptive DPR and live render telemetry.</td>
+      <td>5 material finishes, deterministic cached Canvas PBR, 3 ACES Filmic lighting rigs, model-aware camera fitting (perspective + orthographic), section-cut clipping, point-to-point measurement, compare envelopes, dirty-flag shadow rendering, settled-scene idle rendering, throttled raycast picking, reduced-motion support, adaptive DPR and live render telemetry.</td>
     </tr>
     <tr>
       <td><strong>CAD Mesh Exporters</strong></td>
