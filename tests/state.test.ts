@@ -30,6 +30,7 @@ test("share state round-trips the full workbench configuration", () => {
     sectionAxis: "z",
     sectionPos: 0.375,
     sectionFlip: true,
+    sectionCaps: false,
     compare: "ake",
   };
   const decoded = decodeShareState(`#${encodeShareState(state)}`);

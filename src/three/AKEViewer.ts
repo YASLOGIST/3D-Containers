@@ -57,6 +57,8 @@ export interface ViewerState {
   sectionPos: number;
   /** keep the opposite side of the section plane */
   sectionFlip: boolean;
+  /** render closed stencil caps on the section cut faces */
+  sectionCaps: boolean;
   /** certified envelope of another family, overlaid base-centre aligned */
   compare: ModelId | "none";
 }
@@ -84,6 +86,7 @@ export const DEFAULT_STATE: ViewerState = {
   sectionAxis: "x",
   sectionPos: 0.5,
   sectionFlip: false,
+  sectionCaps: true,
   compare: "none",
 };
 
@@ -301,6 +304,11 @@ export class AKEViewer {
   /* inspection tools: section plane, measure, compare envelope */
   private sectionPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
   private sectionHelper: THREE.Group | null = null;
+  /* stencil-cap mirror: colourless back/front stencil copies of every
+     solid mesh, parented to the meshes so explode/door motion is free */
+  private stencilGroups: THREE.Group[] = [];
+  private stencilMats: THREE.Material[] = [];
+  private capMesh: THREE.Mesh | null = null;
   /** bounds cache so dragging the section slider avoids a full traversal */
   private sectionBoxCache: THREE.Box3 | null = null;
   private measureMode = false;
@@ -334,6 +342,8 @@ export class AKEViewer {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: "high-performance",
+      // three r180 defaults the stencil buffer OFF; section caps need it.
+      stencil: true,
     });
     this.renderer.setPixelRatio(this.baseDpr);
     this.renderer.setSize(host.clientWidth || 800, host.clientHeight || 600);
@@ -536,7 +546,15 @@ export class AKEViewer {
     this.key = new THREE.DirectionalLight(m.key.color, m.key.intensity);
     this.key.position.set(...m.key.pos);
     this.key.castShadow = true;
-    this.key.shadow.mapSize.set(2048, 2048);
+    // Touch-first small screens get a quarter-cost shadow map; the contact
+    // shadow under a 3 m ULD reads identically at phone sizes.
+    const coarseSmall =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches &&
+      Math.min(window.innerWidth, window.innerHeight) <= 820;
+    const shadowSize = coarseSmall ? 1024 : 2048;
+    this.key.shadow.mapSize.set(shadowSize, shadowSize);
     this.key.shadow.camera.near = 0.5;
     this.key.shadow.camera.far = 24;
     const s = 3.2;
@@ -732,8 +750,13 @@ export class AKEViewer {
     this.container?.group.traverse((o) => {
       const mesh = o as THREE.Mesh;
       const mm = mesh.material as THREE.Material | THREE.Material[] | undefined;
-      if (Array.isArray(mm)) mm.forEach(fn);
-      else if (mm) fn(mm);
+      // Stencil-cap materials must never take wireframe/env state: a
+      // wireframed stencil pass marks only edges and the caps would leak.
+      const apply = (m: THREE.Material) => {
+        if (!m.userData.isStencilCap) fn(m);
+      };
+      if (Array.isArray(mm)) mm.forEach(apply);
+      else if (mm) apply(mm);
     });
   }
 
@@ -783,11 +806,148 @@ export class AKEViewer {
     );
     fill.renderOrder = 997;
     edge.renderOrder = 997;
+    fill.name = "sectionFill";
     g.add(fill, edge);
     g.visible = false;
     g.userData.isAnnotation = true;
     this.sectionHelper = g;
     this.scene.add(g);
+  }
+
+  /**
+   * (Re)build the stencil mirror that closes section-cut faces.
+   *
+   * Classic three.js stencil capping: every solid mesh gets two colourless
+   * children — back faces increment the stencil buffer, front faces
+   * decrement it, both clipped by the section plane. A cap plane then
+   * shades exactly the pixels whose stencil value is non-zero, i.e. the
+   * exposed interior of the cut. Shared back/front materials and shared
+   * geometry keep this cheap; parenting mirrors to the meshes makes
+   * exploded views and door swings correct for free.
+   *
+   * Transparent materials (decals, the PMC ghost contour) are excluded —
+   * they are surfaces and guides, not solids with an interior to close.
+   */
+  private rebuildStencilCaps() {
+    this.disposeStencilCaps();
+    const on =
+      this.state.section && this.state.sectionCaps && !!this.container;
+    if (this.capMesh) this.capMesh.visible = on;
+    if (!on || !this.container) return;
+
+    const makeStencilMat = (side: THREE.Side, op: THREE.StencilOp) => {
+      const m = new THREE.MeshBasicMaterial();
+      m.side = side;
+      m.depthWrite = false;
+      m.depthTest = false;
+      m.colorWrite = false;
+      m.stencilWrite = true;
+      m.stencilFunc = THREE.AlwaysStencilFunc;
+      m.stencilFail = op;
+      m.stencilZFail = op;
+      m.stencilZPass = op;
+      m.clippingPlanes = [this.sectionPlane];
+      m.userData.isStencilCap = true;
+      return m;
+    };
+    const backMat = makeStencilMat(
+      THREE.BackSide,
+      THREE.IncrementWrapStencilOp,
+    );
+    const frontMat = makeStencilMat(
+      THREE.FrontSide,
+      THREE.DecrementWrapStencilOp,
+    );
+    this.stencilMats = [backMat, frontMat];
+
+    const targets: THREE.Mesh[] = [];
+    this.container.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.geometry) return;
+      const mm = m.material as THREE.Material | THREE.Material[] | undefined;
+      const list = Array.isArray(mm) ? mm : mm ? [mm] : [];
+      if (list.some((x) => x.transparent)) return;
+      targets.push(m);
+    });
+
+    for (const mesh of targets) {
+      const group = new THREE.Group();
+      group.name = "__sectionStencil";
+      const make = (mat: THREE.Material) => {
+        let s: THREE.Mesh;
+        const inst = mesh as THREE.InstancedMesh;
+        if (inst.isInstancedMesh) {
+          const im = new THREE.InstancedMesh(
+            mesh.geometry,
+            mat,
+            inst.count,
+          );
+          im.instanceMatrix = inst.instanceMatrix; // shared, never disposed here
+          s = im;
+        } else {
+          s = new THREE.Mesh(mesh.geometry, mat);
+        }
+        s.renderOrder = 1;
+        s.castShadow = false;
+        s.receiveShadow = false;
+        s.frustumCulled = mesh.frustumCulled;
+        s.raycast = () => {}; // picking must only see real surfaces
+        s.userData.isStencilCap = true;
+        return s;
+      };
+      group.add(make(backMat), make(frontMat));
+      mesh.add(group);
+      this.stencilGroups.push(group);
+    }
+
+    if (!this.capMesh) {
+      const capMat = new THREE.MeshStandardMaterial({
+        color: "#ffb020",
+        metalness: 0.15,
+        roughness: 0.55,
+        emissive: new THREE.Color("#3a2400"),
+        side: THREE.DoubleSide,
+        stencilWrite: true,
+        stencilRef: 0,
+        stencilFunc: THREE.NotEqualStencilFunc,
+        stencilFail: THREE.ReplaceStencilOp,
+        stencilZFail: THREE.ReplaceStencilOp,
+        stencilZPass: THREE.ReplaceStencilOp,
+      });
+      capMat.userData.isStencilCap = true;
+      this.capMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), capMat);
+      this.capMesh.renderOrder = 2;
+      this.capMesh.castShadow = false;
+      this.capMesh.receiveShadow = false;
+      this.capMesh.raycast = () => {};
+      this.capMesh.userData.isAnnotation = true;
+      this.capMesh.onAfterRender = (renderer) => renderer.clearStencil();
+      this.scene.add(this.capMesh);
+    }
+    this.capMesh.visible = true;
+  }
+
+  private disposeStencilCaps() {
+    for (const g of this.stencilGroups) g.removeFromParent();
+    this.stencilGroups = [];
+    // Geometry and instanceMatrix are shared with the real meshes — only
+    // the two shared stencil materials are ours to release.
+    this.stencilMats.forEach((m) => m.dispose());
+    this.stencilMats = [];
+    if (this.capMesh) this.capMesh.visible = false;
+  }
+
+  /**
+   * Physically detach the stencil mirror for the duration of a mesh
+   * export (OBJ/STL exporters traverse invisible objects too, so hiding
+   * is not enough). Returns the restore function.
+   */
+  private detachStencilCaps(): () => void {
+    const parents = this.stencilGroups.map((g) => g.parent);
+    this.stencilGroups.forEach((g) => g.removeFromParent());
+    return () => {
+      this.stencilGroups.forEach((g, i) => parents[i]?.add(g));
+    };
   }
 
   /**
@@ -813,11 +973,14 @@ export class AKEViewer {
         for (const m of list) {
           if (seen.has(m)) continue;
           seen.add(m);
+          // Stencil-cap materials own their clipping binding (below).
+          if (m.userData.isStencilCap) continue;
           m.clippingPlanes = planes;
           (m as THREE.MeshStandardMaterial).clipShadows = true;
           m.needsUpdate = true;
         }
       });
+      this.rebuildStencilCaps();
     }
     if (!on) return;
 
@@ -851,6 +1014,15 @@ export class AKEViewer {
         ),
       );
       this.sectionHelper.scale.set(su * 1.06 + 0.04, sv * 1.06 + 0.04, 1);
+      // With caps on, the stencil cap IS the cut face — the translucent
+      // helper fill would z-fight it. Keep the amber edge frame only.
+      const fill = this.sectionHelper.getObjectByName("sectionFill");
+      if (fill) fill.visible = !this.state.sectionCaps;
+      if (this.capMesh?.visible) {
+        this.capMesh.position.copy(this.sectionHelper.position);
+        this.capMesh.quaternion.copy(this.sectionHelper.quaternion);
+        this.capMesh.scale.copy(this.sectionHelper.scale);
+      }
     }
     this.cb.onSection?.({ axis, offset: spec.offset, extent: spec.extent });
   }
@@ -1164,7 +1336,11 @@ export class AKEViewer {
       reeferOf(this.container)?.setSetpoint?.(patch.setpoint);
     if (patch.load !== undefined) this.container?.setLoad?.(patch.load);
 
-    if (patch.section !== undefined && patch.section !== prev.section) {
+    if (
+      (patch.section !== undefined && patch.section !== prev.section) ||
+      (patch.sectionCaps !== undefined &&
+        patch.sectionCaps !== prev.sectionCaps)
+    ) {
       this.updateSection(true);
       this.markShadowsDirty();
     } else if (
@@ -1668,23 +1844,43 @@ export class AKEViewer {
   }
 
   async exportGLB(): Promise<Blob> {
-    const exporter = new GLTFExporter();
-    const buf = (await exporter.parseAsync(this.exportRoot(), {
-      binary: true,
-      onlyVisible: true,
-      maxTextureSize: 1024,
-    })) as ArrayBuffer;
-    return new Blob([buf], { type: "model/gltf-binary" });
+    // Exports are always the whole, uncapped solid: detach the stencil
+    // mirror so no duplicated colourless geometry reaches the file.
+    const restore = this.detachStencilCaps();
+    try {
+      const exporter = new GLTFExporter();
+      const buf = (await exporter.parseAsync(this.exportRoot(), {
+        binary: true,
+        onlyVisible: true,
+        maxTextureSize: 1024,
+      })) as ArrayBuffer;
+      return new Blob([buf], { type: "model/gltf-binary" });
+    } finally {
+      restore();
+      this.wake();
+    }
   }
 
   exportOBJ(): string {
-    return new OBJExporter().parse(this.exportRoot());
+    const restore = this.detachStencilCaps();
+    try {
+      return new OBJExporter().parse(this.exportRoot());
+    } finally {
+      restore();
+      this.wake();
+    }
   }
 
   exportSTL(): DataView {
-    return new STLExporter().parse(this.exportRoot(), {
-      binary: true,
-    }) as DataView;
+    const restore = this.detachStencilCaps();
+    try {
+      return new STLExporter().parse(this.exportRoot(), {
+        binary: true,
+      }) as DataView;
+    } finally {
+      restore();
+      this.wake();
+    }
   }
 
   /** Measured envelope of the generated solid. */
@@ -1722,6 +1918,13 @@ export class AKEViewer {
       });
       this.scene.remove(this.sectionHelper);
       this.sectionHelper = null;
+    }
+    this.disposeStencilCaps();
+    if (this.capMesh) {
+      this.capMesh.geometry.dispose();
+      (this.capMesh.material as THREE.Material).dispose();
+      this.scene.remove(this.capMesh);
+      this.capMesh = null;
     }
     this.skyBgs.forEach((t) => t.dispose());
     this.skyEnvs.forEach((t) => t.dispose());

@@ -51,6 +51,7 @@ export function encodeShareState(s: ViewerState): string {
   p.set("ax", s.sectionAxis);
   p.set("spos", String(r3(s.sectionPos)));
   p.set("flp", b01(s.sectionFlip));
+  p.set("cap", b01(s.sectionCaps));
   p.set("cmp", s.compare);
   return p.toString();
 }
@@ -112,6 +113,7 @@ export function decodeShareState(hash: string): Partial<ViewerState> {
     ["reefer", "rf"],
     ["section", "sec"],
     ["sectionFlip", "flp"],
+    ["sectionCaps", "cap"],
   ];
   for (const [field, key] of bools) {
     const v = bool01(get(key));

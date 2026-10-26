@@ -292,6 +292,12 @@ function ControlDeckBase({
                 view-only — exports stay whole
               </span>
             </div>
+            <Toggle
+              label="Solid caps"
+              hint="closed cut faces · stencil"
+              value={state.sectionCaps}
+              onChange={(v) => set({ sectionCaps: v })}
+            />
           </div>
         )}
         {measureOn && (
@@ -366,8 +372,8 @@ function ControlDeckBase({
       </Block>
 
       <p className="border-t border-line-soft pt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-dim">
-        keys · 1–4 models · f fit · o ortho · m measure · s section · d dims · p
-        png
+        keys · 1–4 models · f fit · o ortho · m measure · s section · c caps ·
+        d dims · p png
       </p>
     </Panel>
   );

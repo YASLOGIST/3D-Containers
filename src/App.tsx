@@ -424,6 +424,12 @@ export default function App() {
       else if (k === "d") patch({ dimensions: !state.dimensions });
       else if (k === "w") patch({ wireframe: !state.wireframe });
       else if (k === "s") patch({ section: !state.section });
+      else if (k === "c")
+        patch(
+          state.section
+            ? { sectionCaps: !state.sectionCaps }
+            : { section: true, sectionCaps: true },
+        );
       else if (k === "m") toggleMeasure(!measureOn);
       else if (k === "p") void doSnapshot();
       else if (k === "escape") {
@@ -506,7 +512,7 @@ export default function App() {
       />
 
       {/* ---------------- top bar ---------------- */}
-      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 p-3 sm:p-4">
+      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 p-3 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:p-4">
         <div className="pointer-events-auto flex items-center gap-3">
           <Mark />
           <div>
@@ -743,7 +749,7 @@ export default function App() {
       </aside>
 
       {/* ---------------- bottom status strip ---------------- */}
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 backdrop-blur-sm">
+      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
         <div className="flex items-center gap-3 overflow-hidden px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
           <span
             className={cn(
@@ -808,7 +814,7 @@ export default function App() {
       </footer>
 
       {/* ---------------- mobile sheet ---------------- */}
-      <div className="pointer-events-auto absolute inset-x-0 bottom-[38px] z-30 lg:hidden">
+      <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden">
         <div className="flex items-center justify-center gap-1.5 px-3 pb-2">
           <Btn
             active={sheet && tab === "spec"}
