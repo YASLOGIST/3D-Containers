@@ -15,8 +15,12 @@ import {
   AKEViewer,
   DEFAULT_STATE,
   type HoverInfo,
+  type MeasureInfo,
+  type SectionInfo,
   type ViewerState,
 } from "@/three/AKEViewer";
+import { decodeShareState, encodeShareState } from "@/lib/state";
+import { formatDistance } from "@/lib/units";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
 import { ControlDeck } from "@/components/ControlDeck";
@@ -97,11 +101,29 @@ const isSourceName = (value: string): value is SourceName => value in SOURCES;
 
 type Tab = "spec" | "parts" | "source";
 
+/** Initial workbench state: defaults overlaid with any shared URL hash. */
+function initialState(): ViewerState {
+  if (typeof window === "undefined") return DEFAULT_STATE;
+  const shared = decodeShareState(window.location.hash);
+  const merged = { ...DEFAULT_STATE, ...shared };
+  // A shared setpoint must respect the selected model's controller range.
+  const range = MODELS[merged.model].setpointRange;
+  if (range) {
+    merged.setpoint =
+      shared.setpoint !== undefined
+        ? Math.min(range.max, Math.max(range.min, shared.setpoint))
+        : range.default;
+  }
+  if (merged.compare === merged.model) merged.compare = "none";
+  return merged;
+}
+
 export default function App() {
   const host = useRef<HTMLDivElement>(null);
   const viewer = useRef<AKEViewer | null>(null);
+  const [bootState] = useState<ViewerState>(initialState);
 
-  const [state, setState] = useState<ViewerState>(DEFAULT_STATE);
+  const [state, setState] = useState<ViewerState>(bootState);
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [measured, setMeasured] = useState<{
@@ -113,7 +135,14 @@ export default function App() {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [perf, setPerf] = useState({ fps: 0, triangles: 0, calls: 0 });
   const [tab, setTab] = useState<Tab>("spec");
-  const [source, setSource] = useState<SourceName>("akeLD3.ts");
+  const [source, setSource] = useState<SourceName>(
+    isSourceName(MODELS[bootState.model].sourceFile)
+      ? (MODELS[bootState.model].sourceFile as SourceName)
+      : "akeLD3.ts",
+  );
+  const [measureOn, setMeasureOn] = useState(false);
+  const [measure, setMeasure] = useState<MeasureInfo | null>(null);
+  const [sectionInfo, setSectionInfo] = useState<SectionInfo | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -128,7 +157,7 @@ export default function App() {
     const boot = () => {
       if (!live || !host.current) return;
       try {
-        v = new AKEViewer(host.current, DEFAULT_STATE, {
+        v = new AKEViewer(host.current, bootState, {
           onBuild: (c) => {
             setStats(c.stats as Stats);
             setAssemblies([...c.assemblies]);
@@ -140,6 +169,8 @@ export default function App() {
           },
           onHover: setHover,
           onPerf: setPerf,
+          onMeasure: setMeasure,
+          onSection: setSectionInfo,
           onError: (message) => {
             setError(message);
             if (message) setReady(true);
@@ -173,6 +204,9 @@ export default function App() {
     viewer.current?.setState(next);
   }, []);
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(
@@ -186,6 +220,7 @@ export default function App() {
     patch({
       model: id,
       setpoint: next.setpointRange?.default ?? state.setpoint,
+      compare: state.compare === id ? "none" : state.compare,
     });
     if (isSourceName(next.sourceFile)) setSource(next.sourceFile);
     setHighlight(null);
@@ -235,6 +270,109 @@ export default function App() {
     viewer.current?.highlight(id);
   };
 
+  const toggleMeasure = useCallback((on: boolean) => {
+    setMeasureOn(on);
+    viewer.current?.setMeasureMode(on);
+    if (!on) setMeasure(null);
+  }, []);
+
+  /* ---------------- shareable URL state ---------------- */
+  useEffect(() => {
+    const encoded = `#${encodeShareState(state)}`;
+    const t = window.setTimeout(() => {
+      if (window.location.hash !== encoded) {
+        window.history.replaceState(null, "", encoded);
+      }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [state]);
+
+  useEffect(() => {
+    const onHash = () => {
+      const shared = decodeShareState(window.location.hash);
+      if (!Object.keys(shared).length) return;
+      const current = stateRef.current;
+      const merged = { ...current, ...shared };
+      // Ignore hashes that merely echo our own writes.
+      if (encodeShareState(merged) === encodeShareState(current)) return;
+      const range = MODELS[merged.model].setpointRange;
+      if (range) {
+        merged.setpoint = Math.min(
+          range.max,
+          Math.max(range.min, merged.setpoint),
+        );
+      }
+      if (merged.compare === merged.model) merged.compare = "none";
+      setState(merged);
+      viewer.current?.setState(merged);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const copyLink = () => {
+    const url = `${window.location.origin}${window.location.pathname}#${encodeShareState(state)}`;
+    if (!navigator.clipboard) {
+      notify("Copy the address-bar URL to share this setup");
+      return;
+    }
+    navigator.clipboard
+      .writeText(url)
+      .then(() => notify("Share link copied"))
+      .catch(() => notify("Clipboard unavailable"));
+  };
+
+  const doSnapshot = async () => {
+    const v = viewer.current;
+    if (!v || exporting) return;
+    setExporting(true);
+    try {
+      const blob = await v.snapshotPNG();
+      const stamp = MODELS[state.model].name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      downloadBlob(blob, `${stamp}-view.png`);
+      notify(`PNG written · ${(blob.size / 1024).toFixed(0)} KB`);
+    } catch {
+      notify("Snapshot failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  /* ---------------- keyboard shortcuts ---------------- */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (target?.isContentEditable) return;
+      const ids = Object.keys(MODELS) as ModelId[];
+      const k = e.key.toLowerCase();
+      if (k >= "1" && k <= "4") selectModel(ids[Number(k) - 1]);
+      else if (k === "f") viewer.current?.frameAll();
+      else if (k === "i") viewer.current?.setView("iso");
+      else if (k === "o")
+        patch({
+          projection: state.projection === "persp" ? "ortho" : "persp",
+        });
+      else if (k === "d") patch({ dimensions: !state.dimensions });
+      else if (k === "w") patch({ wireframe: !state.wireframe });
+      else if (k === "s") patch({ section: !state.section });
+      else if (k === "m") toggleMeasure(!measureOn);
+      else if (k === "escape") {
+        if (measureOn) toggleMeasure(false);
+        else viewer.current?.clearMeasure();
+        setSheet(false);
+      } else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const spec = MODELS[state.model];
   const dimsLabel = spec.palletOption
     ? `${spec.dims.width.toFixed(2)} × ${spec.dims.depth.toFixed(2)} m deck · ${(spec.dims.contourHeight ?? 0).toFixed(2)} m contour`
@@ -263,6 +401,15 @@ export default function App() {
     "generated at runtime · no mesh assets",
   ];
   const activeSource = SOURCE_META[source];
+  const measureLabel =
+    measure?.distance != null
+      ? `${formatDistance(measure.distance)} · Δ ${measure.dx.toFixed(2)}/${measure.dy.toFixed(2)}/${measure.dz.toFixed(2)} m`
+      : measureOn && measure?.points === 1
+        ? "first point set — click the second"
+        : null;
+  const sectionReadout = sectionInfo
+    ? `${sectionInfo.axis.toUpperCase()} +${sectionInfo.offset.toFixed(2)} m`
+    : `${Math.round(state.sectionPos * 100)}%`;
 
   return (
     <div className="relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
@@ -348,16 +495,31 @@ export default function App() {
           <Btn
             onClick={() => doExport("obj")}
             disabled={!ready || !!error || exporting}
-            title="Wavefront OBJ"
+            title="Wavefront OBJ · metres"
+            className="hidden sm:inline-flex"
           >
             <DlIcon /> obj
           </Btn>
           <Btn
             onClick={() => doExport("stl")}
             disabled={!ready || !!error || exporting}
-            title="Binary STL for print / CAD"
+            title="Binary STL · units are metres (scale ×1000 for mm slicers)"
+            className="hidden sm:inline-flex"
           >
             <DlIcon /> stl
+          </Btn>
+          <Btn
+            onClick={doSnapshot}
+            disabled={!ready || !!error || exporting}
+            title="Save the current viewport as PNG"
+          >
+            png
+          </Btn>
+          <Btn
+            onClick={copyLink}
+            title="Copy a link that reproduces this exact setup"
+          >
+            link
           </Btn>
           <Btn
             active={tab === "source"}
@@ -380,6 +542,11 @@ export default function App() {
             set={patch}
             onView={(view) => viewer.current?.setView(view)}
             onFrame={() => viewer.current?.frameAll()}
+            measureOn={measureOn}
+            onMeasureToggle={toggleMeasure}
+            onMeasureClear={() => viewer.current?.clearMeasure()}
+            measureLabel={measureLabel}
+            sectionLabel={sectionReadout}
           />
         </div>
       </div>
@@ -503,9 +670,16 @@ export default function App() {
           </span>
           <span className="hidden text-dim lg:inline">{spec.name}</span>
           <span className="ml-auto hidden max-w-[38%] truncate text-amber md:inline">
-            {hover
-              ? `${hover.assembly} → ${hover.part}`
-              : "hover the model to identify components"}
+            {measureOn
+              ? (measureLabel ?? "measure · click two surface points")
+              : hover
+                ? `${hover.assembly} → ${hover.part}`
+                : "hover the model to identify components"}
+          </span>
+          <span className="sr-only" role="status" aria-live="polite">
+            {measure?.distance != null
+              ? `Measured distance ${formatDistance(measure.distance)}`
+              : ""}
           </span>
         </div>
         <div className="relative h-[18px] overflow-hidden border-t border-line-soft/70 bg-void/60">
@@ -593,6 +767,11 @@ export default function App() {
                 set={patch}
                 onView={(view) => viewer.current?.setView(view)}
                 onFrame={() => viewer.current?.frameAll()}
+                measureOn={measureOn}
+                onMeasureToggle={toggleMeasure}
+                onMeasureClear={() => viewer.current?.clearMeasure()}
+                measureLabel={measureLabel}
+                sectionLabel={sectionReadout}
               />
             </div>
           </div>
