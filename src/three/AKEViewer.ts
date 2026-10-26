@@ -678,24 +678,34 @@ export class AKEViewer {
     this.interior.intensity =
       this.state.section || this.state.door > 0.25 ? 1.7 : 0.5;
 
-    const x0 = this.container.profile[0].x;
+    const prof = this.container.profile;
+    const x0 = Math.min(...prof.map((p) => p.x));
+    const minY = Math.min(...prof.map((p) => p.y));
+    const baseLeft = Math.min(
+      ...prof.filter((p) => Math.abs(p.y - minY) < 1e-6).map((p) => p.x),
+    );
     this.annot = createAnnotations({
       code: spec.code,
       baseWidth: spec.dims.width,
       baseLength: spec.dims.depth,
       height: spec.dims.height,
       topWidth:
-        spec.contourOption && this.state.contour
+        spec.annotationKind || (spec.contourOption && this.state.contour)
           ? spec.dims.topWidth
           : spec.dims.width,
       contourHeight: spec.dims.contourHeight,
       x0,
+      baseLeft,
+      taperDeg: spec.taperDeg,
+      taperLabel: spec.taperLabel,
       contour: spec.contourOption && this.state.contour,
       kind: spec.palletOption
         ? "pallet"
-        : spec.contourOption
-          ? "contoured"
-          : "cuboid",
+        : spec.annotationKind
+          ? spec.annotationKind
+          : spec.contourOption
+            ? "contoured"
+            : "cuboid",
     });
     this.annot.group.visible = this.state.dimensions;
     this.scene.add(this.annot.group);

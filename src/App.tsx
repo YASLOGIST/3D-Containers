@@ -2,9 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import akeSource from "./three/akeLD3.ts?raw";
+import akhSource from "./three/akh.ts?raw";
+import alfSource from "./three/alf.ts?raw";
 import rknSource from "./three/rkn.ts?raw";
 import rapSource from "./three/rap.ts?raw";
+import amaSource from "./three/ama.ts?raw";
 import pmcSource from "./three/pmc.ts?raw";
+import profileSource from "./three/profileContainer.ts?raw";
 import primitivesSource from "./three/primitives.ts?raw";
 import viewerSource from "./three/AKEViewer.ts?raw";
 import textureSource from "./three/textures.ts?raw";
@@ -39,9 +43,13 @@ import { cn } from "@/utils/cn";
 
 const SOURCES = {
   "akeLD3.ts": akeSource,
+  "akh.ts": akhSource,
+  "alf.ts": alfSource,
   "rkn.ts": rknSource,
   "rap.ts": rapSource,
+  "ama.ts": amaSource,
   "pmc.ts": pmcSource,
+  "profileContainer.ts": profileSource,
   "models.ts": modelsSource,
   "primitives.ts": primitivesSource,
   "AKEViewer.ts": viewerSource,
@@ -61,6 +69,16 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "Contoured LD-3 generator: one offset polygon drives hull, frames, door and hardware.",
     },
+    "akh.ts": {
+      entry: "createAKHContainer()",
+      description:
+        "LD3-45 wrapper: certified A320-family envelope bound to the symmetric-profile engine.",
+    },
+    "alf.ts": {
+      entry: "createALFContainer()",
+      description:
+        "LD6 wrapper: full-width twin-contour envelope bound to the symmetric-profile engine.",
+    },
     "rkn.ts": {
       entry: "createRKNContainer()",
       description:
@@ -70,6 +88,16 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createRAPContainer()",
       description:
         "Full-width cold-chain generator with insulated panels and twin condenser fans.",
+    },
+    "ama.ts": {
+      entry: "createAMAContainer()",
+      description:
+        "M-1 wrapper: main-deck 96 in envelope with nominal roof chamfer, bound to the symmetric-profile engine.",
+    },
+    "profileContainer.ts": {
+      entry: "createProfileContainer()",
+      description:
+        "Parameterized engine for symmetric extruded-section ULDs (AKH, ALF, AMA): ring hull, edge frame, hinged door, blind end, chassis.",
     },
     "pmc.ts": {
       entry: "createPMCContainer()",
@@ -414,7 +442,7 @@ export default function App() {
       if (target?.isContentEditable) return;
       const ids = Object.keys(MODELS) as ModelId[];
       const k = e.key.toLowerCase();
-      if (k >= "1" && k <= "4") selectModel(ids[Number(k) - 1]);
+      if (k >= "1" && Number(k) <= ids.length) selectModel(ids[Number(k) - 1]);
       else if (k === "f") viewer.current?.frameAll();
       else if (k === "i") viewer.current?.setView("iso");
       else if (k === "o")

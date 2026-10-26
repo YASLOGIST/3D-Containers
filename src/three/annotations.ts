@@ -161,8 +161,14 @@ export interface AnnotationOptions {
   x0: number;
   /** true only when the AKE's fuselage contour is active */
   contour: boolean;
-  kind: "contoured" | "cuboid" | "pallet";
+  kind: "contoured" | "cuboid" | "pallet" | "dual-contour" | "roof-chamfer";
   contourHeight?: number;
+  /** left edge of the base (defaults to x0; symmetric winged sections sit inset from x0) */
+  baseLeft?: number;
+  /** slope angle from vertical, degrees (dual-contour / roof-chamfer kinds) */
+  taperDeg?: number;
+  /** caption under the slope angle */
+  taperLabel?: string;
 }
 
 export interface AnnotationData {
@@ -181,12 +187,13 @@ export function createAnnotations(o: AnnotationOptions): AnnotationData {
   const contourH = o.contourHeight ?? 0;
   const envelopeH = o.kind === "pallet" ? H + contourH : H;
   const showContour = o.kind === "contoured" && o.contour && TW > BW + 1e-6;
+  const baseLeft = o.baseLeft ?? x0;
 
   // Base width — in front of the container.
   dimension(
     group,
-    new THREE.Vector3(x0, 0.004, BL / 2 + pad),
-    new THREE.Vector3(x0 + BW, 0.004, BL / 2 + pad),
+    new THREE.Vector3(baseLeft, 0.004, BL / 2 + pad),
+    new THREE.Vector3(baseLeft + BW, 0.004, BL / 2 + pad),
     metric(BW),
     { sub: "BASE WIDTH", labelOffset: new THREE.Vector3(0, 0.09, 0.02) },
   );
@@ -272,6 +279,48 @@ export function createAnnotations(o: AnnotationOptions): AnnotationData {
     const vertical = labelSprite("0.0\u00B0", "VERTICAL WALLS");
     vertical.position.set(x0 - pad - 0.18, H * 0.58, -BL / 2 - 0.08);
     group.add(vertical);
+  } else if (o.kind === "dual-contour" || o.kind === "roof-chamfer") {
+    // Symmetric sections: top span is centred on the envelope centreline —
+    // an overall winged width (dual-contour) or a roof flat (roof-chamfer).
+    const envCx = (x0 + rightX) / 2;
+    dimension(
+      group,
+      new THREE.Vector3(envCx - TW / 2, H + 0.3, 0),
+      new THREE.Vector3(envCx + TW / 2, H + 0.3, 0),
+      metric(TW),
+      {
+        sub: o.kind === "dual-contour" ? "OVERALL TOP WIDTH" : "ROOF FLAT",
+        labelOffset: new THREE.Vector3(0, 0.1, 0),
+        witnessY: H,
+      },
+    );
+
+    const slopeMat = new THREE.LineDashedMaterial({
+      color: INK,
+      transparent: true,
+      opacity: 0.3,
+      dashSize: 0.05,
+      gapSize: 0.04,
+    });
+    for (const s of [-1, 1]) {
+      const slope = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(baseLeft + (s > 0 ? BW : 0), 0.004, BL / 2 + 0.16),
+          new THREE.Vector3(envCx + s * (TW / 2), H, BL / 2 + 0.16),
+        ]),
+        slopeMat,
+      );
+      slope.computeLineDistances();
+      group.add(slope);
+    }
+    if (o.taperDeg !== undefined) {
+      const slopeLabel = labelSprite(
+        `${o.taperDeg.toFixed(1)}\u00B0`,
+        o.taperLabel ?? "WING ANGLE",
+      );
+      slopeLabel.position.set(rightX + 0.34, H * 0.6, BL / 2 + 0.16);
+      group.add(slopeLabel);
+    }
   }
 
   // Certified / nominal build envelope box.
