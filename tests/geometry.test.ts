@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { AKE_DIMENSIONS, contourProfile } from "../src/three/akeLD3.ts";
+import { AKH_DIMENSIONS, akhProfile } from "../src/three/akh.ts";
+import { ALF_DIMENSIONS, alfProfile } from "../src/three/alf.ts";
+import { AMA_DIMENSIONS, amaProfile } from "../src/three/ama.ts";
 import { MODELS } from "../src/three/models.ts";
 import { PMC_DIMENSIONS, pmcProfile } from "../src/three/pmc.ts";
 import { offsetPolygon, type V2 } from "../src/three/primitives.ts";
@@ -65,6 +68,16 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: AKE_DIMENSIONS.baseLength,
       height: AKE_DIMENSIONS.height,
     },
+    akh: {
+      width: AKH_DIMENSIONS.baseWidth,
+      depth: AKH_DIMENSIONS.baseLength,
+      height: AKH_DIMENSIONS.height,
+    },
+    alf: {
+      width: ALF_DIMENSIONS.baseWidth,
+      depth: ALF_DIMENSIONS.baseLength,
+      height: ALF_DIMENSIONS.height,
+    },
     rkn: {
       width: RKN_DIMENSIONS.width,
       depth: RKN_DIMENSIONS.depth,
@@ -74,6 +87,11 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       width: RAP_DIMENSIONS.width,
       depth: RAP_DIMENSIONS.depth,
       height: RAP_DIMENSIONS.height,
+    },
+    ama: {
+      width: AMA_DIMENSIONS.baseWidth,
+      depth: AMA_DIMENSIONS.baseLength,
+      height: AMA_DIMENSIONS.height,
     },
     pmc: {
       width: PMC_DIMENSIONS.width,
@@ -103,6 +121,42 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       assert.ok(model.setpointRange.default >= model.setpointRange.min);
       assert.ok(model.setpointRange.default <= model.setpointRange.max);
     }
+  }
+});
+
+test("symmetric fleet sections (AKH/ALF/AMA) are CCW, mirrored and envelope-exact", () => {
+  const cases = [
+    { profile: akhProfile(), dims: AKH_DIMENSIONS, points: 6 },
+    { profile: alfProfile(), dims: ALF_DIMENSIONS, points: 4 },
+    { profile: amaProfile(), dims: AMA_DIMENSIONS, points: 6 },
+  ];
+  for (const { profile, dims, points } of cases) {
+    assert.equal(profile.length, points);
+    assert.ok(profile.every(isFinitePoint));
+    assert.ok(area(profile) > 0, "CCW polygons must have positive signed area");
+
+    // bilateral symmetry about x = 0: every vertex has a mirrored twin
+    for (const p of profile) {
+      assert.ok(
+        profile.some((q) => Math.abs(q.x + p.x) < 1e-9 && Math.abs(q.y - p.y) < 1e-9),
+        `vertex (${p.x}, ${p.y}) needs a mirror twin`,
+      );
+    }
+
+    // envelope extents match the certified dimensions
+    const xs = profile.map((p) => p.x);
+    const topXs = profile.filter((p) => Math.abs(p.y - dims.height) < 1e-9).map((p) => p.x);
+    const baseXs = profile.filter((p) => Math.abs(p.y - 0.09) < 1e-9).map((p) => p.x);
+    assert.ok(Math.abs(Math.max(...xs) - Math.min(...xs) - Math.max(dims.baseWidth, dims.topWidth)) < 1e-9);
+    assert.ok(Math.abs(Math.max(...topXs) - Math.min(...topXs) - dims.topWidth) < 1e-9);
+    assert.ok(Math.abs(Math.max(...baseXs) - Math.min(...baseXs) - dims.baseWidth) < 1e-9);
+    assert.ok(Math.abs(Math.max(...profile.map((p) => p.y)) - dims.height) < 1e-9);
+
+    // the shared offset kernel must stay finite and area-reducing on hexagons
+    const inner = offsetPolygon(profile, 0.047);
+    assert.ok(inner.every(isFinitePoint));
+    assert.ok(Math.abs(area(inner)) < Math.abs(area(profile)));
+    assert.ok(Math.abs(area(inner)) > 0);
   }
 });
 

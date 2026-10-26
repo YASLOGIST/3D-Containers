@@ -15,11 +15,14 @@ import type {
   ViewerContainer,
 } from "./primitives";
 import { AKE_DIMENSIONS, createAKEContainer } from "./akeLD3";
+import { AKH_DIMENSIONS, createAKHContainer } from "./akh";
+import { ALF_DIMENSIONS, createALFContainer } from "./alf";
 import { RKN_DIMENSIONS, createRKNContainer } from "./rkn";
 import { RAP_DIMENSIONS, createRAPContainer } from "./rap";
+import { AMA_DIMENSIONS, createAMAContainer } from "./ama";
 import { PMC_DIMENSIONS, createPMCContainer } from "./pmc";
 
-export type ModelId = "ake" | "rkn" | "rap" | "pmc";
+export type ModelId = "ake" | "akh" | "alf" | "rkn" | "rap" | "ama" | "pmc";
 
 /** Everything the UI can ask a model to build. */
 export interface ViewerOptions {
@@ -72,6 +75,12 @@ export interface ModelInfo {
   reeferOption: boolean;
   /** is this a flat pallet (no walls, no door, cargo contour instead)? */
   palletOption: boolean;
+  /** section-drawing kind for symmetric profile families (AKH/ALF/AMA) */
+  annotationKind?: "dual-contour" | "roof-chamfer";
+  /** slope angle from vertical drawn on the dimension overlay, degrees */
+  taperDeg?: number;
+  /** caption under the slope angle, e.g. "WING ANGLE (EACH SIDE)" */
+  taperLabel?: string;
   /** human-readable certified volume */
   volumeLabel: string;
   /** extra spec rows for the specification sheet */
@@ -109,6 +118,72 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Net payload", v: "1496 kg" },
     ],
     build: (o) => createAKEContainer(o),
+  },
+  akh: {
+    id: "akh",
+    code: "AKH",
+    name: "AKH · LD3-45",
+    family: "narrowbody lower-deck container",
+    blurb:
+      "The LD3-45 for A320-family lower decks: only 45 in (1.14 m) tall, with wings sloping out on both sides from a low knee to a 2.44 m overall width that fills the narrowbody fuselage. Built by the shared symmetric-profile engine; the 0.30 m knee is a nominal approximation of the A320 bilge curve.",
+    dims: {
+      width: AKH_DIMENSIONS.baseWidth,
+      depth: AKH_DIMENSIONS.baseLength,
+      height: AKH_DIMENSIONS.height,
+      topWidth: AKH_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    annotationKind: "dual-contour",
+    taperDeg: (Math.atan2((AKH_DIMENSIONS.topWidth - AKH_DIMENSIONS.baseWidth) / 2, AKH_DIMENSIONS.height - AKH_DIMENSIONS.kneeHeight) * 180) / Math.PI,
+    taperLabel: "WING ANGLE (EACH SIDE)",
+    volumeLabel: "3.3 m³ · 116 ft³",
+    sourceFile: "akh.ts",
+    featureLabel: "A320-family lower deck · double-wing 45 in contour",
+    ratings: { tareKg: 82, maxGrossKg: 1588, payloadKg: 1506, volumeM3: 3.3 },
+    specs: [
+      { k: "Overall top width", v: "2.44 m", tone: "steel" },
+      { k: "Wing angle", v: "28.2° each side", tone: "steel" },
+      { k: "Certified volume", v: "3.3 m³ · 116 ft³" },
+      { k: "Tare mass", v: "82 kg" },
+      { k: "Max gross", v: "1588 kg", tone: "amber" },
+      { k: "Net payload", v: "1506 kg" },
+    ],
+    build: (o) => createAKHContainer(o),
+  },
+  alf: {
+    id: "alf",
+    code: "ALF",
+    name: "ALF · LD6",
+    family: "full-width lower-deck container",
+    blurb:
+      "The LD6 spans the full widebody lower-deck width on a 60.4 × 125 in base: two LD-3 contours mirrored back to back, each wing sloping the full height at ≈16° to a 4.06 m roof line. One ALF replaces a pair of AKEs — compare them side by side with the envelope overlay.",
+    dims: {
+      width: ALF_DIMENSIONS.baseWidth,
+      depth: ALF_DIMENSIONS.baseLength,
+      height: ALF_DIMENSIONS.height,
+      topWidth: ALF_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    annotationKind: "dual-contour",
+    taperDeg: (Math.atan2((ALF_DIMENSIONS.topWidth - ALF_DIMENSIONS.baseWidth) / 2, ALF_DIMENSIONS.height - ALF_DIMENSIONS.kneeHeight) * 180) / Math.PI,
+    taperLabel: "WING ANGLE (EACH SIDE)",
+    volumeLabel: "8.9 m³ · 316 ft³",
+    sourceFile: "alf.ts",
+    featureLabel: "full-width lower deck · twin-LD3 double contour",
+    ratings: { tareKg: 230, maxGrossKg: 3175, payloadKg: 2945, volumeM3: 8.95 },
+    specs: [
+      { k: "Overall top width", v: "4.06 m", tone: "steel" },
+      { k: "Wing angle", v: "16.1° each side", tone: "steel" },
+      { k: "Certified volume", v: "8.9 m³ · 316 ft³" },
+      { k: "Tare mass", v: "230 kg" },
+      { k: "Max gross", v: "3175 kg", tone: "amber" },
+      { k: "Net payload", v: "2945 kg" },
+    ],
+    build: (o) => createALFContainer(o),
   },
   rkn: {
     id: "rkn",
@@ -171,6 +246,39 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Max gross", v: "6033 kg", tone: "amber" },
     ],
     build: (o) => createRAPContainer(o),
+  },
+  ama: {
+    id: "ama",
+    code: "AMA",
+    name: "AMA · M-1",
+    family: "main-deck container",
+    blurb:
+      "Main-deck box for 747F / 777F freighters on the same 96 × 125 in M-base as the PMC pallet: vertical walls rising 96 in with chamfered upper corners under a flat roof to clear the fuselage crown. Chamfer break (1.95 m) and 2.60 m roof flat are nominal — no manufacturer publishes them.",
+    dims: {
+      width: AMA_DIMENSIONS.baseWidth,
+      depth: AMA_DIMENSIONS.baseLength,
+      height: AMA_DIMENSIONS.height,
+      topWidth: AMA_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    annotationKind: "roof-chamfer",
+    taperDeg: (Math.atan2((AMA_DIMENSIONS.baseWidth - AMA_DIMENSIONS.topWidth) / 2, AMA_DIMENSIONS.height - AMA_DIMENSIONS.kneeHeight) * 180) / Math.PI,
+    taperLabel: "ROOF CHAMFER",
+    volumeLabel: "17.6 m³ · 621 ft³",
+    sourceFile: "ama.ts",
+    featureLabel: "main-deck box · 96 in height · PMC footprint",
+    ratings: { tareKg: 314, maxGrossKg: 6804, payloadKg: 6490, volumeM3: 17.6 },
+    specs: [
+      { k: "Roof flat", v: "2.60 m (nominal)", tone: "steel" },
+      { k: "Roof chamfer", v: "30.5° each side", tone: "steel" },
+      { k: "Certified volume", v: "17.6 m³ · 621 ft³" },
+      { k: "Tare mass", v: "314 kg" },
+      { k: "Max gross", v: "6804 kg", tone: "amber" },
+      { k: "Net payload", v: "6490 kg" },
+    ],
+    build: (o) => createAMAContainer(o),
   },
   pmc: {
     id: "pmc",

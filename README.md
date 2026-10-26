@@ -2,7 +2,7 @@
   <a href="https://www.yaslogist.com">
     <img src="assets/readme/yaslogist-hero.gif" alt="3D-Containers — Zero-Asset Procedural Aviation ULD Geometry Lab · Engineered by YASLOGIST" width="100%" />
   </a>
-  <img src="assets/readme/yaslogist-telemetry-strip.svg" alt="3D-Containers Real-Time Telemetry — CCW Polygon Kernel · 4 Certified ULD Families · Three.js r180 PBR · GLB OBJ STL Export" width="100%" />
+  <img src="assets/readme/yaslogist-telemetry-strip.svg" alt="3D-Containers Real-Time Telemetry — CCW Polygon Kernel · 7 Certified ULD Families · Three.js r180 PBR · GLB OBJ STL Export" width="100%" />
 
   <br />
 
@@ -66,7 +66,7 @@
 
 ## `02 //` Certified ULD Fleet Matrix
 
-All four procedural generators conform to the shared `ContainerBase` / `ViewerContainer` contract in `src/three/models.ts` and `src/three/primitives.ts`, exposing real-time assembly explode groups, part bills-of-materials, and family-specific parametric toggles:
+All seven models conform to the shared `ContainerBase` / `ViewerContainer` contract in `src/three/models.ts` and `src/three/primitives.ts`, exposing real-time assembly explode groups, part bills-of-materials, and family-specific parametric toggles. Four are bespoke generators (`AKE`, `RKN`, `RAP`, `PMC`); three (`AKH`, `ALF`, `AMA`) are thin certified-envelope wrappers over one shared symmetric-profile engine, `src/three/profileContainer.ts`:
 
 <table>
   <thead>
@@ -87,6 +87,20 @@ All four procedural generators conform to the shared `ContainerBase` / `ViewerCo
       <td valign="top">Toggleable fuselage overhang (<code>contour</code>), <code>0°–112°</code> plug/bifold door, cam-latch rods, tie-down rings.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
     </tr>
     <tr>
+      <td valign="top"><strong><code>AKH · LD3-45</code></strong><br /><sub>Narrowbody Lower Deck</sub></td>
+      <td valign="top">A320-family lower-deck container, double-wing hexagon section<br /><code>src/three/akh.ts</code> → <code>profileContainer.ts</code></td>
+      <td valign="top"><code>1.53 × 1.56 × 1.14 m</code><br /><sub><code>2.44 m</code> overall top · <code>28.2°</code> wings each side</sub></td>
+      <td valign="top"><code>3.3 m³</code> (<code>116 ft³</code>)<br /><sub>Tare <code>82 kg</code> · Gross <code>1,588 kg</code></sub></td>
+      <td valign="top"><code>45 in</code> height fills the A320 bilge; wing-tip hinge post, <code>0°–112°</code> leaf, cam-latch rods. Knee (<code>0.30 m</code>) is a nominal bilge approximation.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>ALF · LD6</code></strong><br /><sub>full-width Lower Deck</sub></td>
+      <td valign="top">Widebody full-width container — two LD-3 contours mirrored<br /><code>src/three/alf.ts</code> → <code>profileContainer.ts</code></td>
+      <td valign="top"><code>3.18 × 1.53 × 1.63 m</code><br /><sub><code>4.06 m</code> overall top · <code>16.1°</code> wings each side</sub></td>
+      <td valign="top"><code>8.9 m³</code> (<code>316 ft³</code>)<br /><sub>Tare <code>230 kg</code> · Gross <code>3,175 kg</code></sub></td>
+      <td valign="top">One unit replaces a pair of <code>AKE</code>s; full-height trapezoidal wings, <code>125 in</code> door side, <code>0°–112°</code> leaf.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
+    </tr>
+    <tr>
       <td valign="top"><strong><code>RKN · LD-9</code></strong><br /><sub>Active Cold-Chain</sub></td>
       <td valign="top">Refrigerated lower-deck cuboid reefer<br /><code>src/three/rkn.ts</code></td>
       <td valign="top"><code>2.00 × 1.53 × 1.62 m</code><br /><sub><code>0.0°</code> vertical insulated walls</sub></td>
@@ -99,6 +113,13 @@ All four procedural generators conform to the shared `ContainerBase` / `ViewerCo
       <td valign="top"><code>3.18 × 2.44 × 1.62 m</code><br /><sub><code>60 mm</code> VIP sandwich wall</sub></td>
       <td valign="top"><code>6.6 m³</code> (<code>233 ft³</code>)<br /><sub>Tare <code>450 kg</code> · Gross <code>6,033 kg</code></sub></td>
       <td valign="top">Twin condenser fans, glycol service ports, status beacon, live setpoint readout (<code>+4 °C</code> default), double doors.<br /><strong>6 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>climate</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>AMA · M-1</code></strong><br /><sub>Main-Deck Box</sub></td>
+      <td valign="top">Widebody-freighter main-deck container on the PMC footprint<br /><code>src/three/ama.ts</code> → <code>profileContainer.ts</code></td>
+      <td valign="top"><code>3.18 × 2.44 × 2.44 m</code><br /><sub><code>2.60 m</code> roof flat · <code>30.5°</code> roof chamfers</sub></td>
+      <td valign="top"><code>17.6 m³</code> (<code>621 ft³</code>)<br /><sub>Tare <code>314 kg</code> · Gross <code>6,804 kg</code></sub></td>
+      <td valign="top"><code>96 in</code> walls with crown-clearance chamfers (break + roof flat nominal — unpublished), <code>0°–112°</code> leaf; compares 1:1 against the <code>PMC</code> pallet.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
     </tr>
     <tr>
       <td valign="top"><strong><code>PMC · P6P</code></strong><br /><sub>Main-Deck Pallet</sub></td>
@@ -127,7 +148,7 @@ All four procedural generators conform to the shared `ContainerBase` / `ViewerCo
 ```mermaid
 flowchart LR
   subgraph UI["React 19 Control Layer (src/App.tsx)"]
-    Switch["ULD Switcher\nAKE · RKN · RAP · PMC"]
+    Switch["ULD Switcher\nAKE · AKH · ALF · RKN · RAP · AMA · PMC"]
     Deck["ControlDeck\nKinematics · Finish · Camera"]
     Inspector["SpecSheet · PartsList\nRaw TS Source (?raw)"]
   end
@@ -206,7 +227,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         <li><strong>Articulated Door &amp; Variant Controls:</strong> Continuous <code>0° → 112°</code> door rotation, contour overhang toggle (<code>AKE</code>), active reefer + temperature slider (<code>RKN</code> / <code>RAP</code>), and cargo stack + restraint net toggle (<code>PMC</code>).</li>
         <li><strong>CAD Overlays &amp; Raycast Picking:</strong> Toggleable wireframe, model-specific 3D dimensions, nominal envelope box, three lighting rigs, and throttled raycast picking synchronized with the keyboard-accessible assembly tree. Adaptive DPR preserves interaction on weaker GPUs.</li>
         <li><strong>Inspection Tools:</strong> True-scale <strong>orthographic</strong> engineering projection alongside perspective; a draggable <strong>section cut</strong> (local clipping plane on X/Y/Z with flip and closed <strong>stencil caps</strong> on the cut faces, revealing real wall and cavity construction — view-only, exports stay whole); <strong>point-to-point measurement</strong> with metre/inch readout and per-axis deltas; and a <strong>compare envelope</strong> overlaying any other family's certified box, base-centre aligned.</li>
-        <li><strong>Load Planner, Share Links &amp; Snapshots:</strong> The spec sheet estimates payload/volume utilisation, volumetric (chargeable) weight at the 6000/5000 divisors and overweight status from certified ratings. The full workbench state round-trips through a shareable URL hash, the viewport saves as PNG, and keyboard shortcuts (<code>1–4</code>, <code>F</code>, <code>O</code>, <code>M</code>, <code>S</code>, <code>D</code>) drive models, framing and inspection tools.</li>
+        <li><strong>Load Planner, Share Links &amp; Snapshots:</strong> The spec sheet estimates payload/volume utilisation, volumetric (chargeable) weight at the 6000/5000 divisors and overweight status from certified ratings. The full workbench state round-trips through a shareable URL hash, the viewport saves as PNG, and keyboard shortcuts (<code>1–7</code>, <code>F</code>, <code>O</code>, <code>M</code>, <code>S</code>, <code>D</code>) drive models, framing and inspection tools.</li>
       </ul>
     </td>
     <td width="50%" valign="top">
@@ -215,7 +236,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         <li><strong>Binary glTF 2.0 (<code>.glb</code>):</strong> Exports the complete hierarchical scene assembly with PBR materials via <code>GLTFExporter</code> for Blender, Unreal Engine, Unity, or Omniverse.</li>
         <li><strong>Wavefront (<code>.obj</code>):</strong> Exports clean ASCII polygon geometry via <code>OBJExporter</code> for universal DCC and CAD interchange.</li>
         <li><strong>Binary Stereolithography (<code>.stl</code>):</strong> Exports triangulated solid geometry in metres via <code>STLExporter</code> for slicing, CFD/FEA meshing, or 3D printing.</li>
-        <li><strong>In-App TypeScript Source Inspector:</strong> Bundles all four generators plus the registry, CAD kernel, renderer, textures and annotations via Vite <code>?raw</code> imports, with copy feedback and direct <code>.ts</code> download.</li>
+        <li><strong>In-App TypeScript Source Inspector:</strong> Bundles every generator (including the shared <code>profileContainer.ts</code> engine) plus the registry, CAD kernel, renderer, textures and annotations via Vite <code>?raw</code> imports, with copy feedback and direct <code>.ts</code> download.</li>
       </ul>
     </td>
   </tr>
@@ -234,7 +255,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
 ├── vite.config.ts                # Vite 8 + React + Tailwind v4 + viteSingleFile() bundler
 ├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
-├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (19 checks)
+├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (20 checks)
 └── src/
     ├── main.tsx                  # React 19 root mount
     ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
@@ -252,6 +273,10 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         ├── models.ts             # Declarative MODELS registry (ake, rkn, rap, pmc)
         ├── primitives.ts         # CCW offsetPolygon kernel, extrusions, RivetRun & FINISHES
         ├── akeLD3.ts             # IATA AKE / LD-3 contoured lower-deck generator
+        ├── profileContainer.ts   # symmetric-profile engine (AKH · ALF · AMA)
+        ├── akh.ts                # IATA AKH / LD3-45 A320-family lower-deck wrapper
+        ├── alf.ts                # IATA ALF / LD6 full-width lower-deck wrapper
+        ├── ama.ts                # IATA AMA / M-1 main-deck wrapper
         ├── rkn.ts                # IATA RKN / LD-9 refrigerated cuboid generator
         ├── rap.ts                # IATA RAP / LD-9 twin-fan cold-chain generator
         ├── pmc.ts                # IATA PMC / P6P 96x125 in main-deck pallet generator
@@ -305,7 +330,7 @@ npm run preview
     <tr>
       <td><strong>Procedural ULD Generators</strong></td>
       <td><code>Implemented</code></td>
-      <td>All 4 families (<code>AKE</code>, <code>RKN</code>, <code>RAP</code>, <code>PMC</code>) are fully implemented in <code>src/three/</code> with parametric toggles and multi-group explode trees.</td>
+      <td>All 7 families (<code>AKE</code>, <code>AKH</code>, <code>ALF</code>, <code>RKN</code>, <code>RAP</code>, <code>AMA</code>, <code>PMC</code>) are fully implemented in <code>src/three/</code> with parametric toggles and multi-group explode trees.</td>
     </tr>
     <tr>
       <td><strong>Canvas PBR &amp; Viewport</strong></td>

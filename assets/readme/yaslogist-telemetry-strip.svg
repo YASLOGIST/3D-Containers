@@ -52,7 +52,7 @@
       <animate attributeName="opacity" values="0.45;1;0.45" dur="3.2s" begin="0.5s" repeatCount="indefinite"/>
     </rect>
     <text x="20" y="31" fill="#5ce1e6" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, 'DejaVu Sans Mono', monospace" font-size="10.5" font-weight="700" letter-spacing="1.4">02 // CERTIFIED ULD FLEET</text>
-    <text x="4" y="54" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', system-ui, sans-serif" font-size="14.5" font-weight="700" letter-spacing="0.4">AKE · RKN · RAP · PMC</text>
+    <text x="4" y="54" fill="#eef3f7" font-family="'Chakra Petch', 'Segoe UI', system-ui, sans-serif" font-size="14.5" font-weight="700" letter-spacing="0.4">AKE·AKH·ALF·RKN·RAP·AMA·PMC</text>
     <text x="4" y="71" fill="#8b99a7" font-family="'IBM Plex Mono', 'SFMono-Regular', Consolas, 'DejaVu Sans Mono', monospace" font-size="10.5">IATA AHM / SAE AS1811 envelopes</text>
   </g>
 
