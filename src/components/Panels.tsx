@@ -23,16 +23,117 @@ export type Stats = {
   [extra: string]: number | string;
 };
 
+/**
+ * 2-D certified-section preview: the generator's own profile polygon plotted
+ * to scale inside its certified envelope rectangle (dashed). Pure registry /
+ * generator data — what you see is the exact section the 3-D hull extrudes.
+ */
+function SectionCard({ model }: { model: ModelInfo }) {
+  const pts = model.sectionProfile();
+  const minX = Math.min(...pts.map((p) => p.x));
+  const envW = Math.max(model.dims.width, model.dims.topWidth);
+  const envH = model.palletOption
+    ? model.dims.height + (model.dims.contourHeight ?? 0)
+    : model.dims.height;
+  const padX = envW * 0.07 + 0.04;
+  const padTop = envH * 0.1 + 0.04;
+  const padBot = envH * 0.07 + 0.03;
+  const totalH = envH + padTop + padBot;
+  const groundY = totalH - padBot;
+  const sy = (y: number) => groundY - y;
+  const poly = pts.map((p) => `${p.x.toFixed(4)},${sy(p.y).toFixed(4)}`).join(" ");
+  const ticks = Array.from({ length: 9 }, (_, i) => minX - padX * 0.6 + (i * (envW + padX * 1.2)) / 8);
+  const slope =
+    model.taperDeg !== undefined
+      ? `${(model.taperLabel ?? "slope").toLowerCase()} ${model.taperDeg.toFixed(1)}°`
+      : model.contourOption || model.annotationKind === "contoured"
+        ? `taper ${((Math.atan2(model.dims.topWidth - model.dims.width, model.dims.height) * 180) / Math.PI).toFixed(1)}°`
+        : model.palletOption
+          ? "netted contour guide"
+          : "vertical walls 0.0°";
+  return (
+    <div className="border border-line-soft bg-void/40 px-2 pb-1.5 pt-2">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="stencil text-[9.5px] text-dim">certified section</span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-steel">{slope}</span>
+      </div>
+      <svg
+        viewBox={`${minX - padX} 0 ${envW + padX * 2} ${totalH}`}
+        className="h-[118px] w-full"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`${model.code} cross-section: base ${model.dims.width.toFixed(2)} metres, top ${model.dims.topWidth.toFixed(2)} metres, height ${model.dims.height.toFixed(2)} metres`}
+      >
+        <rect
+          x={minX}
+          y={sy(envH)}
+          width={envW}
+          height={envH}
+          fill="none"
+          stroke="currentColor"
+          strokeDasharray="4 3"
+          strokeWidth={1}
+          vectorEffect="non-scaling-stroke"
+          className="text-steel/50"
+        />
+        <polygon
+          points={poly}
+          strokeWidth={1.4}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+          className="fill-amber/15 stroke-amber/80"
+        />
+        <line x1={minX - padX * 0.8} y1={groundY} x2={minX + envW + padX * 0.8} y2={groundY} stroke="currentColor" strokeWidth={1.2} vectorEffect="non-scaling-stroke" className="text-dim" />
+        {ticks.map((x, i) => (
+          <line key={i} x1={x} y1={groundY} x2={x - envW * 0.02} y2={groundY + padBot * 0.55} stroke="currentColor" strokeWidth={0.8} vectorEffect="non-scaling-stroke" className="text-dim/60" />
+        ))}
+      </svg>
+      <div className="flex justify-between font-mono text-[9.5px] tabular-nums text-dim">
+        <span>base {model.dims.width.toFixed(2)} m</span>
+        <span>top {model.dims.topWidth.toFixed(2)} m</span>
+        <span>h {model.dims.height.toFixed(2)} m</span>
+      </div>
+    </div>
+  );
+}
+
 function SpecSheetBase({
   stats,
   measured,
   model,
+  compareModel,
 }: {
   stats: Stats | null;
   measured: { x: number; y: number; z: number } | null;
   model: ModelInfo;
+  compareModel?: ModelInfo | null;
 }) {
   const { dims } = model;
+  const sectionLabel = model.palletOption
+    ? "flat pallet"
+    : model.annotationKind === "dual-contour"
+      ? "dual contour"
+      : model.annotationKind === "roof-chamfer"
+        ? "roof chamfer"
+        : model.contourOption || model.annotationKind === "contoured"
+          ? "contoured"
+          : "uniform cuboid";
+  // Certified outer envelope the solid must stay inscribed in (measured with
+  // the door latched / pallet load stowed by the viewer).
+  const envelope = {
+    x: Math.max(dims.width, dims.topWidth),
+    y: model.palletOption ? dims.height + (dims.contourHeight ?? 0) : dims.height,
+    z: dims.depth,
+  };
+  const deltaMm = measured
+    ? {
+        x: Math.round((measured.x - envelope.x) * 1000),
+        y: Math.round((measured.y - envelope.y) * 1000),
+        z: Math.round((measured.z - envelope.z) * 1000),
+      }
+    : null;
+  const inscribed = deltaMm ? deltaMm.x <= 1 && deltaMm.y <= 1 && deltaMm.z <= 1 : null;
+  const fmtDelta = (v: number) => `${v > 0 ? "+" : ""}${v}`;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
@@ -40,13 +141,7 @@ function SpecSheetBase({
         <Chip tone="steel">
           {model.name.split("·")[1]?.trim() ?? model.code}
         </Chip>
-        <Chip>
-          {model.palletOption
-            ? "flat pallet"
-            : model.contourOption
-              ? "contoured"
-              : "uniform cuboid"}
-        </Chip>
+        <Chip>{sectionLabel}</Chip>
         {model.reeferOption && <Chip tone="steel">active reefer</Chip>}
         {model.palletOption && <Chip tone="steel">netted contour</Chip>}
       </div>
@@ -70,10 +165,13 @@ function SpecSheetBase({
         ))}
       </div>
 
+      <SectionCard model={model} />
+
       <div>
         {model.specs.map((r) => (
           <Row key={r.k} k={r.k} v={r.v} tone={r.tone ?? "ink"} />
         ))}
+        <Row k="Aircraft fit" v={model.aircraft} tone="steel" />
         <Row
           k="Geometric volume"
           v={`${stats?.volumeM3.toFixed(3) ?? "—"} m³`}
@@ -98,12 +196,26 @@ function SpecSheetBase({
           }
           tone="steel"
         />
+        <Row
+          k="Δ vs certified (mm)"
+          v={
+            deltaMm
+              ? `${fmtDelta(deltaMm.x)} · ${fmtDelta(deltaMm.y)} · ${fmtDelta(deltaMm.z)}`
+              : "—"
+          }
+          tone={inscribed === false ? "amber" : "steel"}
+        />
+        <Row
+          k="Envelope verdict"
+          v={inscribed === null ? "—" : inscribed ? "INSCRIBED ✓" : "EXCEEDS ENVELOPE"}
+          tone={inscribed === false ? "amber" : "steel"}
+        />
         <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
           {model.palletOption
             ? "The plate is a flat sheet: every vertex sits exactly on the certified base, and the contour block is a transparent build guide."
-            : model.contourOption
-              ? "Filleted corners keep the solid inscribed in the certified envelope — no vertex ever crosses it."
-              : "Every vertex of the generated cuboid lands exactly on the certified envelope."}{" "}
+            : model.contourOption || model.annotationKind
+              ? "Measured door-closed: filleted corners keep the solid inscribed in the certified envelope — negative Δ is the fillet allowance, no vertex crosses the boundary."
+              : "Measured door-closed: every vertex of the generated cuboid lands on the certified envelope."}{" "}
           {model.family.charAt(0).toUpperCase() + model.family.slice(1)} —{" "}
           {model.volumeLabel}.
         </p>
@@ -112,6 +224,37 @@ function SpecSheetBase({
       <p className="border-t border-line-soft pt-2 text-[10.5px] leading-relaxed text-mute">
         {model.blurb}
       </p>
+
+      {compareModel && compareModel.id !== model.id && (
+        <div className="border-t border-line-soft pt-2">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 bg-amber" />
+            <span className="stencil text-[9.5px] text-dim">
+              certified comparison · {model.code} vs {compareModel.code}
+            </span>
+          </div>
+          {(
+            [
+              ["Certified volume", model.ratings.volumeM3, compareModel.ratings.volumeM3, "m³", 2],
+              ["Net payload", model.ratings.payloadKg, compareModel.ratings.payloadKg, "kg", 0],
+              ["Footprint", model.dims.width * model.dims.depth, compareModel.dims.width * compareModel.dims.depth, "m²", 2],
+              ["Height", model.dims.height, compareModel.dims.height, "m", 2],
+              ["Payload density", model.ratings.payloadKg / model.ratings.volumeM3, compareModel.ratings.payloadKg / compareModel.ratings.volumeM3, "kg/m³", 0],
+            ] as [string, number, number, string, number][]
+          ).map(([k, a, b, unit, dp]) => (
+            <Row
+              key={k}
+              k={k}
+              v={`${a.toFixed(dp)} vs ${b.toFixed(dp)} ${unit} (${a - b > 0 ? "+" : ""}${(a - b).toFixed(dp)})`}
+              tone="steel"
+            />
+          ))}
+          <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
+            Registry-certified figures for both units; the dashed 3-D envelope
+            shows the same comparison spatially.
+          </p>
+        </div>
+      )}
 
       <LoadPlanner key={model.id} model={model} />
     </div>

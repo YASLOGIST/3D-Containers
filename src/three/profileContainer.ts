@@ -22,17 +22,19 @@ import {
 } from "./primitives";
 
 /**
- * profileContainer.ts — parameterized generator for SYMMETRIC extruded-section
- * ULDs. It generalizes the bespoke AKE·LD-3 recipe (asymmetric right
- * trapezoid, kept in akeLD3.ts) to any convex, bilaterally symmetric section:
- * hull ring extrusion, corner-rail edge frame, end rings, a hinged door leaf
- * and a blind end are all successive inward offsets of ONE nominal polygon,
- * so AKH·LD3-45 (dual-wing hexagon), ALF·LD6 (dual-wing trapezoid) and
- * AMA·M-1 (roof-chamfer hexagon) share this single engine.
+ * profileContainer.ts — parameterized generator for EXTRUDED-SECTION ULDs.
+ * It generalizes the bespoke AKE·LD-3 recipe (kept in akeLD3.ts) to any
+ * convex constant section: hull ring extrusion, corner-rail edge frame, end
+ * rings, a hinged door leaf and a blind end are all successive inward
+ * offsets of ONE nominal polygon, so AKH·LD3-45 (dual-wing hexagon),
+ * ALF·LD6 (dual-wing trapezoid), AMA·M-1 and AGA·M-2 (roof-chamfer
+ * hexagons) and the single-slope AKC·LD-1 / DPE·LD-2 right trapezoids all
+ * share this single engine.
  *
  * Profile contract: counter-clockwise from the bottom-left corner, y from
- * CHASSIS (0.09 m) to the overall height, symmetric about the section
- * centreline, convex. Units are metres throughout. Ratings are nominal
+ * CHASSIS (0.09 m) to the overall height, convex; symmetric sections are
+ * built by symmetricProfile(), single-slope sections are passed explicitly
+ * (asymmetricProfile()). Units are metres throughout. Ratings are nominal
  * published values supplied by each wrapper; the geometric volume reported in
  * stats is computed live from the profile and kept separate from the
  * certified (IATA) volume, exactly as in the other generators.
@@ -51,6 +53,12 @@ export interface ProfileContainerConfig {
   topWidth: number;
   /** y where the slope starts; ≤ CHASSIS means a full trapezoid */
   kneeHeight: number;
+  /**
+   * Explicit section polygon (CCW from bottom-left). When supplied it wins
+   * over the symmetric builder — used by the single-slope LD1/LD2 sections,
+   * whose contour leans out on the fuselage side only.
+   */
+  profile?: V2[];
   depth: number;
   height: number;
   tareKg: number;
@@ -91,6 +99,21 @@ export function symmetricProfile(baseWidth: number, topWidth: number, kneeHeight
     { x: tw, y: height },
     { x: -tw, y: height },
     { x: -bw, y: kneeHeight },
+  ];
+}
+
+/**
+ * Single-slope trapezoid in the AKE convention: vertical centreline wall on
+ * −X, contour leaning out on +X, envelope centred on the top width so the
+ * base's left corner sits at −topWidth/2. Used by LD1 (AKC) and LD2 (DPE).
+ */
+export function asymmetricProfile(baseWidth: number, topWidth: number, height: number): V2[] {
+  const x0 = -topWidth / 2;
+  return [
+    { x: x0, y: CHASSIS },
+    { x: x0 + baseWidth, y: CHASSIS },
+    { x: x0 + topWidth, y: height },
+    { x: x0, y: height },
   ];
 }
 
@@ -137,7 +160,7 @@ export function createProfileContainer(
   const rivets = new RivetRun();
 
   /* --- the section stack: one symmetric polygon, successive offsets ----- */
-  const nominal = symmetricProfile(BW, TW, cfg.kneeHeight, H);
+  const nominal = cfg.profile ?? symmetricProfile(BW, TW, cfg.kneeHeight, H);
   const hullOut = offsetPolygon(nominal, RAIL_T);
   const cavity = offsetPolygon(nominal, RAIL_T + WALL);
   const leafPoly = offsetPolygon(nominal, FRAME_W + LEAF_CLEAR + LEAF_BEVEL);
