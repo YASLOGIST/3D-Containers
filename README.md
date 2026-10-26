@@ -21,6 +21,11 @@
     <a href="https://www.yaslogist.com"><code>YASLOGIST ↗</code></a>
   </p>
 
+  <p>
+    <a href="https://containers-ahmedyas9966-2532s-projects.vercel.app"><code>▶ LIVE PREVIEW — Open the 3D Lab on Vercel ↗</code></a><br />
+    <sub><a href="https://containers-ahmedyas9966-2532s-projects.vercel.app"><code>containers-ahmedyas9966-2532s-projects.vercel.app</code></a> · runs entirely in your browser — section cuts, measurement, load planner and CAD exports included, no install needed</sub>
+  </p>
+
   <sub>
     Prefer a static high-resolution plate? View the 24-bit keyframe poster: <a href="assets/readme/yaslogist-hero.png"><code>assets/readme/yaslogist-hero.png</code></a> (<code>1920 × 720</code>)
   </sub>
@@ -265,6 +270,8 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ## `06 //` Quick Start &amp; Engineering Status
 
 ### Local Development &amp; Single-File Production Build
+
+> **Just want to try it?** Open the live Vercel deployment — no install required: <https://containers-ahmedyas9966-2532s-projects.vercel.app>
 
 **Prerequisites:** Node.js `>= 20.19` and `npm`.
 
