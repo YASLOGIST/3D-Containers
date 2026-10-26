@@ -71,6 +71,39 @@ export const PMC_DIMENSIONS = {
   contourHeight: CONTOUR_H,
 } as const;
 
+/**
+ * One certified pallet family. The generator body is fully parameterized by
+ * this spec, so PMC/P6P (96×125), PAG/P1P (88×125) and PGA (96×238.5, 20 ft)
+ * share a single implementation.
+ */
+export interface PalletSpec {
+  code: string;
+  groupTag: string;
+  width: number;
+  depth: number;
+  thickness: number;
+  contourHeight: number;
+  tareKg: number;
+  maxGrossKg: number;
+  plateId: string;
+  plateCarrier: string;
+  plateSerial: string;
+}
+
+export const PMC_SPEC: PalletSpec = {
+  code: "PMC",
+  groupTag: "PMC_P6P",
+  width: PMC_DIMENSIONS.width,
+  depth: PMC_DIMENSIONS.depth,
+  thickness: PMC_DIMENSIONS.thickness,
+  contourHeight: PMC_DIMENSIONS.contourHeight,
+  tareKg: 120,
+  maxGrossKg: 6804,
+  plateId: "PMC 4127",
+  plateCarrier: "LH",
+  plateSerial: "PMC4127LH-0713",
+};
+
 /* ========================================================================== */
 /* 2. Materials                                                               */
 /* ========================================================================== */
@@ -86,15 +119,15 @@ export interface PMCMaterials extends BaseMaterials {
   contour: THREE.MeshPhysicalMaterial;
 }
 
-function createMaterials(finish: FinishId) {
+function createMaterials(finish: FinishId, width: number, depth: number) {
   const base = createBaseMaterials(finish);
   const trackTex = makeSeatTrackTexture();
   const netTex = makeCargoNetTexture();
   // one canvas == one metre of rail: 16 studs per metre ≈ 62 mm pitch
-  trackTex.repeat.set(1, PMC_DIMENSIONS.width - 0.12);
+  trackTex.repeat.set(1, width - 0.12);
   const trackTexShort = trackTex.clone();
   trackTexShort.needsUpdate = true;
-  trackTexShort.repeat.set(1, PMC_DIMENSIONS.depth - 0.12);
+  trackTexShort.repeat.set(1, depth - 0.12);
 
   const f = FINISHES[finish];
   const m: PMCMaterials = {
@@ -149,16 +182,21 @@ const makeSeatTrackTexture = makeSeatTrack;
 /* 3. Section — a flat plate                                                  */
 /* ========================================================================== */
 
-/** The PMC "profile" is a flat plate: a thin rectangle at the base. */
-export function pmcProfile(): V2[] {
-  const { width: W } = PMC_DIMENSIONS;
+/** A pallet "profile" is a flat plate: a thin rectangle at the base. */
+export function palletProfile(spec: PalletSpec): V2[] {
+  const W = spec.width;
   const x0 = -W / 2;
   return [
     { x: x0, y: 0 },
     { x: x0 + W, y: 0 },
-    { x: x0 + W, y: PLATE_T },
-    { x: x0, y: PLATE_T },
+    { x: x0 + W, y: spec.thickness },
+    { x: x0, y: spec.thickness },
   ];
+}
+
+/** The PMC "profile" is a flat plate: a thin rectangle at the base. */
+export function pmcProfile(): V2[] {
+  return palletProfile(PMC_SPEC);
 }
 
 /* ========================================================================== */
@@ -200,19 +238,21 @@ export interface PMCContainer extends ContainerBase {
 /* 5. The generator                                                           */
 /* ========================================================================== */
 
-export function createPMCContainer(
+export function createPallet(
+  spec: PalletSpec,
   options: Partial<BuildOptions> = {},
 ): PMCContainer {
   const o: BuildOptions = { ...DEFAULT_OPTIONS, ...options };
-  const { width: W, depth: D, thickness: T } = PMC_DIMENSIONS;
+  const { width: W, depth: D, thickness: T } = spec;
+  const CH = spec.contourHeight;
 
   const {
     mats: mat,
     trackTex,
     trackTexShort,
     netTex,
-  } = createMaterials(o.finish);
-  const root = tag(new THREE.Group(), "PMC_P6P");
+  } = createMaterials(o.finish, W, D);
+  const root = tag(new THREE.Group(), spec.groupTag);
   const rivets = new RivetRun();
 
   const X0 = -W / 2; // -X edge
@@ -260,7 +300,8 @@ export function createPMCContainer(
   A_DECK.group.add(deck);
 
   // reinforcing ribs pressed into the underside of the plate
-  for (const dz of [-0.95, -0.45, 0, 0.45, 0.95]) {
+  for (const f of [-0.39, -0.185, 0, 0.185, 0.39]) {
+    const dz = f * D;
     const rib = box(
       mat.deck,
       W - 0.3,
@@ -324,15 +365,22 @@ export function createPMCContainer(
   // discrete tie-down studs + rings along the tracks
   if (o.detail) {
     const studs: THREE.Vector3[] = [];
+    const spread = (range: number, step: number): number[] => {
+      const n = Math.max(3, Math.round((2 * range) / step) + 1);
+      return Array.from(
+        { length: n },
+        (_, i) => -range + (2 * range * i) / (n - 1),
+      );
+    };
     for (const sx of [-1, 1]) {
       const x = X0 + (sx > 0 ? W - RAIL_INSET : RAIL_INSET);
-      for (let i = -3; i <= 3; i++)
-        studs.push(new THREE.Vector3(x, trackY + TRACK_T, i * 0.36));
+      for (const z of spread(D / 2 - 0.35, 0.36))
+        studs.push(new THREE.Vector3(x, trackY + TRACK_T, z));
     }
     for (const sz of [-1, 1]) {
       const z = Z0 + (sz > 0 ? D - RAIL_INSET : RAIL_INSET);
-      for (let i = -3; i <= 3; i++)
-        studs.push(new THREE.Vector3(i * 0.46, trackY + TRACK_T, z));
+      for (const x of spread(W / 2 - 0.35, 0.46))
+        studs.push(new THREE.Vector3(x, trackY + TRACK_T, z));
     }
     for (const p of studs) {
       const stud = mesh(
@@ -408,8 +456,11 @@ export function createPMCContainer(
       A_STRUCTURE.group.add(skid);
     }
   }
-  // three support beams running the full depth
-  for (const bx of [X0 + 0.7, X0 + W / 2, X0 + W - 0.7]) {
+  // support beams running the full depth (more on the long 20 ft base)
+  const beamFracs =
+    W > 4 ? [0.08, 0.29, 0.5, 0.71, 0.92] : [0.22, 0.5, 0.78];
+  for (const bf of beamFracs) {
+    const bx = X0 + bf * W;
     const beam = box(
       mat.chassis,
       BEAM_W,
@@ -421,7 +472,7 @@ export function createPMCContainer(
     beam.position.set(bx, (SKID_H + 0.018) / 2, 0);
     A_STRUCTURE.group.add(beam);
   }
-  for (const cz of [-0.9, 0.9]) {
+  for (const cz of [-(D / 2 - 0.32), D / 2 - 0.32]) {
     const cross = box(
       mat.chassis,
       W - 0.24,
@@ -436,8 +487,9 @@ export function createPMCContainer(
 
   // four-way fork entry: slots through the plate at both ends and both sides
   const forkY = SKID_H + FORK_H / 2 + 0.004;
+  const forkSpreadX = Math.max(0.55, W * 0.17);
   for (const sz of [-1, 1]) {
-    for (const fx of [-0.55, 0.55]) {
+    for (const fx of [-forkSpreadX, forkSpreadX]) {
       const slot = box(mat.dark, 0.34, FORK_H, 0.1, "Fork entry (end)", 0.006);
       slot.position.set(fx, forkY, Z0 + (sz > 0 ? D - 0.1 : 0.1));
       A_STRUCTURE.group.add(slot);
@@ -456,7 +508,7 @@ export function createPMCContainer(
     }
   }
   for (const sx of [-1, 1]) {
-    for (const fz of [-0.75, 0.75]) {
+    for (const fz of [-(D * 0.31), D * 0.31]) {
       const slot = box(mat.dark, 0.1, FORK_H, 0.34, "Fork entry (side)", 0.006);
       slot.position.set(X0 + (sx > 0 ? W - 0.1 : 0.1), forkY, fz);
       A_STRUCTURE.group.add(slot);
@@ -467,12 +519,12 @@ export function createPMCContainer(
   const idTex = makeIdPlate({
     width: 0.42,
     height: 0.22,
-    id: "PMC 4127",
-    carrier: "LH",
-    serial: "PMC4127LH-0713",
-    tareKg: 120,
-    maxGrossKg: 6804,
-    volumeM3: W * D * CONTOUR_H,
+    id: spec.plateId,
+    carrier: spec.plateCarrier,
+    serial: spec.plateSerial,
+    tareKg: spec.tareKg,
+    maxGrossKg: spec.maxGrossKg,
+    volumeM3: W * D * CH,
   });
   const idMat = mat.plate.clone();
   idMat.map = idTex;
@@ -487,7 +539,7 @@ export function createPMCContainer(
     ),
   );
 
-  const pmcTex = makeStencil("PMC", "#ffb020", 512, 200);
+  const pmcTex = makeStencil(spec.code, "#ffb020", 512, 200);
   const pmcMat = mat.stencil.clone();
   pmcMat.map = pmcTex;
   A_DECK.group.add(
@@ -515,7 +567,12 @@ export function createPMCContainer(
     ),
   );
 
-  const warnTex = makeStencil("MAX 6804 KG", "#e2513c", 640, 150);
+  const warnTex = makeStencil(
+    `MAX ${spec.maxGrossKg} KG`,
+    "#e2513c",
+    640,
+    150,
+  );
   const warnMat = mat.stencil.clone();
   warnMat.map = warnTex;
   A_DECK.group.add(
@@ -580,7 +637,7 @@ export function createPMCContainer(
 
   const applyLoad = (t: number) => {
     const k = THREE.MathUtils.clamp(t, 0, 1);
-    const h = Math.max(0.02, k * CONTOUR_H);
+    const h = Math.max(0.02, k * CH);
     contourMesh.scale.set(1, h, 1);
     contourMesh.position.set(0, SKID_H + T + h / 2, 0);
     outline.scale.set(1, h, 1);
@@ -649,18 +706,18 @@ export function createPMCContainer(
     assemblies,
     // a pallet has no hinged door; the group exists for interface parity
     doorPivot: tag(new THREE.Group(), "Door pivot (n/a — pallet)"),
-    profile: pmcProfile(),
+    profile: palletProfile(spec),
     stats: {
       meshes: meshCount,
       triangles,
       volumeM3: W * D * T,
-      iataVolumeM3: W * D * CONTOUR_H,
+      iataVolumeM3: W * D * CH,
       footprintM2: W * D,
-      tareKg: 120,
-      maxGrossKg: 6804,
-      payloadKg: 6804 - 120,
-      contourM3: W * D * CONTOUR_H,
-      contourHeightM: CONTOUR_H,
+      tareKg: spec.tareKg,
+      maxGrossKg: spec.maxGrossKg,
+      payloadKg: spec.maxGrossKg - spec.tareKg,
+      contourM3: W * D * CH,
+      contourHeightM: CH,
     },
     setFinish(id: FinishId) {
       const f = FINISHES[id];
@@ -715,4 +772,11 @@ export function createPMCContainer(
       netTex.dispose();
     },
   };
+}
+
+/** PMC · P6P — the 96×125 in certified pallet (backwards-compatible entry). */
+export function createPMCContainer(
+  options: Partial<BuildOptions> = {},
+): PMCContainer {
+  return createPallet(PMC_SPEC, options);
 }

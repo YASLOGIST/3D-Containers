@@ -11,6 +11,10 @@ import { AMA_DIMENSIONS, amaProfile } from "../src/three/ama.ts";
 import { AMD_DIMENSIONS, amdProfile } from "../src/three/amd.ts";
 import { AGA_DIMENSIONS, agaProfile } from "../src/three/aga.ts";
 import { DQF_DIMENSIONS, dqfProfile } from "../src/three/dqf.ts";
+import { AQP_DIMENSIONS, aqpProfile } from "../src/three/aqp.ts";
+import { AAP_DIMENSIONS, aapProfile } from "../src/three/aap.ts";
+import { PAG_DIMENSIONS, pagProfile } from "../src/three/pag.ts";
+import { PGA_DIMENSIONS, pgaProfile } from "../src/three/pga.ts";
 import { MODELS } from "../src/three/models.ts";
 import { PMC_DIMENSIONS, pmcProfile } from "../src/three/pmc.ts";
 import { offsetPolygon, type V2 } from "../src/three/primitives.ts";
@@ -104,6 +108,16 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: ALP_DIMENSIONS.baseLength,
       height: ALP_DIMENSIONS.height,
     },
+    aqp: {
+      width: AQP_DIMENSIONS.baseWidth,
+      depth: AQP_DIMENSIONS.baseLength,
+      height: AQP_DIMENSIONS.height,
+    },
+    aap: {
+      width: AAP_DIMENSIONS.baseWidth,
+      depth: AAP_DIMENSIONS.baseLength,
+      height: AAP_DIMENSIONS.height,
+    },
     rkn: {
       width: RKN_DIMENSIONS.width,
       depth: RKN_DIMENSIONS.depth,
@@ -129,10 +143,20 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: AGA_DIMENSIONS.baseLength,
       height: AGA_DIMENSIONS.height,
     },
+    pag: {
+      width: PAG_DIMENSIONS.width,
+      depth: PAG_DIMENSIONS.depth,
+      height: PAG_DIMENSIONS.thickness,
+    },
     pmc: {
       width: PMC_DIMENSIONS.width,
       depth: PMC_DIMENSIONS.depth,
       height: PMC_DIMENSIONS.thickness,
+    },
+    pga: {
+      width: PGA_DIMENSIONS.width,
+      depth: PGA_DIMENSIONS.depth,
+      height: PGA_DIMENSIONS.thickness,
     },
   };
 
@@ -170,6 +194,8 @@ test("symmetric fleet sections (AKH/ALF/AMA) are CCW, mirrored and envelope-exac
     { profile: alfProfile(), dims: ALF_DIMENSIONS, points: 4 },
     { profile: alpProfile(), dims: ALP_DIMENSIONS, points: 4 },
     { profile: dqfProfile(), dims: DQF_DIMENSIONS, points: 4 },
+    { profile: aqpProfile(), dims: AQP_DIMENSIONS, points: 4 },
+    { profile: aapProfile(), dims: AAP_DIMENSIONS, points: 4 },
     { profile: amaProfile(), dims: AMA_DIMENSIONS, points: 6 },
     { profile: agaProfile(), dims: AGA_DIMENSIONS, points: 6 },
   ];
@@ -285,4 +311,20 @@ test("seeded procedural noise is repeatable", () => {
   const bv = Array.from({ length: 16 }, () => b());
   assert.deepEqual(av, bv);
   assert.ok(av.every((v) => v >= 0 && v < 1));
+});
+
+test("pallet family sections (PAG/PMC/PGA) are CCW plates on the certified base", () => {
+  const cases = [
+    { profile: pagProfile(), dims: PAG_DIMENSIONS },
+    { profile: pmcProfile(), dims: PMC_DIMENSIONS },
+    { profile: pgaProfile(), dims: PGA_DIMENSIONS },
+  ];
+  for (const { profile, dims } of cases) {
+    assert.equal(profile.length, 4);
+    assert.ok(profile.every(isFinitePoint));
+    assert.ok(area(profile) > 0, "CCW polygons must have positive signed area");
+    const xs = profile.map((q) => q.x);
+    assert.ok(Math.abs(Math.max(...xs) - Math.min(...xs) - dims.width) < 1e-9);
+    assert.ok(Math.abs(Math.max(...profile.map((q) => q.y)) - dims.thickness) < 1e-9);
+  }
 });

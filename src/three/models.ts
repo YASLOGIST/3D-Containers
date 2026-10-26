@@ -18,18 +18,22 @@ import { AKE_DIMENSIONS, contourProfile, createAKEContainer } from "./akeLD3";
 import { AKC_DIMENSIONS, akcProfile, createAKCContainer } from "./akc";
 import { DPE_DIMENSIONS, createDPEContainer, dpeProfile } from "./dpe";
 import { DQF_DIMENSIONS, createDQFContainer, dqfProfile } from "./dqf";
+import { AAP_DIMENSIONS, aapProfile, createAAPContainer } from "./aap";
 import { AKH_DIMENSIONS, akhProfile, createAKHContainer } from "./akh";
 import { ALF_DIMENSIONS, alfProfile, createALFContainer } from "./alf";
 import { ALP_DIMENSIONS, alpProfile, createALPContainer } from "./alp";
+import { AQP_DIMENSIONS, aqpProfile, createAQPContainer } from "./aqp";
 import { RKN_DIMENSIONS, createRKNContainer, rknProfile } from "./rkn";
 import { RAP_DIMENSIONS, createRAPContainer, rapProfile } from "./rap";
 import { AMA_DIMENSIONS, amaProfile, createAMAContainer } from "./ama";
 import { AMD_DIMENSIONS, amdProfile, createAMDContainer } from "./amd";
 import { AGA_DIMENSIONS, agaProfile, createAGAContainer } from "./aga";
+import { PAG_DIMENSIONS, pagProfile, createPAGContainer } from "./pag";
 import { PMC_DIMENSIONS, createPMCContainer, pmcProfile } from "./pmc";
+import { PGA_DIMENSIONS, pgaProfile, createPGAContainer } from "./pga";
 import type { V2 } from "./primitives";
 
-export type ModelId = "ake" | "akc" | "dpe" | "dqf" | "akh" | "alf" | "alp" | "rkn" | "rap" | "ama" | "amd" | "aga" | "pmc";
+export type ModelId = "ake" | "akc" | "dpe" | "dqf" | "aqp" | "akh" | "alf" | "alp" | "aap" | "rkn" | "rap" | "ama" | "amd" | "aga" | "pag" | "pmc" | "pga";
 
 /**
  * Nominal aircraft-hold placement for the schematic hold-fit preview.
@@ -263,6 +267,39 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     ],
     build: (o) => createDQFContainer(o),
   },
+  aqp: {
+    id: "aqp",
+    code: "AQP",
+    name: "AQP · LD-4",
+    family: "rectangular lower-deck container",
+    blurb:
+      "The rectangular sibling of the LD-8: identical 96 × 60.4 in footprint and 64 in height with vertical walls, completing the 767 lower-deck trio alongside the LD-2 half-width and the contoured LD-8. Certified 2438 × 1534 mm base, ≈ 5.5 m³ internal volume, 120 kg tare, 2449 kg max gross (EUAS / ACL Airshop sheets).",
+    dims: {
+      width: AQP_DIMENSIONS.baseWidth,
+      depth: AQP_DIMENSIONS.baseLength,
+      height: AQP_DIMENSIONS.height,
+      topWidth: AQP_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    volumeLabel: "5.5 m³ · 195 ft³",
+    sourceFile: "aqp.ts",
+    aircraft: "767 · 777 · 787 lower deck",
+    sectionProfile: aqpProfile,
+    hold: { aircraft: "Boeing 767", deck: "lower", fuselageM: 5.03, abreast: 1, mode: "twin", base: 2.438, top: 2.438, height: 1.626, floorDrop: 1.7 },
+    featureLabel: "767 lower deck · LD-8 footprint, vertical walls",
+    ratings: { tareKg: 120, maxGrossKg: 2449, payloadKg: 2329, volumeM3: 5.5 },
+    specs: [
+      { k: "Section", v: "rectangular · vertical walls", tone: "steel" },
+      { k: "Taper angle", v: "0.0° — straight walls", tone: "steel" },
+      { k: "Certified volume", v: "5.5 m³ · 195 ft³" },
+      { k: "Tare mass", v: "120 kg" },
+      { k: "Max gross", v: "2449 kg", tone: "amber" },
+      { k: "Net payload", v: "2329 kg" },
+    ],
+    build: (o) => createAQPContainer(o),
+  },
   akh: {
     id: "akh",
     code: "AKH",
@@ -367,6 +404,39 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Net payload", v: "2991 kg" },
     ],
     build: (o) => createALPContainer(o),
+  },
+  aap: {
+    id: "aap",
+    code: "AAP",
+    name: "AAP · LD-9",
+    family: "rectangular P1P-base container",
+    blurb:
+      "A rigid box on the 88 × 125 in P1P pallet base — the biggest-volume rigid lower-deck container: contour code P means fully rectangular, door on the 125 in side. Certified 3175 × 2235 mm base at 64 in height, ≈ 10.8 m³ AS 1825 volume, 270 kg tare, 6033 kg max gross (4626 kg operationally in lower holds; DSV / AviusULD / Nordisk sheets).",
+    dims: {
+      width: AAP_DIMENSIONS.baseWidth,
+      depth: AAP_DIMENSIONS.baseLength,
+      height: AAP_DIMENSIONS.height,
+      topWidth: AAP_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    volumeLabel: "10.8 m³ · 381 ft³",
+    sourceFile: "aap.ts",
+    aircraft: "747 · 777 · A350 lower deck + main",
+    sectionProfile: aapProfile,
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 2, mode: "single", base: 2.235, top: 2.235, height: 1.626, floorDrop: 1.7 },
+    featureLabel: "88 × 125 in P1P base · contour code P",
+    ratings: { tareKg: 270, maxGrossKg: 6033, payloadKg: 5763, volumeM3: 10.8 },
+    specs: [
+      { k: "Section", v: "rectangular · contour code P", tone: "steel" },
+      { k: "Taper angle", v: "0.0° — straight walls", tone: "steel" },
+      { k: "Certified volume", v: "10.8 m³ · 381 ft³" },
+      { k: "Tare mass", v: "270 kg" },
+      { k: "Max gross", v: "6033 kg", tone: "amber" },
+      { k: "Net payload", v: "5763 kg" },
+    ],
+    build: (o) => createAAPContainer(o),
   },
   rkn: {
     id: "rkn",
@@ -542,6 +612,43 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     ],
     build: (o) => createAGAContainer(o),
   },
+  pag: {
+    id: "pag",
+    code: "PAG",
+    name: "PAG · P1P",
+    family: "certified 88 × 125 in pallet",
+    blurb:
+      "The narrower of the two certified 125 in pallets: an 88 in deep aluminium base plate with seat tracks, built by the shared pallet engine. 3175 × 2235 mm base, 110 kg tare, 6033 kg max gross on the main deck (4626 kg lower hold). The AAP · LD-9 box sits on this exact base.",
+    dims: {
+      width: PAG_DIMENSIONS.width,
+      depth: PAG_DIMENSIONS.depth,
+      height: PAG_DIMENSIONS.thickness,
+      topWidth: PAG_DIMENSIONS.width,
+      contourHeight: PAG_DIMENSIONS.contourHeight,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: true,
+    volumeLabel: "11.5 m³ netted contour",
+    sourceFile: "pag.ts",
+    aircraft: "Widebody main + lower decks",
+    sectionProfile: pagProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "twin", base: 2.235, top: 2.235, height: 2.438, floorDrop: 1.0 },
+    featureLabel: "88 × 125 in pallet · 62 mm seat-track pitch",
+    ratings: { tareKg: 110, maxGrossKg: 6033, payloadKg: 5923, volumeM3: 11.5 },
+    specs: [
+      { k: "Section", v: "flat plate, 50 mm", tone: "steel" },
+      { k: "Taper angle", v: "0.0° — flat", tone: "steel" },
+      {
+        k: "Cargo contour",
+        v: `1.62 m · ${(PAG_DIMENSIONS.width * PAG_DIMENSIONS.depth * 1.62).toFixed(1)} m³`,
+      },
+      { k: "Seat tracks", v: "4 continuous, 62 mm pitch", tone: "amber" },
+      { k: "Tare mass", v: "110 kg" },
+      { k: "Max gross", v: "6033 kg", tone: "amber" },
+    ],
+    build: (o) => createPAGContainer(o),
+  },
   pmc: {
     id: "pmc",
     code: "PMC",
@@ -578,6 +685,43 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Max gross", v: "6804 kg", tone: "amber" },
     ],
     build: (o) => createPMCContainer(o),
+  },
+  pga: {
+    id: "pga",
+    code: "PGA",
+    name: "PGA · 20 ft",
+    family: "certified 20 ft main-deck pallet",
+    blurb:
+      "The heavy hauler: a 20 ft (6058 × 2438 mm, NAS 3610 2G1P) main-deck pallet rated to 13608 kg — 30,000 lb — for vehicles, engines and outsize machinery on the 747F. Built by the shared pallet engine with a five-beam underside and the full 244 cm main-deck netted build height.",
+    dims: {
+      width: PGA_DIMENSIONS.width,
+      depth: PGA_DIMENSIONS.depth,
+      height: PGA_DIMENSIONS.thickness,
+      topWidth: PGA_DIMENSIONS.width,
+      contourHeight: PGA_DIMENSIONS.contourHeight,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: true,
+    volumeLabel: "36.0 m³ netted contour",
+    sourceFile: "pga.ts",
+    aircraft: "Boeing 747F main deck",
+    sectionProfile: pgaProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "twin", base: 2.438, top: 2.438, height: 2.438, floorDrop: 1.0 },
+    featureLabel: "96 × 238.5 in pallet · 13.6 t rated",
+    ratings: { tareKg: 541, maxGrossKg: 13608, payloadKg: 13067, volumeM3: 36.0 },
+    specs: [
+      { k: "Section", v: "flat plate, 50 mm", tone: "steel" },
+      { k: "Taper angle", v: "0.0° — flat", tone: "steel" },
+      {
+        k: "Cargo contour",
+        v: `2.44 m · ${(PGA_DIMENSIONS.width * PGA_DIMENSIONS.depth * 2.438).toFixed(1)} m³`,
+      },
+      { k: "Seat tracks", v: "4 continuous, 62 mm pitch", tone: "amber" },
+      { k: "Tare mass", v: "541 kg" },
+      { k: "Max gross", v: "13608 kg", tone: "amber" },
+    ],
+    build: (o) => createPGAContainer(o),
   },
 };
 

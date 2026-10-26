@@ -4,15 +4,19 @@ import akeSource from "./three/akeLD3.ts?raw";
 import akcSource from "./three/akc.ts?raw";
 import dpeSource from "./three/dpe.ts?raw";
 import dqfSource from "./three/dqf.ts?raw";
+import aqpSource from "./three/aqp.ts?raw";
 import akhSource from "./three/akh.ts?raw";
 import alfSource from "./three/alf.ts?raw";
 import alpSource from "./three/alp.ts?raw";
+import aapSource from "./three/aap.ts?raw";
 import rknSource from "./three/rkn.ts?raw";
 import rapSource from "./three/rap.ts?raw";
 import amaSource from "./three/ama.ts?raw";
 import amdSource from "./three/amd.ts?raw";
 import agaSource from "./three/aga.ts?raw";
+import pagSource from "./three/pag.ts?raw";
 import pmcSource from "./three/pmc.ts?raw";
+import pgaSource from "./three/pga.ts?raw";
 import profileSource from "./three/profileContainer.ts?raw";
 import primitivesSource from "./three/primitives.ts?raw";
 import viewerSource from "./three/AKEViewer.ts?raw";
@@ -51,15 +55,19 @@ const SOURCES = {
   "akc.ts": akcSource,
   "dpe.ts": dpeSource,
   "dqf.ts": dqfSource,
+  "aqp.ts": aqpSource,
   "akh.ts": akhSource,
   "alf.ts": alfSource,
   "alp.ts": alpSource,
+  "aap.ts": aapSource,
   "rkn.ts": rknSource,
   "rap.ts": rapSource,
   "ama.ts": amaSource,
   "amd.ts": amdSource,
   "aga.ts": agaSource,
+  "pag.ts": pagSource,
   "pmc.ts": pmcSource,
+  "pga.ts": pgaSource,
   "profileContainer.ts": profileSource,
   "models.ts": modelsSource,
   "primitives.ts": primitivesSource,
@@ -95,6 +103,11 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "LD-8 wrapper: 767 full-width twin-LD2 trapezoid bound to the symmetric-profile engine.",
     },
+    "aqp.ts": {
+      entry: "createAQPContainer()",
+      description:
+        "LD-4 wrapper: rectangular 96 × 60.4 in lower-deck envelope bound to the profile engine.",
+    },
     "akh.ts": {
       entry: "createAKHContainer()",
       description:
@@ -109,6 +122,11 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createALPContainer()",
       description:
         "LD-11 wrapper: rectangular full-width lower-deck envelope bound to the profile engine.",
+    },
+    "aap.ts": {
+      entry: "createAAPContainer()",
+      description:
+        "LD-9 wrapper: rectangular box on the 88 × 125 in P1P base, bound to the profile engine.",
     },
     "rkn.ts": {
       entry: "createRKNContainer()",
@@ -140,10 +158,20 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "Parameterized engine for extruded-section ULDs (AKC, DPE, DQF, AKH, ALF, ALP, AMA, AMD, AGA): ring hull, edge frame, hinged door, blind end, chassis.",
     },
+    "pag.ts": {
+      entry: "createPAGContainer()",
+      description:
+        "P1P wrapper: 88 × 125 in pallet spec bound to the shared pallet engine in pmc.ts.",
+    },
     "pmc.ts": {
       entry: "createPMCContainer()",
       description:
-        "Main-deck pallet generator with seat tracks, underside structure and load contour.",
+        "Shared pallet engine (PAG/PMC/PGA) with seat tracks, underside structure and load contour.",
+    },
+    "pga.ts": {
+      entry: "createPGAContainer()",
+      description:
+        "20 ft wrapper: 96 × 238.5 in heavy-haul pallet spec bound to the shared pallet engine in pmc.ts.",
     },
     "models.ts": {
       entry: "MODELS",
@@ -521,7 +549,7 @@ export default function App() {
       if (target?.isContentEditable) return;
       const ids = Object.keys(MODELS) as ModelId[];
       const k = e.key.toLowerCase();
-      const keyIndex = "1234567890qer".indexOf(k); // w stays the wireframe toggle
+      const keyIndex = "1234567890qertyug".indexOf(k); // w stays the wireframe toggle
       if (keyIndex >= 0 && keyIndex < ids.length) selectModel(ids[keyIndex]);
       else if (k === "f") viewer.current?.frameAll();
       else if (k === "i") viewer.current?.setView("iso");
@@ -643,7 +671,7 @@ export default function App() {
           <div
             role="group"
             aria-label="Select ULD model"
-            className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
+            className="flex max-w-[72vw] flex-wrap justify-end border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
           >
             {(Object.keys(MODELS) as ModelId[]).map((id) => (
               <button
@@ -653,7 +681,7 @@ export default function App() {
                 title={MODELS[id].family}
                 aria-pressed={state.model === id}
                 className={cn(
-                  "px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
+                  "px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
                   state.model === id
                     ? "bg-amber text-void shadow-[0_0_14px_-4px_rgba(255,176,32,0.9)]"
                     : "text-dim hover:bg-raise hover:text-ink",
@@ -800,7 +828,7 @@ export default function App() {
                 code={`${spec.code} envelope`}
                 className="h-full overflow-y-auto scroll-slim"
               >
-                <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} />
+                <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
               </Panel>
             </div>
           )}
@@ -973,7 +1001,7 @@ export default function App() {
         {sheet && (
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
             {tab === "spec" && (
-              <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} />
+              <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
             )}
             {tab === "parts" && (
               <PartsList
