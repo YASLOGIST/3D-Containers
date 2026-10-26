@@ -3,7 +3,8 @@ import type { Assembly } from "@/three/primitives";
 import { highlightTS } from "@/lib/io";
 import { computePlan } from "@/lib/planner";
 import { kgToLb } from "@/lib/units";
-import type { ModelInfo } from "@/three/models";
+import { MODELS, type ModelId, type ModelInfo } from "@/three/models";
+import { MODEL_IDS } from "@/lib/state";
 import { Btn, Chip, Row, Segmented, Slider } from "./ui";
 import { cn } from "@/utils/cn";
 
@@ -179,11 +180,13 @@ function SpecSheetBase({
   measured,
   model,
   compareModel,
+  onSelectModel,
 }: {
   stats: Stats | null;
   measured: { x: number; y: number; z: number } | null;
   model: ModelInfo;
   compareModel?: ModelInfo | null;
+  onSelectModel?: (id: ModelId) => void;
 }) {
   const { dims } = model;
   const sectionLabel = model.palletOption
@@ -338,6 +341,7 @@ function SpecSheetBase({
       )}
 
       <LoadPlanner key={model.id} model={model} />
+      {onSelectModel && <FleetCard model={model} onSelect={onSelectModel} />}
     </div>
   );
 }
@@ -345,6 +349,93 @@ function SpecSheetBase({
 /* ------------------------------------------------------------------ */
 /* Load planner — estimated payload / volume utilisation               */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Fleet-at-a-glance: every family's certified section silhouette as a
+ * clickable chip, so the whole catalogue can be scanned and jumped
+ * between without cycling the header switcher. Silhouettes are
+ * normalized per unit for legibility — the hold-fit card above remains
+ * the true-scale reference.
+ */
+function FleetCard({
+  model,
+  onSelect,
+}: {
+  model: ModelInfo;
+  onSelect: (id: ModelId) => void;
+}) {
+  return (
+    <div className="border border-line-soft bg-void/40 px-2 pb-1.5 pt-2">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="stencil text-[9.5px] text-dim">
+          fleet at a glance · tap to switch
+        </span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-steel">
+          {MODEL_IDS.length} families
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        {MODEL_IDS.map((id) => {
+          const m = MODELS[id];
+          const pts = m.sectionProfile();
+          const xs = pts.map((p) => p.x);
+          const ys = pts.map((p) => p.y);
+          const x0 = Math.min(...xs);
+          const x1 = Math.max(...xs);
+          const y1 = Math.max(...ys, 0.05);
+          const W = 76;
+          const H = 46;
+          const pad = 3;
+          const s = Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / y1);
+          const ox = W / 2 - ((x0 + x1) / 2) * s;
+          const oy = H - pad;
+          const d =
+            pts
+              .map((p, i) => `${i === 0 ? "M" : "L"}${(p.x * s + ox).toFixed(1)},${(oy - p.y * s).toFixed(1)}`)
+              .join(" ") + " Z";
+          const active = id === model.id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              aria-pressed={active}
+              title={`${m.name} — ${m.family} · ${m.ratings.volumeM3.toFixed(1)} m³ · ${m.ratings.payloadKg} kg payload`}
+              className={cn(
+                "flex flex-col items-center gap-0.5 border px-1 py-1 text-left transition-colors",
+                active
+                  ? "border-amber/70 bg-amber/10"
+                  : "border-line-soft bg-void/30 hover:border-steel/60 hover:bg-steel/10",
+              )}
+            >
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-hidden="true">
+                <path
+                  d={d}
+                  className={active ? "fill-amber/25 stroke-amber" : "fill-steel/15 stroke-steel/70"}
+                  strokeWidth="1.1"
+                />
+              </svg>
+              <span
+                className={cn(
+                  "font-mono text-[9px] uppercase leading-none tracking-[0.08em]",
+                  active ? "text-amber" : "text-dim",
+                )}
+              >
+                {m.code}
+              </span>
+              <span className="font-mono text-[8.5px] leading-none text-steel">
+                {m.ratings.volumeM3.toFixed(1)} m³
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-1 text-[9px] normal-case leading-snug text-steel">
+        Silhouettes normalized per unit — hold-fit card is the true-scale reference.
+      </div>
+    </div>
+  );
+}
 
 function LoadPlanner({ model }: { model: ModelInfo }) {
   const { ratings } = model;

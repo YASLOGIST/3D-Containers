@@ -2,7 +2,7 @@
   <a href="https://www.yaslogist.com">
     <img src="assets/readme/yaslogist-hero.gif" alt="3D-Containers — Zero-Asset Procedural Aviation ULD Geometry Lab · Engineered by YASLOGIST" width="100%" />
   </a>
-  <img src="assets/readme/yaslogist-telemetry-strip.svg" alt="3D-Containers Real-Time Telemetry — CCW Polygon Kernel · 13 Certified ULD Families · Three.js r180 PBR · GLB OBJ STL Export" width="100%" />
+  <img src="assets/readme/yaslogist-telemetry-strip.svg" alt="3D-Containers Real-Time Telemetry — CCW Polygon Kernel · 17 Certified ULD Families · Three.js r180 PBR · GLB OBJ STL Export" width="100%" />
 
   <br />
 
@@ -66,7 +66,7 @@
 
 ## `02 //` Certified ULD Fleet Matrix
 
-All thirteen models conform to the shared `ContainerBase` / `ViewerContainer` contract in `src/three/models.ts` and `src/three/primitives.ts`, exposing real-time assembly explode groups, part bills-of-materials, and family-specific parametric toggles. Four are bespoke generators (`AKE`, `RKN`, `RAP`, `PMC`); nine (`AKC`, `DPE`, `DQF`, `AKH`, `ALF`, `ALP`, `AMA`, `AMD`, `AGA`) are thin certified-envelope wrappers over one shared profile engine, `src/three/profileContainer.ts`, spanning symmetric dual-wing/roof-chamfer sections, a plain rectangle, the single-slope LD-1/LD-2 trapezoids and the asymmetric 118 in contour-D pentagon:
+All seventeen models conform to the shared `ContainerBase` / `ViewerContainer` contract in `src/three/models.ts` and `src/three/primitives.ts`, exposing real-time assembly explode groups, part bills-of-materials, and family-specific parametric toggles. Three are bespoke generators (`AKE`, `RKN`, `RAP`); eleven (`AKC`, `DPE`, `DQF`, `AQP`, `AKH`, `ALF`, `ALP`, `AAP`, `AMA`, `AMD`, `AGA`) are thin certified-envelope wrappers over one shared profile engine, `src/three/profileContainer.ts`, spanning symmetric dual-wing/roof-chamfer sections, plain rectangles, the single-slope LD-1/LD-2 trapezoids and the asymmetric 118 in contour-D pentagon; three pallets (`PAG`, `PMC`, `PGA`) are specs over one parameterized pallet engine in `src/three/pmc.ts`:
 
 <table>
   <thead>
@@ -108,6 +108,13 @@ All thirteen models conform to the shared `ContainerBase` / `ViewerContainer` co
       <td valign="top">One unit does the work of a <code>DPE</code> pair; hold-fit card shows both arrangements in the same 767 tube.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
     </tr>
     <tr>
+      <td valign="top"><strong><code>AQP · LD-4</code></strong><br /><sub>Rectangular 767</sub></td>
+      <td valign="top">Rectangular 767/777/787 lower-deck box — the LD-8 footprint with vertical walls<br /><code>src/three/aqp.ts</code> → <code>profileContainer.ts</code></td>
+      <td valign="top"><code>2.44 × 1.53 × 1.63 m</code><br /><sub><code>0.0°</code> vertical walls</sub></td>
+      <td valign="top"><code>5.5 m³</code> (<code>195 ft³</code>)<br /><sub>Tare <code>120 kg</code> · Gross <code>2,449 kg</code></sub></td>
+      <td valign="top">Completes the 767 trio with <code>DPE</code> + <code>DQF</code>; compare against the <code>DQF</code> to price the twin wedge.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
+    </tr>
+    <tr>
       <td valign="top"><strong><code>AKH · LD3-45</code></strong><br /><sub>Narrowbody Lower Deck</sub></td>
       <td valign="top">A320-family lower-deck container, double-wing hexagon section<br /><code>src/three/akh.ts</code> → <code>profileContainer.ts</code></td>
       <td valign="top"><code>1.53 × 1.56 × 1.14 m</code><br /><sub><code>2.44 m</code> overall top · <code>28.2°</code> wings each side</sub></td>
@@ -127,6 +134,13 @@ All thirteen models conform to the shared `ContainerBase` / `ViewerContainer` co
       <td valign="top"><code>3.18 × 1.53 × 1.63 m</code><br /><sub><code>0.0°</code> vertical walls</sub></td>
       <td valign="top"><code>7.2 m³</code> (<code>253 ft³</code>)<br /><sub>Tare <code>185 kg</code> · Gross <code>3,176 kg</code></sub></td>
       <td valign="top">Plain rectangle that cubes out perfectly — compare against the <code>ALF</code> to price the fuselage wedge (≈<code>1.7 m³</code>).<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>AAP · LD-9</code></strong><br /><sub>P1P-base Rigid Box</sub></td>
+      <td valign="top">Rectangular box (contour code <code>P</code>) on the <code>88 × 125 in</code> P1P pallet base<br /><code>src/three/aap.ts</code> → <code>profileContainer.ts</code></td>
+      <td valign="top"><code>3.18 × 2.24 × 1.63 m</code><br /><sub><code>0.0°</code> vertical walls · door on the <code>125 in</code> side</sub></td>
+      <td valign="top"><code>10.8 m³</code> (<code>381 ft³</code>)<br /><sub>Tare <code>270 kg</code> · Gross <code>6,033 kg</code></sub></td>
+      <td valign="top">Biggest-volume rigid lower-deck unit; sits on the exact <code>PAG</code> base below.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
     </tr>
     <tr>
       <td valign="top"><strong><code>RKN · LD-9</code></strong><br /><sub>Active Cold-Chain</sub></td>
@@ -164,11 +178,25 @@ All thirteen models conform to the shared `ContainerBase` / `ViewerContainer` co
       <td valign="top">Largest rigid box in the fleet — two M-1 lengths in one shell; end-face door, <code>0°–112°</code> leaf.<br /><strong>5 groups:</strong> <code>hull</code>, <code>frame</code>, <code>base</code>, <code>door</code>, <code>blind</code></td>
     </tr>
     <tr>
+      <td valign="top"><strong><code>PAG · P1P</code></strong><br /><sub>88-in Certified Pallet</sub></td>
+      <td valign="top">Certified <code>88 × 125 in</code> flat cargo pallet<br /><code>src/three/pag.ts</code> → <code>pmc.ts</code> pallet engine</td>
+      <td valign="top"><code>3.18 × 2.24 × 0.05 m</code><br /><sub><code>1.62 m</code> netted stack height</sub></td>
+      <td valign="top"><code>11.5 m³</code> netted contour<br /><sub>Tare <code>110 kg</code> · Gross <code>6,033 kg</code></sub></td>
+      <td valign="top">The narrower 125-in base the <code>AAP</code> box stands on; seat tracks, underside beams, toggleable netted load.<br /><strong>4 groups:</strong> <code>deck</code>, <code>tracks</code>, <code>structure</code>, <code>contour</code></td>
+    </tr>
+    <tr>
       <td valign="top"><strong><code>PMC · P6P</code></strong><br /><sub>Main-Deck Pallet</sub></td>
-      <td valign="top">Certified <code>96 × 125 in</code> flat cargo pallet<br /><code>src/three/pmc.ts</code></td>
+      <td valign="top">Certified <code>96 × 125 in</code> flat cargo pallet<br /><code>src/three/pmc.ts</code> (shared pallet engine)</td>
       <td valign="top"><code>3.18 × 2.44 × 0.05 m</code><br /><sub><code>1.62 m</code> netted stack height</sub></td>
       <td valign="top"><code>12.6 m³</code> netted contour<br /><sub>Tare <code>120 kg</code> · Gross <code>6,804 kg</code></sub></td>
       <td valign="top"><code>7075-T6</code> plate, 4 seat tracks (<code>62 mm</code> scalloped slot pitch), forged corner gussets, toggleable cargo + net (<code>palletLoaded</code>).<br /><strong>4 groups:</strong> <code>deck</code>, <code>tracks</code>, <code>structure</code>, <code>contour</code></td>
+    </tr>
+    <tr>
+      <td valign="top"><strong><code>PGA · 20 ft</code></strong><br /><sub>Heavy-Haul Pallet</sub></td>
+      <td valign="top">Certified <code>96 × 238.5 in</code> 747F main-deck pallet (NAS 3610 2G1P)<br /><code>src/three/pga.ts</code> → <code>pmc.ts</code> pallet engine</td>
+      <td valign="top"><code>6.06 × 2.44 × 0.05 m</code><br /><sub><code>2.44 m</code> netted stack height</sub></td>
+      <td valign="top"><code>36.0 m³</code> netted contour<br /><sub>Tare <code>541 kg</code> · Gross <code>13,608 kg</code></sub></td>
+      <td valign="top">The 30,000 lb vehicle/engine hauler — longest base in the fleet, five-beam underside.<br /><strong>4 groups:</strong> <code>deck</code>, <code>tracks</code>, <code>structure</code>, <code>contour</code></td>
     </tr>
   </tbody>
 </table>
@@ -190,7 +218,7 @@ All thirteen models conform to the shared `ContainerBase` / `ViewerContainer` co
 ```mermaid
 flowchart LR
   subgraph UI["React 19 Control Layer (src/App.tsx)"]
-    Switch["ULD Switcher\n13 certified families"]
+    Switch["ULD Switcher\n17 certified families"]
     Deck["ControlDeck\nKinematics · Finish · Camera"]
     Inspector["SpecSheet · PartsList\nRaw TS Source (?raw)"]
   end
@@ -271,7 +299,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         <li><strong>Inspection Tools:</strong> True-scale <strong>orthographic</strong> engineering projection alongside perspective; a draggable <strong>section cut</strong> (local clipping plane on X/Y/Z with flip and closed <strong>stencil caps</strong> on the cut faces, revealing real wall and cavity construction — view-only, exports stay whole); <strong>point-to-point measurement</strong> with metre/inch readout and per-axis deltas; and a <strong>compare envelope</strong> overlaying any other family's certified box, base-centre aligned.</li>
         <li><strong>Detail-True Spec Sheet:</strong> A scale 2-D drawing of the generator's own certified cross-section inside its dashed envelope, aircraft-fit line, and a live <em>measured vs certified</em> envelope check (Δ in mm per axis, measured door-closed) prove the solid stays inscribed in its certified boundary. With a compare model selected, certified volume/payload/footprint/payload-density deltas appear beside the 3-D envelope overlay.</li>
         <li><strong>Hold-Fit Schematic &amp; Showcase:</strong> Every spec sheet draws the unit (singly or as a mirrored pair) inside its primary aircraft's fuselage tube — published fuselage Ø, nominal floor position, explicitly a scale schematic rather than a loading diagram, with the underlying data machine-checked to stay inside the tube. The header <code>▶ showcase</code> button runs a 7 s door/load + explode choreography that returns every control to its starting value.</li>
-        <li><strong>Load Planner, Share Links &amp; Snapshots:</strong> The spec sheet estimates payload/volume utilisation, volumetric (chargeable) weight at the 6000/5000 divisors and overweight status from certified ratings. The full workbench state round-trips through a shareable URL hash, the viewport saves as PNG, and keyboard shortcuts (<code>1–0·q·e·r</code>, <code>F</code>, <code>O</code>, <code>M</code>, <code>S</code>, <code>D</code>) drive models, framing and inspection tools.</li>
+        <li><strong>Load Planner, Share Links &amp; Snapshots:</strong> The spec sheet estimates payload/volume utilisation, volumetric (chargeable) weight at the 6000/5000 divisors and overweight status from certified ratings. The full workbench state round-trips through a shareable URL hash, the viewport saves as PNG, and keyboard shortcuts (<code>1–0·q·e·r·t·y·u·g</code>, <code>F</code>, <code>O</code>, <code>M</code>, <code>S</code>, <code>D</code>) drive models, framing and inspection tools.</li>
       </ul>
     </td>
     <td width="50%" valign="top">
@@ -299,7 +327,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
 ├── vite.config.ts                # Vite 8 + React + Tailwind v4 + viteSingleFile() bundler
 ├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
-├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (23 checks)
+├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (24 checks)
 └── src/
     ├── main.tsx                  # React 19 root mount
     ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
@@ -317,19 +345,23 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
         ├── models.ts             # Declarative MODELS registry (ake, rkn, rap, pmc)
         ├── primitives.ts         # CCW offsetPolygon kernel, extrusions, RivetRun & FINISHES
         ├── akeLD3.ts             # IATA AKE / LD-3 contoured lower-deck generator
-        ├── profileContainer.ts   # profile engine (AKC · DPE · DQF · AKH · ALF · ALP · AMA · AMD · AGA)
+        ├── profileContainer.ts   # profile engine (AKC · DPE · DQF · AQP · AKH · ALF · ALP · AAP · AMA · AMD · AGA)
         ├── akc.ts                # IATA AKC / LD-1 deep-contour lower-deck wrapper
         ├── dpe.ts                # IATA DPE / LD-2 767 half-width wrapper
         ├── dqf.ts                # IATA DQF / LD-8 767 full-width wrapper
+        ├── aqp.ts                # IATA AQP / LD-4 rectangular 767 wrapper
         ├── akh.ts                # IATA AKH / LD3-45 A320-family lower-deck wrapper
         ├── alf.ts                # IATA ALF / LD6 full-width lower-deck wrapper
         ├── alp.ts                # IATA ALP / LD-11 rectangular lower-deck wrapper
+        ├── aap.ts                # IATA AAP / LD-9 P1P-base rectangular wrapper
         ├── ama.ts                # IATA AMA / M-1 main-deck wrapper
         ├── amd.ts                # IATA AMD / M1H 118-in contour-D wrapper
         ├── aga.ts                # IATA AGA / M-2 20-ft main-deck wrapper
         ├── rkn.ts                # IATA RKN / LD-9 refrigerated cuboid generator
         ├── rap.ts                # IATA RAP / LD-9 twin-fan cold-chain generator
-        ├── pmc.ts                # IATA PMC / P6P 96x125 in main-deck pallet generator
+        ├── pmc.ts                # shared pallet engine + IATA PMC / P6P 96x125 in spec
+        ├── pag.ts                # IATA PAG / P1P 88x125 in pallet spec
+        ├── pga.ts                # IATA PGA 20-ft 96x238.5 in pallet spec
         ├── textures.ts           # Procedural Canvas PBR maps, placards & LED displays
         ├── annotations.ts        # Model-aware CAD dimensions, badges & envelope helpers
         ├── textureSupport.ts     # Deterministic PRNG and clone-safe Canvas texture cache
@@ -380,7 +412,7 @@ npm run preview
     <tr>
       <td><strong>Procedural ULD Generators</strong></td>
       <td><code>Implemented</code></td>
-      <td>All 13 families (<code>AKE</code>, <code>AKC</code>, <code>DPE</code>, <code>DQF</code>, <code>AKH</code>, <code>ALF</code>, <code>ALP</code>, <code>RKN</code>, <code>RAP</code>, <code>AMA</code>, <code>AMD</code>, <code>AGA</code>, <code>PMC</code>) are fully implemented in <code>src/three/</code> with parametric toggles and multi-group explode trees.</td>
+      <td>All 17 families (<code>AKE</code>, <code>AKC</code>, <code>DPE</code>, <code>DQF</code>, <code>AQP</code>, <code>AKH</code>, <code>ALF</code>, <code>ALP</code>, <code>AAP</code>, <code>RKN</code>, <code>RAP</code>, <code>AMA</code>, <code>AMD</code>, <code>AGA</code>, <code>PAG</code>, <code>PMC</code>, <code>PGA</code>) are fully implemented in <code>src/three/</code> with parametric toggles and multi-group explode trees.</td>
     </tr>
     <tr>
       <td><strong>Canvas PBR &amp; Viewport</strong></td>

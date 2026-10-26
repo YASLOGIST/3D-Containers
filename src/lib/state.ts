@@ -11,7 +11,7 @@ import type { ViewerState } from "@/three/AKEViewer";
 import type { ModelId } from "@/three/models";
 import type { FinishId } from "@/three/primitives";
 
-export const MODEL_IDS: ModelId[] = ["ake", "akc", "dpe", "dqf", "akh", "alf", "alp", "rkn", "rap", "ama", "amd", "aga", "pmc"];
+export const MODEL_IDS: ModelId[] = ["ake", "akc", "dpe", "dqf", "aqp", "akh", "alf", "alp", "aap", "rkn", "rap", "ama", "amd", "aga", "pag", "pmc", "pga"];
 export const FINISH_IDS: FinishId[] = [
   "mill",
   "graphite",
