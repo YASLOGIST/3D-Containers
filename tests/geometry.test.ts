@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { AKE_DIMENSIONS, contourProfile } from "../src/three/akeLD3.ts";
+import { AKC_DIMENSIONS, akcProfile } from "../src/three/akc.ts";
+import { DPE_DIMENSIONS, dpeProfile } from "../src/three/dpe.ts";
 import { AKH_DIMENSIONS, akhProfile } from "../src/three/akh.ts";
 import { ALF_DIMENSIONS, alfProfile } from "../src/three/alf.ts";
 import { AMA_DIMENSIONS, amaProfile } from "../src/three/ama.ts";
+import { AGA_DIMENSIONS, agaProfile } from "../src/three/aga.ts";
 import { MODELS } from "../src/three/models.ts";
 import { PMC_DIMENSIONS, pmcProfile } from "../src/three/pmc.ts";
 import { offsetPolygon, type V2 } from "../src/three/primitives.ts";
@@ -68,6 +71,16 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: AKE_DIMENSIONS.baseLength,
       height: AKE_DIMENSIONS.height,
     },
+    akc: {
+      width: AKC_DIMENSIONS.baseWidth,
+      depth: AKC_DIMENSIONS.baseLength,
+      height: AKC_DIMENSIONS.height,
+    },
+    dpe: {
+      width: DPE_DIMENSIONS.baseWidth,
+      depth: DPE_DIMENSIONS.baseLength,
+      height: DPE_DIMENSIONS.height,
+    },
     akh: {
       width: AKH_DIMENSIONS.baseWidth,
       depth: AKH_DIMENSIONS.baseLength,
@@ -93,6 +106,11 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: AMA_DIMENSIONS.baseLength,
       height: AMA_DIMENSIONS.height,
     },
+    aga: {
+      width: AGA_DIMENSIONS.baseWidth,
+      depth: AGA_DIMENSIONS.baseLength,
+      height: AGA_DIMENSIONS.height,
+    },
     pmc: {
       width: PMC_DIMENSIONS.width,
       depth: PMC_DIMENSIONS.depth,
@@ -111,6 +129,10 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
     );
     assert.equal(model.sourceFile.endsWith(".ts"), true);
     assert.ok(model.featureLabel.length > 4);
+    assert.ok(model.aircraft.length > 4, `${id} needs an aircraft-fit line`);
+    const section = model.sectionProfile();
+    assert.ok(section.length >= 4 && section.every(isFinitePoint), `${id} section preview profile`);
+    assert.ok(area(section) > 0, `${id} section profile must be CCW`);
     assert.equal(
       model.ratings.payloadKg,
       model.ratings.maxGrossKg - model.ratings.tareKg,
@@ -129,6 +151,7 @@ test("symmetric fleet sections (AKH/ALF/AMA) are CCW, mirrored and envelope-exac
     { profile: akhProfile(), dims: AKH_DIMENSIONS, points: 6 },
     { profile: alfProfile(), dims: ALF_DIMENSIONS, points: 4 },
     { profile: amaProfile(), dims: AMA_DIMENSIONS, points: 6 },
+    { profile: agaProfile(), dims: AGA_DIMENSIONS, points: 6 },
   ];
   for (const { profile, dims, points } of cases) {
     assert.equal(profile.length, points);
@@ -153,6 +176,29 @@ test("symmetric fleet sections (AKH/ALF/AMA) are CCW, mirrored and envelope-exac
     assert.ok(Math.abs(Math.max(...profile.map((p) => p.y)) - dims.height) < 1e-9);
 
     // the shared offset kernel must stay finite and area-reducing on hexagons
+    const inner = offsetPolygon(profile, 0.047);
+    assert.ok(inner.every(isFinitePoint));
+    assert.ok(Math.abs(area(inner)) < Math.abs(area(profile)));
+    assert.ok(Math.abs(area(inner)) > 0);
+  }
+});
+
+test("single-slope sections (AKC/LD1, DPE/LD2) are CCW right trapezoids on the certified envelope", () => {
+  const cases = [
+    { profile: akcProfile(), dims: AKC_DIMENSIONS },
+    { profile: dpeProfile(), dims: DPE_DIMENSIONS },
+  ];
+  for (const { profile, dims } of cases) {
+    assert.equal(profile.length, 4);
+    assert.ok(profile.every(isFinitePoint));
+    assert.ok(area(profile) > 0, "CCW polygons must have positive signed area");
+    // AKE convention: vertical centreline wall on −X at −topWidth/2
+    assert.ok(Math.abs(profile[0].x - -dims.topWidth / 2) < 1e-9);
+    assert.ok(Math.abs(profile[3].x - profile[0].x) < 1e-9, "left wall must be vertical");
+    assert.ok(Math.abs(profile[1].x - profile[0].x - dims.baseWidth) < 1e-9);
+    assert.ok(Math.abs(profile[2].x - profile[0].x - dims.topWidth) < 1e-9);
+    assert.ok(profile[2].x > profile[1].x, "contour leans out on +X only");
+    assert.ok(Math.abs(profile[3].y - dims.height) < 1e-9);
     const inner = offsetPolygon(profile, 0.047);
     assert.ok(inner.every(isFinitePoint));
     assert.ok(Math.abs(area(inner)) < Math.abs(area(profile)));

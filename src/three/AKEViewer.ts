@@ -256,6 +256,8 @@ export class AKEViewer {
 
   private modelRoot = new THREE.Group();
   private container: ViewerContainer | null = null;
+  /** door-closed / load-stowed bounding size from the latest rebuild */
+  private measuredSize = { x: 0, y: 0, z: 0 };
   private annot: ReturnType<typeof createAnnotations> | null = null;
   private highlightBox: THREE.LineSegments;
   private highlightTag: THREE.Sprite | null = null;
@@ -328,7 +330,7 @@ export class AKEViewer {
     private cb: {
       onHover?: (h: HoverInfo | null) => void;
       onPerf?: (p: PerfInfo) => void;
-      onBuild?: (c: ViewerContainer) => void;
+      onBuild?: (c: ViewerContainer, measured: { x: number; y: number; z: number }) => void;
       onError?: (message: string | null) => void;
       onMeasure?: (m: MeasureInfo) => void;
       onSection?: (s: SectionInfo) => void;
@@ -665,6 +667,18 @@ export class AKEViewer {
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
+    // Measure the as-certified envelope: door latched, pallet load stowed,
+    // assemblies home. Measuring with the door swung would inflate Z and
+    // make the spec sheet's "inscribed in envelope" claim false.
+    this.container.setDoorOpen(0);
+    this.container.setLoad?.(0);
+    this.container.group.updateMatrixWorld(true);
+    const measuredSize = new THREE.Box3()
+      .setFromObject(this.container.group)
+      .getSize(new THREE.Vector3());
+    this.measuredSize = { x: measuredSize.x, y: measuredSize.y, z: measuredSize.z };
+    this.container.setDoorOpen(this.state.door);
+    this.container.setLoad?.(this.state.load);
     this.applyMaterialState();
     this.applyExplode();
     // Fresh geometry invalidates any placed measurement; the section plane
@@ -698,7 +712,7 @@ export class AKEViewer {
       baseLeft,
       taperDeg: spec.taperDeg,
       taperLabel: spec.taperLabel,
-      contour: spec.contourOption && this.state.contour,
+      contour: spec.annotationKind === "contoured" || (spec.contourOption && this.state.contour),
       kind: spec.palletOption
         ? "pallet"
         : spec.annotationKind
@@ -714,7 +728,7 @@ export class AKEViewer {
     this.updateHomePose();
     if (refitCamera)
       this.flyToPose(this.homeTarget, this.homeCamera, 0.85, this.homeOrthoSize);
-    this.cb.onBuild?.(this.container);
+    this.cb.onBuild?.(this.container, this.measuredSize);
   }
 
   private disposeAnnotations() {

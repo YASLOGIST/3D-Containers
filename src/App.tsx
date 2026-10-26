@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as THREE from "three";
 
 import akeSource from "./three/akeLD3.ts?raw";
+import akcSource from "./three/akc.ts?raw";
+import dpeSource from "./three/dpe.ts?raw";
 import akhSource from "./three/akh.ts?raw";
 import alfSource from "./three/alf.ts?raw";
 import rknSource from "./three/rkn.ts?raw";
 import rapSource from "./three/rap.ts?raw";
 import amaSource from "./three/ama.ts?raw";
+import agaSource from "./three/aga.ts?raw";
 import pmcSource from "./three/pmc.ts?raw";
 import profileSource from "./three/profileContainer.ts?raw";
 import primitivesSource from "./three/primitives.ts?raw";
@@ -43,11 +45,14 @@ import { cn } from "@/utils/cn";
 
 const SOURCES = {
   "akeLD3.ts": akeSource,
+  "akc.ts": akcSource,
+  "dpe.ts": dpeSource,
   "akh.ts": akhSource,
   "alf.ts": alfSource,
   "rkn.ts": rknSource,
   "rap.ts": rapSource,
   "ama.ts": amaSource,
+  "aga.ts": agaSource,
   "pmc.ts": pmcSource,
   "profileContainer.ts": profileSource,
   "models.ts": modelsSource,
@@ -68,6 +73,16 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createAKEContainer()",
       description:
         "Contoured LD-3 generator: one offset polygon drives hull, frames, door and hardware.",
+    },
+    "akc.ts": {
+      entry: "createAKCContainer()",
+      description:
+        "LD-1 wrapper: deep 92 in single-contour trapezoid bound to the profile engine via an explicit asymmetric section.",
+    },
+    "dpe.ts": {
+      entry: "createDPEContainer()",
+      description:
+        "LD-2 wrapper: 767 half-width P-base envelope bound to the profile engine via an explicit asymmetric section.",
     },
     "akh.ts": {
       entry: "createAKHContainer()",
@@ -94,10 +109,15 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "M-1 wrapper: main-deck 96 in envelope with nominal roof chamfer, bound to the symmetric-profile engine.",
     },
+    "aga.ts": {
+      entry: "createAGAContainer()",
+      description:
+        "M-2 wrapper: 20-ft PGA-footprint main-deck box bound to the symmetric-profile engine.",
+    },
     "profileContainer.ts": {
       entry: "createProfileContainer()",
       description:
-        "Parameterized engine for symmetric extruded-section ULDs (AKH, ALF, AMA): ring hull, edge frame, hinged door, blind end, chassis.",
+        "Parameterized engine for extruded-section ULDs (AKC, DPE, AKH, ALF, AMA, AGA): ring hull, edge frame, hinged door, blind end, chassis.",
     },
     "pmc.ts": {
       entry: "createPMCContainer()",
@@ -213,12 +233,11 @@ export default function App() {
       if (!live || !host.current) return;
       try {
         v = new AKEViewer(host.current, bootState, {
-          onBuild: (c) => {
+          onBuild: (c, measuredSize) => {
             setStats(c.stats as Stats);
             setAssemblies([...c.assemblies]);
-            const box = new THREE.Box3().setFromObject(c.group);
-            const size = box.getSize(new THREE.Vector3());
-            setMeasured({ x: size.x, y: size.y, z: size.z });
+            // Viewer measures door-closed / load-stowed: the certified pose.
+            setMeasured(measuredSize);
             setError(null);
             setReady(true);
           },
@@ -442,7 +461,8 @@ export default function App() {
       if (target?.isContentEditable) return;
       const ids = Object.keys(MODELS) as ModelId[];
       const k = e.key.toLowerCase();
-      if (k >= "1" && Number(k) <= ids.length) selectModel(ids[Number(k) - 1]);
+      if (k >= "1" && k <= "9") selectModel(ids[Number(k) - 1]);
+      else if (k === "0" && ids.length >= 10) selectModel(ids[9]);
       else if (k === "f") viewer.current?.frameAll();
       else if (k === "i") viewer.current?.setView("iso");
       else if (k === "o")
@@ -712,7 +732,7 @@ export default function App() {
                 code={`${spec.code} envelope`}
                 className="h-full overflow-y-auto scroll-slim"
               >
-                <SpecSheet stats={stats} measured={measured} model={spec} />
+                <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} />
               </Panel>
             </div>
           )}
@@ -885,7 +905,7 @@ export default function App() {
         {sheet && (
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
             {tab === "spec" && (
-              <SpecSheet stats={stats} measured={measured} model={spec} />
+              <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} />
             )}
             {tab === "parts" && (
               <PartsList
