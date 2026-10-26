@@ -10,6 +10,9 @@ import viewerSource from "./three/AKEViewer.ts?raw";
 import textureSource from "./three/textures.ts?raw";
 import modelsSource from "./three/models.ts?raw";
 import annotationsSource from "./three/annotations.ts?raw";
+import plannerSource from "./lib/planner.ts?raw";
+import stateSource from "./lib/state.ts?raw";
+import unitsSource from "./lib/units.ts?raw";
 
 import {
   AKEViewer,
@@ -44,6 +47,9 @@ const SOURCES = {
   "AKEViewer.ts": viewerSource,
   "textures.ts": textureSource,
   "annotations.ts": annotationsSource,
+  "planner.ts": plannerSource,
+  "state.ts": stateSource,
+  "units.ts": unitsSource,
 } as const;
 
 type SourceName = keyof typeof SOURCES;
@@ -83,7 +89,7 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
     "AKEViewer.ts": {
       entry: "AKEViewer",
       description:
-        "Renderer lifecycle, model-aware camera framing, lighting, picking and mesh exports.",
+        "Renderer lifecycle, perspective/orthographic cameras, section cuts, measurement, compare envelopes, idle rendering and mesh exports.",
     },
     "textures.ts": {
       entry: "makeBrushedMetal / makeReeferPanel",
@@ -93,13 +99,29 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
     "annotations.ts": {
       entry: "createAnnotations()",
       description:
-        "Model-aware 3D dimension furniture generated from registry measurements.",
+        "Model-aware 3D dimension furniture with metric + imperial readouts, generated from registry measurements.",
+    },
+    "planner.ts": {
+      entry: "computePlan()",
+      description:
+        "Pure load-planning arithmetic: utilisation, volumetric and chargeable weight, overload status.",
+    },
+    "state.ts": {
+      entry: "encodeShareState / decodeShareState",
+      description:
+        "Shareable URL-hash codec for the full workbench configuration, decoded defensively field by field.",
+    },
+    "units.ts": {
+      entry: "formatDistance()",
+      description:
+        "Metric/imperial conversions shared by dimension sprites, measurement labels and the planner.",
     },
   };
 
 const isSourceName = (value: string): value is SourceName => value in SOURCES;
 
 type Tab = "spec" | "parts" | "source";
+const TAB_ORDER: Tab[] = ["spec", "parts", "source"];
 
 /** Initial workbench state: defaults overlaid with any shared URL hash. */
 function initialState(): ViewerState {
@@ -133,7 +155,12 @@ export default function App() {
   } | null>(null);
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const [perf, setPerf] = useState({ fps: 0, triangles: 0, calls: 0 });
+  const [perf, setPerf] = useState({
+    fps: 0,
+    triangles: 0,
+    calls: 0,
+    idle: false,
+  });
   const [tab, setTab] = useState<Tab>("spec");
   const [source, setSource] = useState<SourceName>(
     isSourceName(MODELS[bootState.model].sourceFile)
@@ -187,10 +214,19 @@ export default function App() {
       }
     };
 
-    // Canvas-drawn placards need the webfonts resolved before the first bake.
+    // Canvas-drawn placards need the webfonts resolved before the first
+    // bake — but a hanging font request must never block the viewer.
+    let booted = false;
+    const bootOnce = () => {
+      if (booted) return;
+      booted = true;
+      boot();
+    };
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-    if (fonts?.ready) fonts.ready.then(boot).catch(boot);
-    else boot();
+    if (fonts?.ready) {
+      fonts.ready.then(bootOnce).catch(bootOnce);
+      window.setTimeout(bootOnce, 1200);
+    } else bootOnce();
 
     return () => {
       live = false;
@@ -207,13 +243,30 @@ export default function App() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const notify = (message: string) => {
+  const toastId = useRef(0);
+  const notify = useCallback((message: string) => {
+    const id = ++toastId.current;
     setToast(message);
-    window.setTimeout(
-      () => setToast((current) => (current === message ? null : current)),
-      2600,
-    );
-  };
+    window.setTimeout(() => {
+      if (toastId.current === id) setToast(null);
+    }, 2600);
+  }, []);
+
+  /* Stable callbacks keep the memoised panels out of hover/perf re-renders. */
+  const onViewCb = useCallback(
+    (view: "front" | "top" | "contour" | "iso") =>
+      viewer.current?.setView(view),
+    [],
+  );
+  const onFrameCb = useCallback(() => viewer.current?.frameAll(), []);
+  const onMeasureClearCb = useCallback(
+    () => viewer.current?.clearMeasure(),
+    [],
+  );
+  const onFocusCb = useCallback(
+    (id: string | null) => viewer.current?.focus(id),
+    [],
+  );
 
   const selectModel = (id: ModelId) => {
     const next = MODELS[id];
@@ -265,10 +318,20 @@ export default function App() {
     }
   };
 
-  const onListHover = (id: string | null) => {
+  const onListHover = useCallback((id: string | null) => {
     setHighlight(id);
     viewer.current?.highlight(id);
-  };
+  }, []);
+
+  const onDownloadSource = useCallback(() => {
+    downloadText(SOURCES[source], source, "text/typescript");
+    notify(`${source} downloaded`);
+  }, [source, notify]);
+  const onCopySource = useCallback(
+    (ok: boolean) =>
+      notify(ok ? `${source} copied` : "Clipboard unavailable"),
+    [source, notify],
+  );
 
   const toggleMeasure = useCallback((on: boolean) => {
     setMeasureOn(on);
@@ -362,6 +425,7 @@ export default function App() {
       else if (k === "w") patch({ wireframe: !state.wireframe });
       else if (k === "s") patch({ section: !state.section });
       else if (k === "m") toggleMeasure(!measureOn);
+      else if (k === "p") void doSnapshot();
       else if (k === "escape") {
         if (measureOn) toggleMeasure(false);
         else viewer.current?.clearMeasure();
@@ -540,11 +604,11 @@ export default function App() {
           <ControlDeck
             state={state}
             set={patch}
-            onView={(view) => viewer.current?.setView(view)}
-            onFrame={() => viewer.current?.frameAll()}
+            onView={onViewCb}
+            onFrame={onFrameCb}
             measureOn={measureOn}
             onMeasureToggle={toggleMeasure}
-            onMeasureClear={() => viewer.current?.clearMeasure()}
+            onMeasureClear={onMeasureClearCb}
             measureLabel={measureLabel}
             sectionLabel={sectionReadout}
           />
@@ -559,13 +623,35 @@ export default function App() {
             aria-label="Inspector view"
             className="flex border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
           >
-            {(["spec", "parts", "source"] as Tab[]).map((item) => (
+            {TAB_ORDER.map((item) => (
               <button
                 key={item}
                 type="button"
                 role="tab"
+                id={`tab-${item}`}
                 aria-selected={tab === item}
+                aria-controls={`panel-${item}`}
+                tabIndex={tab === item ? 0 : -1}
                 onClick={() => setTab(item)}
+                onKeyDown={(e) => {
+                  const idx = TAB_ORDER.indexOf(item);
+                  const next =
+                    e.key === "ArrowRight"
+                      ? TAB_ORDER[(idx + 1) % TAB_ORDER.length]
+                      : e.key === "ArrowLeft"
+                        ? TAB_ORDER[
+                            (idx - 1 + TAB_ORDER.length) % TAB_ORDER.length
+                          ]
+                        : e.key === "Home"
+                          ? TAB_ORDER[0]
+                          : e.key === "End"
+                            ? TAB_ORDER[TAB_ORDER.length - 1]
+                            : null;
+                  if (!next) return;
+                  e.preventDefault();
+                  setTab(next);
+                  document.getElementById(`tab-${next}`)?.focus();
+                }}
                 className={cn(
                   "flex-1 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
                   tab === item
@@ -581,40 +667,61 @@ export default function App() {
 
         <div className="pointer-events-auto min-h-0 flex-1 overflow-hidden">
           {tab === "spec" && (
-            <Panel
-              title="Specification"
-              code={`${spec.code} envelope`}
-              className="h-full overflow-y-auto scroll-slim"
+            <div
+              role="tabpanel"
+              id="panel-spec"
+              aria-labelledby="tab-spec"
+              className="h-full"
             >
-              <SpecSheet stats={stats} measured={measured} model={spec} />
-            </Panel>
+              <Panel
+                title="Specification"
+                code={`${spec.code} envelope`}
+                className="h-full overflow-y-auto scroll-slim"
+              >
+                <SpecSheet stats={stats} measured={measured} model={spec} />
+              </Panel>
+            </div>
           )}
           {tab === "parts" && (
-            <Panel
-              title="Assembly tree"
-              code={`${assemblies.length} groups`}
-              className="h-full overflow-y-auto scroll-slim"
+            <div
+              role="tabpanel"
+              id="panel-parts"
+              aria-labelledby="tab-parts"
+              className="h-full"
             >
-              <PartsList
-                assemblies={assemblies}
-                hovered={highlight}
-                onHover={onListHover}
-                onFocus={(id) => viewer.current?.focus(id)}
-              />
-            </Panel>
+              <Panel
+                title="Assembly tree"
+                code={`${assemblies.length} groups`}
+                className="h-full overflow-y-auto scroll-slim"
+              >
+                <PartsList
+                  assemblies={assemblies}
+                  hovered={highlight}
+                  onHover={onListHover}
+                  onFocus={onFocusCb}
+                />
+              </Panel>
+            </div>
           )}
           {tab === "source" && (
-            <Panel
-              title="Repository source"
-              code="typescript"
-              className="flex h-full flex-col"
-              bodyClass="min-h-0 flex-1 px-3 py-2.5"
+            <div
+              role="tabpanel"
+              id="panel-source"
+              aria-labelledby="tab-source"
+              className="h-full"
             >
+              <Panel
+                title="Repository source"
+                code="typescript"
+                className="flex h-full flex-col"
+                bodyClass="min-h-0 flex-1 px-3 py-2.5"
+              >
               <div className="mb-2 flex flex-wrap gap-1">
                 {(Object.keys(SOURCES) as SourceName[]).map((name) => (
                   <Btn
                     key={name}
                     active={source === name}
+                    pressed={source === name}
                     onClick={() => setSource(name)}
                   >
                     {name}
@@ -626,15 +733,11 @@ export default function App() {
                 filename={source}
                 entry={activeSource.entry}
                 description={activeSource.description}
-                onDownload={() => {
-                  downloadText(SOURCES[source], source, "text/typescript");
-                  notify(`${source} downloaded`);
-                }}
-                onCopy={(ok) =>
-                  notify(ok ? `${source} copied` : "Clipboard unavailable")
-                }
+                onDownload={onDownloadSource}
+                onCopy={onCopySource}
               />
-            </Panel>
+              </Panel>
+            </div>
           )}
         </div>
       </aside>
@@ -660,9 +763,16 @@ export default function App() {
                 ? "geometry live"
                 : "building"}
           </span>
-          <span className="text-dim">
-            {perf.fps} fps · {(perf.triangles / 1000).toFixed(1)}k tris ·{" "}
-            {perf.calls} calls
+          <span
+            className="text-dim"
+            title={
+              perf.idle
+                ? "Scene settled — renderer idling at ~4 Hz until the next interaction"
+                : undefined
+            }
+          >
+            {perf.idle ? "idle" : `${perf.fps} fps`} ·{" "}
+            {(perf.triangles / 1000).toFixed(1)}k tris · {perf.calls} calls
           </span>
           <span className="hidden text-dim sm:inline">
             meshes {stats?.meshes ?? "—"} · vol{" "}
@@ -685,9 +795,9 @@ export default function App() {
         <div className="relative h-[18px] overflow-hidden border-t border-line-soft/70 bg-void/60">
           <div className="marquee-track absolute flex whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.2em] text-dim">
             {[0, 1].map((copy) => (
-              <span key={copy} className="flex">
-                {marquee.map((text) => (
-                  <span key={text} className="px-6">
+              <span key={copy} className="flex" aria-hidden={copy === 1}>
+                {marquee.map((text, i) => (
+                  <span key={`${copy}-${i}`} className="px-6">
                     {text} <span className="text-amber/60">/</span>
                   </span>
                 ))}
@@ -702,6 +812,7 @@ export default function App() {
         <div className="flex items-center justify-center gap-1.5 px-3 pb-2">
           <Btn
             active={sheet && tab === "spec"}
+            pressed={sheet && tab === "spec"}
             onClick={() => {
               setTab("spec");
               setSheet(true);
@@ -711,6 +822,7 @@ export default function App() {
           </Btn>
           <Btn
             active={sheet && tab === "parts"}
+            pressed={sheet && tab === "parts"}
             onClick={() => {
               setTab("parts");
               setSheet(true);
@@ -720,6 +832,7 @@ export default function App() {
           </Btn>
           <Btn
             active={sheet && tab === "source"}
+            pressed={sheet && tab === "source"}
             onClick={() => {
               setTab("source");
               setSheet(true);
@@ -727,7 +840,11 @@ export default function App() {
           >
             source
           </Btn>
-          <Btn active={sheet} onClick={() => setSheet((open) => !open)}>
+          <Btn
+            active={sheet}
+            pressed={sheet}
+            onClick={() => setSheet((open) => !open)}
+          >
             {sheet ? "hide" : "controls"}
           </Btn>
         </div>
@@ -741,7 +858,7 @@ export default function App() {
                 assemblies={assemblies}
                 hovered={highlight}
                 onHover={onListHover}
-                onFocus={(id) => viewer.current?.focus(id)}
+                onFocus={onFocusCb}
               />
             )}
             {tab === "source" && (
@@ -751,13 +868,8 @@ export default function App() {
                   filename={source}
                   entry={activeSource.entry}
                   description={activeSource.description}
-                  onDownload={() => {
-                    downloadText(SOURCES[source], source, "text/typescript");
-                    notify(`${source} downloaded`);
-                  }}
-                  onCopy={(ok) =>
-                    notify(ok ? `${source} copied` : "Clipboard unavailable")
-                  }
+                  onDownload={onDownloadSource}
+                  onCopy={onCopySource}
                 />
               </div>
             )}
@@ -765,11 +877,11 @@ export default function App() {
               <ControlDeck
                 state={state}
                 set={patch}
-                onView={(view) => viewer.current?.setView(view)}
-                onFrame={() => viewer.current?.frameAll()}
+                onView={onViewCb}
+                onFrame={onFrameCb}
                 measureOn={measureOn}
                 onMeasureToggle={toggleMeasure}
-                onMeasureClear={() => viewer.current?.clearMeasure()}
+                onMeasureClear={onMeasureClearCb}
                 measureLabel={measureLabel}
                 sectionLabel={sectionReadout}
               />

@@ -4,6 +4,7 @@
  * family-specific dimension is baked into the drawing layer.
  */
 import * as THREE from "three";
+import { IN_PER_M } from "@/lib/units";
 
 const AMBER = new THREE.Color("#ffb020");
 const INK = new THREE.Color("#e8ecef");
@@ -24,7 +25,9 @@ function labelSprite(text: string, sub?: string) {
 
   ctx.fillStyle = "rgba(10,12,15,0.82)";
   ctx.beginPath();
-  ctx.roundRect(0, 0, c.width, c.height, 8);
+  // roundRect is Safari 16+; older engines fall back to square corners.
+  if (typeof ctx.roundRect === "function") ctx.roundRect(0, 0, c.width, c.height, 8);
+  else ctx.rect(0, 0, c.width, c.height);
   ctx.fill();
   ctx.strokeStyle = "rgba(255,176,32,0.55)";
   ctx.lineWidth = 2;
@@ -132,7 +135,15 @@ function dimension(
     }
   }
 
-  const spr = labelSprite(text, opts.sub ?? `${(len * 1000).toFixed(0)} mm`);
+  // Every dimension carries its imperial equivalent for ramp crews who
+  // work in inches (the PMC is even certified as 96 × 125 in).
+  const inches = `${(len * IN_PER_M).toFixed(1)} in`;
+  const spr = labelSprite(
+    text,
+    opts.sub
+      ? `${opts.sub} · ${inches.toUpperCase()}`
+      : `${(len * 1000).toFixed(0)} mm · ${inches}`,
+  );
   spr.position
     .copy(a)
     .addScaledVector(dir, len / 2)

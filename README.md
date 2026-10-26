@@ -229,7 +229,7 @@ No `.png`, `.jpg`, or `.hdr` files are fetched at runtime. Instead, `src/three/t
 ├── index.html                    # Entry shell + Chakra Petch / IBM Plex typography
 ├── vite.config.ts                # Vite 8 + React + Tailwind v4 + viteSingleFile() bundler
 ├── package.json                  # Scripts & runtime dependencies (React 19, Three.js r180)
-├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec (16 checks)
+├── tests/                        # Geometry/registry invariants, planner arithmetic, URL codec, viewer maths (19 checks)
 └── src/
     ├── main.tsx                  # React 19 root mount
     ├── App.tsx                   # Workbench shell, ULD switcher, telemetry bar & exporters
@@ -303,7 +303,7 @@ npm run preview
     <tr>
       <td><strong>Canvas PBR &amp; Viewport</strong></td>
       <td><code>Implemented</code></td>
-      <td>5 material finishes, deterministic cached Canvas PBR, 3 ACES Filmic lighting rigs, model-aware camera fitting (perspective + orthographic), section-cut clipping, point-to-point measurement, compare envelopes, dirty-flag shadow rendering, throttled raycast picking, reduced-motion support, adaptive DPR and live render telemetry.</td>
+      <td>5 material finishes, deterministic cached Canvas PBR, 3 ACES Filmic lighting rigs, model-aware camera fitting (perspective + orthographic), section-cut clipping, point-to-point measurement, compare envelopes, dirty-flag shadow rendering, settled-scene idle rendering, throttled raycast picking, reduced-motion support, adaptive DPR and live render telemetry.</td>
     </tr>
     <tr>
       <td><strong>CAD Mesh Exporters</strong></td>

@@ -149,6 +149,64 @@ export interface PerfInfo {
   fps: number;
   triangles: number;
   calls: number;
+  /** true while the settled-scene idle renderer is throttling frames */
+  idle: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pure inspection maths (unit-tested in tests/viewer-math.test.ts)    */
+/* ------------------------------------------------------------------ */
+
+/** Orthographic frustum height fitting a bounding sphere in both axes. */
+export function orthoFitSizeFor(radius: number, aspect: number, margin: number) {
+  const safeAspect = Math.max(aspect, 0.1);
+  return (radius * 2 * margin) / Math.min(1, safeAspect);
+}
+
+export interface SectionPlaneSpec {
+  normal: THREE.Vector3;
+  constant: number;
+  /** a point on the plane: box centre with the axis set to the cut */
+  point: THREE.Vector3;
+  /** cut offset from the box minimum along the axis, metres */
+  offset: number;
+  /** full box extent along the axis, metres */
+  extent: number;
+}
+
+/**
+ * Clipping-plane parameters for a normalised cut across a bounding box.
+ * Default keeps the min side of the axis; `flip` keeps the max side.
+ * A fragment survives where normal·p + constant >= 0.
+ */
+export function sectionPlaneFor(
+  box: THREE.Box3,
+  axis: SectionAxis,
+  pos01: number,
+  flip: boolean,
+): SectionPlaneSpec {
+  const min = box.min[axis];
+  const max = box.max[axis];
+  const pos = THREE.MathUtils.lerp(
+    min,
+    max,
+    THREE.MathUtils.clamp(pos01, 0, 1),
+  );
+  const sign = flip ? 1 : -1;
+  const normal = new THREE.Vector3(
+    axis === "x" ? sign : 0,
+    axis === "y" ? sign : 0,
+    axis === "z" ? sign : 0,
+  );
+  const point = box.getCenter(new THREE.Vector3());
+  point[axis] = pos;
+  return {
+    normal,
+    constant: -normal.dot(point),
+    point,
+    offset: pos - min,
+    extent: max - min,
+  };
 }
 
 export interface MeasureInfo {
@@ -227,6 +285,18 @@ export class AKEViewer {
   private ro: ResizeObserver;
   /** shadow maps re-render only when light-receiving geometry actually moves */
   private shadowDirty = true;
+
+  /* settled-scene idle rendering: full rate while anything can change,
+     ~4 Hz once the scene is provably static (battery/tablet friendly) */
+  private idle = false;
+  /** elapsed time when the scene first became idle-eligible (-1 = active) */
+  private idleEligibleSince = -1;
+  private lastIdleRender = 0;
+  private forceFrames = 0;
+  private lastControlsChange = -10;
+  private lastPointerMove = -10;
+  private lastTriangles = 0;
+  private lastCalls = 0;
 
   /* inspection tools: section plane, measure, compare envelope */
   private sectionPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
@@ -382,7 +452,27 @@ export class AKEViewer {
     c.maxPolarAngle = Math.PI * 0.495;
     c.autoRotateSpeed = 0.55;
     c.listenToKeyEvents(this.renderer.domElement);
+    // OrbitControls fires `change` for user input AND damping tail-off,
+    // which is exactly the activity signal the idle renderer needs.
+    c.addEventListener("change", this.onControlsChange);
     return c;
+  }
+
+  private onControlsChange = () => {
+    this.lastControlsChange = this.elapsed;
+  };
+
+  /** Force the next few frames to render at full rate (state just changed). */
+  private wake(frames = 3) {
+    this.forceFrames = Math.max(this.forceFrames, frames);
+  }
+
+  /** Is per-frame container animation visually changing anything right now? */
+  private fanActive() {
+    if (!this.container?.animate || this.reducedMotion) return false;
+    const spec = MODELS[this.state.model];
+    // Reefer fans/LCD animate only while powered; the pallet net always breathes.
+    return !(spec.reeferOption && !this.state.reefer);
   }
 
   /** Rebuild the orthographic frustum from orthoSize, preserving zoom. */
@@ -399,9 +489,7 @@ export class AKEViewer {
   /** Frustum height that fits a bounding box in orthographic projection. */
   private orthoFitSize(box: THREE.Box3, margin = 1.18) {
     const sphere = box.getBoundingSphere(new THREE.Sphere());
-    const aspect = Math.max(this.aspect(), 0.1);
-    // Height must cover the diameter vertically AND horizontally.
-    return (sphere.radius * 2 * margin) / Math.min(1, aspect);
+    return orthoFitSizeFor(sphere.radius, this.aspect(), margin);
   }
 
   /**
@@ -568,6 +656,9 @@ export class AKEViewer {
     this.updateSection(true);
     this.rebuildCompare();
     this.markShadowsDirty();
+    this.wake();
+    this.interior.intensity =
+      this.state.section || this.state.door > 0.25 ? 1.7 : 0.5;
 
     const x0 = this.container.profile[0].x;
     this.annot = createAnnotations({
@@ -732,20 +823,15 @@ export class AKEViewer {
 
     const box = (this.sectionBoxCache ??= this.modelBox());
     const axis = this.state.sectionAxis;
-    const min = box.min[axis];
-    const max = box.max[axis];
-    const pos = THREE.MathUtils.lerp(min, max, this.state.sectionPos);
-    // Default keeps the min side of the axis; flip keeps the max side.
-    const sign = this.state.sectionFlip ? 1 : -1;
-    const normal = new THREE.Vector3(
-      axis === "x" ? sign : 0,
-      axis === "y" ? sign : 0,
-      axis === "z" ? sign : 0,
+    const spec = sectionPlaneFor(
+      box,
+      axis,
+      this.state.sectionPos,
+      this.state.sectionFlip,
     );
-    const onPlane = box.getCenter(new THREE.Vector3());
-    onPlane[axis] = pos;
-    this.sectionPlane.normal.copy(normal);
-    this.sectionPlane.constant = -normal.dot(onPlane);
+    const onPlane = spec.point;
+    this.sectionPlane.normal.copy(spec.normal);
+    this.sectionPlane.constant = spec.constant;
 
     if (this.sectionHelper) {
       const size = box.getSize(new THREE.Vector3());
@@ -766,7 +852,7 @@ export class AKEViewer {
       );
       this.sectionHelper.scale.set(su * 1.06 + 0.04, sv * 1.06 + 0.04, 1);
     }
-    this.cb.onSection?.({ axis, offset: pos - min, extent: max - min });
+    this.cb.onSection?.({ axis, offset: spec.offset, extent: spec.extent });
   }
 
   /** Fresh-canvas text sprite for click-rate tools (measure, compare). */
@@ -806,6 +892,7 @@ export class AKEViewer {
   }
 
   setMeasureMode(on: boolean) {
+    this.wake();
     this.measureMode = on;
     if (on) this.setHover(null);
     this.renderer.domElement.style.cursor = on ? "crosshair" : "grab";
@@ -914,6 +1001,7 @@ export class AKEViewer {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    this.wake();
     if (e.button !== 0) return;
     this.pointerDownAt = { x: e.clientX, y: e.clientY, t: performance.now() };
   };
@@ -1011,6 +1099,7 @@ export class AKEViewer {
   /* ---------------- state ---------------- */
 
   setState(patch: Partial<ViewerState>) {
+    this.wake();
     const prev = this.state;
     // The camera getter follows state.projection, so swap cameras while
     // the old one is still active, then merge the rest of the patch.
@@ -1089,6 +1178,10 @@ export class AKEViewer {
     if (patch.compare !== undefined && patch.compare !== prev.compare) {
       this.rebuildCompare();
     }
+    // Opening the door or cutting a section exposes the cavity: raise the
+    // interior work-light so wall construction reads clearly inside.
+    this.interior.intensity =
+      this.state.section || this.state.door > 0.25 ? 1.7 : 0.5;
   }
 
   /** Live metalness / roughness trim on top of the selected finish. */
@@ -1100,6 +1193,7 @@ export class AKEViewer {
   }
 
   highlight(assemblyId: string | null) {
+    this.wake();
     this.highlighted = assemblyId;
     this.highlightKey = "";
     if (!assemblyId || !this.container) {
@@ -1212,6 +1306,13 @@ export class AKEViewer {
       .copy(target)
       .addScaledVector(dir, this.fitDistance(box, 1.18));
     this.homeOrthoSize = this.orthoFitSize(box, 1.18);
+    // Keep the interior work-light inside the active envelope (the RAP is
+    // twice the AKE's width; a fixed position would sit inside a wall).
+    this.interior.position.set(
+      target.x,
+      Math.max(target.y, 0.35),
+      target.z,
+    );
   }
 
   private flyToPose(
@@ -1331,6 +1432,7 @@ export class AKEViewer {
       -((e.clientY - r.top) / r.height) * 2 + 1,
     );
     this.pointerActive = true;
+    this.lastPointerMove = this.elapsed;
     this.pickTimer = 0;
   };
 
@@ -1395,6 +1497,7 @@ export class AKEViewer {
     }
     const dt = Math.min(this.clock.getDelta(), 0.05);
     this.elapsed += dt;
+    this.acc += dt; // wall-clock perf window, including idle-skipped frames
 
     if (this.intro > 0) {
       this.intro = Math.max(0, this.intro - dt / 1.9);
@@ -1435,6 +1538,43 @@ export class AKEViewer {
       !this.tweenCam;
     this.controls.update();
 
+    /* ---- settled-scene idle throttling ----
+       Render at full rate while anything can visibly change; once the
+       scene has been static for ~0.75 s, drop to a ~4 Hz heartbeat.
+       Any input, camera motion, animation or state change (wake())
+       restores full rate on the very next frame. */
+    const active =
+      this.forceFrames > 0 ||
+      this.intro > 0 ||
+      !!this.tweenCam ||
+      this.controls.autoRotate ||
+      this.elapsed - this.lastPointerMove < 0.3 ||
+      this.highlightBox.visible ||
+      this.fanActive() ||
+      this.elapsed - this.lastControlsChange < 0.2;
+    if (active) {
+      if (this.idle) {
+        // Restart perf accounting so the idle stretch cannot read as low FPS.
+        this.idle = false;
+        this.frames = 0;
+        this.acc = 0;
+        this.lowFpsTime = 0;
+        this.recoveredTime = 0;
+      }
+      this.idleEligibleSince = -1;
+    } else {
+      if (this.idleEligibleSince < 0) this.idleEligibleSince = this.elapsed;
+      if (!this.idle && this.elapsed - this.idleEligibleSince > 0.75) {
+        this.idle = true;
+        this.lastIdleRender = this.elapsed;
+      }
+    }
+    if (this.idle) {
+      // Time-based heartbeat: identical cadence at 60 Hz and 120 Hz.
+      if (this.elapsed - this.lastIdleRender < 0.25) return;
+      this.lastIdleRender = this.elapsed;
+    }
+
     // Picking is bounded to ~20 Hz; it is unnecessary work at display rate.
     this.pickTimer -= dt;
     if (this.pointerActive && this.pickTimer <= 0) {
@@ -1460,18 +1600,22 @@ export class AKEViewer {
       this.renderer.shadowMap.needsUpdate = true;
       this.shadowDirty = false;
     }
+    if (this.forceFrames > 0) this.forceFrames--;
     this.renderer.render(this.scene, this.camera);
+    this.lastTriangles = this.renderer.info.render.triangles;
+    this.lastCalls = this.renderer.info.render.calls;
 
     this.frames++;
-    this.acc += dt;
     if (this.acc > 0.5) {
       const fps = Math.round(this.frames / this.acc);
       this.cb.onPerf?.({
         fps,
-        triangles: this.renderer.info.render.triangles,
-        calls: this.renderer.info.render.calls,
+        triangles: this.lastTriangles,
+        calls: this.lastCalls,
+        idle: this.idle,
       });
-      this.adaptResolution(fps, this.acc);
+      // DPR adaptation must never mistake deliberate idle for a weak GPU.
+      if (!this.idle) this.adaptResolution(fps, this.acc);
       this.frames = 0;
       this.acc = 0;
     }
@@ -1514,6 +1658,7 @@ export class AKEViewer {
     // Fit distances depend on aspect (portrait phones especially); refresh
     // the home pose without yanking the user's current camera.
     this.updateHomePose();
+    this.wake();
   };
 
   /* ---------------- export ---------------- */

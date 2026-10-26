@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { Assembly } from "@/three/primitives";
 import { highlightTS } from "@/lib/io";
 import { computePlan } from "@/lib/planner";
@@ -23,7 +23,7 @@ export type Stats = {
   [extra: string]: number | string;
 };
 
-export function SpecSheet({
+function SpecSheetBase({
   stats,
   measured,
   model,
@@ -274,7 +274,9 @@ function PlanBar({ label, pct }: { label: string; pct: number }) {
 /* Parts list                                                          */
 /* ------------------------------------------------------------------ */
 
-export function PartsList({
+export const SpecSheet = memo(SpecSheetBase);
+
+function PartsListBase({
   assemblies,
   hovered,
   onHover,
@@ -349,7 +351,9 @@ export function PartsList({
 /* Source drawer                                                       */
 /* ------------------------------------------------------------------ */
 
-export function SourcePanel({
+export const PartsList = memo(PartsListBase);
+
+function SourcePanelBase({
   source,
   filename,
   entry,
@@ -405,3 +409,5 @@ export function SourcePanel({
     </div>
   );
 }
+
+export const SourcePanel = memo(SourcePanelBase);

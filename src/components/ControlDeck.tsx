@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { FINISHES, type FinishId } from "@/three/primitives";
 import { MODELS, type ModelId } from "@/three/models";
 import type {
@@ -17,7 +18,7 @@ const FINISH_ORDER: FinishId[] = [
   "titanium",
 ];
 
-export function ControlDeck({
+function ControlDeckBase({
   state,
   set,
   onView,
@@ -282,6 +283,7 @@ export function ControlDeck({
             <div className="flex items-center justify-between gap-2">
               <Btn
                 active={state.sectionFlip}
+                pressed={state.sectionFlip}
                 onClick={() => set({ sectionFlip: !state.sectionFlip })}
               >
                 flip kept side
@@ -310,6 +312,7 @@ export function ControlDeck({
           <div className="flex flex-wrap gap-1">
             <Btn
               active={state.compare === "none"}
+              pressed={state.compare === "none"}
               onClick={() => set({ compare: "none" })}
             >
               off
@@ -320,6 +323,7 @@ export function ControlDeck({
                 <Btn
                   key={id}
                   active={state.compare === id}
+                  pressed={state.compare === id}
                   onClick={() => set({ compare: id })}
                   title={`${MODELS[id].name} certified envelope`}
                 >
@@ -362,11 +366,18 @@ export function ControlDeck({
       </Block>
 
       <p className="border-t border-line-soft pt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-dim">
-        keys · 1–4 models · f fit · o ortho · m measure · s section · d dims
+        keys · 1–4 models · f fit · o ortho · m measure · s section · d dims · p
+        png
       </p>
     </Panel>
   );
 }
+
+/**
+ * Memoised: hover picks and the 2 Hz perf ticker re-render the App shell,
+ * and the deck's slider tree should not pay for either.
+ */
+export const ControlDeck = memo(ControlDeckBase);
 
 function Block({
   label,

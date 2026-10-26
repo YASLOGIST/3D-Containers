@@ -59,6 +59,26 @@
   }
 }
 
+/* Touch-first devices get larger targets without changing desktop density. */
+@media (pointer: coarse) {
+  button {
+    min-height: 36px;
+  }
+  .range-uld {
+    height: 32px;
+    margin-top: -16px;
+  }
+  .range-uld::-webkit-slider-thumb {
+    height: 18px;
+    width: 18px;
+    margin-top: -7.5px;
+  }
+  .range-uld::-moz-range-thumb {
+    height: 17px;
+    width: 17px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -239,12 +259,13 @@
   display: inline-block;
   width: 3.4ch;
   margin-right: 1.6ch;
-  color: #3d4750;
+  color: #4e5a65;
   text-align: right;
   user-select: none;
 }
 .code-scroll .c-com {
-  color: #5c6a75;
+  /* ≥ 4.5:1 on panel/void — comments are readable content, not decoration */
+  color: #76838f;
   font-style: italic;
 }
 .code-scroll .c-str {

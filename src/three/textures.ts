@@ -467,7 +467,8 @@ export function makeReeferPanel(o: ReeferPanelOptions): PanelTexture {
       kg.addColorStop(1, "#232a30");
       ctx.fillStyle = kg;
       ctx.beginPath();
-      ctx.roundRect(x, ky, kw, kh, 6);
+      if (typeof ctx.roundRect === "function") ctx.roundRect(x, ky, kw, kh, 6);
+      else ctx.rect(x, ky, kw, kh);
       ctx.fill();
       ctx.strokeStyle = "rgba(0,0,0,0.55)";
       ctx.lineWidth = 2;
@@ -751,7 +752,9 @@ export function makeSeatTrack(len = 2048) {
       const x = i * pitch + pitch * 0.5;
       ctx.fillStyle = "#0b0e11";
       ctx.beginPath();
-      ctx.roundRect(x - pitch * 0.26, h * 0.3, pitch * 0.52, h * 0.44, 3);
+      if (typeof ctx.roundRect === "function")
+        ctx.roundRect(x - pitch * 0.26, h * 0.3, pitch * 0.52, h * 0.44, 3);
+      else ctx.rect(x - pitch * 0.26, h * 0.3, pitch * 0.52, h * 0.44);
       ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,0.1)";
       ctx.fillRect(x - pitch * 0.26, h * 0.3, pitch * 0.52, 1.5);
