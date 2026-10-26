@@ -457,11 +457,28 @@ export function createProfileContainer(
   const leafBottomSpan = Math.max(...leafBottom.map((p) => p.x)) - Math.min(...leafBottom.map((p) => p.x));
   const leafCx = (Math.max(...leafBottom.map((p) => p.x)) + Math.min(...leafBottom.map((p) => p.x))) / 2;
 
+  // Leaf-top height at a given x (scan polygon edge crossings) so vertical
+  // door hardware never overshoots a down-sloping top edge (AMD contour D).
+  const leafTopAtX = (x: number): number => {
+    let top = leafPoly[0].y;
+    for (let i = 0; i < leafPoly.length; i++) {
+      const a = leafPoly[i];
+      const b = leafPoly[(i + 1) % leafPoly.length];
+      if ((a.x - x) * (b.x - x) > 0 || Math.abs(b.x - a.x) < 1e-9) continue;
+      const t = (x - a.x) / (b.x - a.x);
+      top = Math.max(top, a.y + (b.y - a.y) * t);
+    }
+    return top;
+  };
+  const ribBaseY = CHASSIS + 0.1;
+  const clampedLen = (x: number, want: number) => Math.max(0.2, Math.min(want, leafTopAtX(x) - ribBaseY - 0.06));
+
   const leafH = H - CHASSIS - 0.2;
   for (const dx of [leafCx - leafBottomSpan * 0.24, leafCx + leafBottomSpan * 0.24]) {
+    const len = clampedLen(dx, leafH);
     doorPivot.add(wallBox(
-      mat.shell, 0.1, leafH, 0.014, nDoor, new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(px(dx), CHASSIS + leafH / 2 + 0.1, FACE + 0.008), "Door stiffener",
+      mat.shell, 0.1, len, 0.014, nDoor, new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(px(dx), ribBaseY + len / 2, FACE + 0.008), "Door stiffener",
     ));
   }
   // perimeter ribs following each sloped leaf edge (both wings / chamfers)
@@ -487,11 +504,12 @@ export function createProfileContainer(
 
   const rodXs = [leafCx - leafBottomSpan * 0.34, leafCx + leafBottomSpan * 0.34];
   for (const rx of rodXs) {
-    const rodLen = H - CHASSIS - 0.2;
+    const rodLen = clampedLen(rx, H - CHASSIS - 0.2);
     const rod = mesh(new THREE.CylinderGeometry(0.012, 0.012, rodLen, 14), mat.steel, "Cam latch rod");
-    rod.position.set(px(rx), CHASSIS + rodLen / 2 + 0.1, FACE + 0.013);
+    rod.position.set(px(rx), ribBaseY + rodLen / 2, FACE + 0.013);
     doorPivot.add(rod);
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
+      if (hy > leafTopAtX(rx) - 0.08) continue; // hub would float past a sloped leaf edge
       const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
       hub.position.set(px(rx), hy, FACE + 0.013);
       doorPivot.add(hub);
@@ -502,7 +520,9 @@ export function createProfileContainer(
     }
   }
   for (const rx of rodXs) {
-    for (const ky of [CHASSIS + 0.13, H - 0.13]) {
+    for (const kyRaw of [CHASSIS + 0.13, H - 0.13]) {
+      const ky = Math.min(kyRaw, leafTopAtX(rx) - 0.09);
+      if (ky < CHASSIS + 0.1) continue;
       const k = box(mat.alloy, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
       k.position.set(rx, ky, BL / 2 - 0.028);
       A_DOOR.group.add(k);

@@ -97,6 +97,83 @@ function SectionCard({ model }: { model: ModelInfo }) {
   );
 }
 
+/**
+ * Hold-fit schematic: the model's lateral section placed in its primary
+ * aircraft's fuselage tube — ×1 centred or ×2 abreast (mirrored pair).
+ * Fuselage diameters are published airframe data; floor position and the
+ * simplified lateral section are nominal. A scale schematic for fit
+ * intuition, explicitly not a certified loading diagram.
+ */
+function HoldCard({ model }: { model: ModelInfo }) {
+  const h = model.hold;
+  const R = h.fuselageM / 2;
+  const cy = h.floorDrop; // fuselage centre height above the hold floor
+  const GAP = 0.05;
+  const single = (mirror: boolean): [number, number][] => {
+    const pts: [number, number][] = [[0, 0], [h.base, 0]];
+    if (h.knee) pts.push([h.base, h.knee]);
+    pts.push([h.top, h.height], [0, h.height]);
+    return pts.map(([x, y]) => [mirror ? -(GAP / 2 + x) : GAP / 2 + x, y] as [number, number]);
+  };
+  const twin = (cx: number): [number, number][] => {
+    const pts: [number, number][] = [[-h.base / 2, 0], [h.base / 2, 0]];
+    if (h.knee) pts.push([h.base / 2, h.knee]);
+    pts.push([h.top / 2, h.height], [-h.top / 2, h.height]);
+    if (h.knee) pts.push([-h.base / 2, h.knee]);
+    return pts.map(([x, y]) => [cx + x, y] as [number, number]);
+  };
+  const units =
+    h.mode === "single"
+      ? h.abreast === 2
+        ? [single(true), single(false)]
+        : [single(false)]
+      : h.abreast === 2
+        ? [twin(-(h.base / 2 + GAP / 2)), twin(h.base / 2 + GAP / 2)]
+        : [twin(0)];
+  const pad = 0.28;
+  const top = cy + R;
+  const vbH = 2 * R + pad * 2;
+  const sy = (y: number) => top + pad - y;
+  const floorHalf = Math.sqrt(Math.max(R * R - cy * cy, 0));
+  return (
+    <div className="border border-line-soft bg-void/40 px-2 pb-1.5 pt-2">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="stencil text-[9.5px] text-dim">
+          hold fit · {h.aircraft} {h.deck} deck
+        </span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-steel">
+          Ø {h.fuselageM.toFixed(2)} m · ×{h.abreast} abreast
+        </span>
+      </div>
+      <svg
+        viewBox={`${-R - pad} 0 ${2 * R + pad * 2} ${vbH}`}
+        className="h-[150px] w-full"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`${model.code} shown ${h.abreast === 2 ? "as a pair" : "singly"} in a ${h.aircraft} ${h.deck} deck fuselage section (schematic)`}
+      >
+        <circle cx={0} cy={sy(cy)} r={R} strokeWidth={1.2} vectorEffect="non-scaling-stroke" className="fill-steel/5 stroke-steel/60" />
+        <line x1={0} y1={sy(top)} x2={0} y2={sy(cy - R)} stroke="currentColor" strokeDasharray="3 4" strokeWidth={0.8} vectorEffect="non-scaling-stroke" className="text-dim/40" />
+        <line x1={-floorHalf} y1={sy(0)} x2={floorHalf} y2={sy(0)} stroke="currentColor" strokeWidth={1.6} vectorEffect="non-scaling-stroke" className="text-dim" />
+        {units.map((pts, i) => (
+          <polygon
+            key={i}
+            points={pts.map(([x, y]) => `${x.toFixed(3)},${sy(y).toFixed(3)}`).join(" ")}
+            strokeWidth={1.3}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            className="fill-amber/15 stroke-amber/80"
+          />
+        ))}
+      </svg>
+      <p className="text-[9.5px] leading-snug text-dim">
+        Scale schematic — published fuselage Ø; floor position and lateral
+        section nominal. Not a certified loading diagram.
+      </p>
+    </div>
+  );
+}
+
 function SpecSheetBase({
   stats,
   measured,
@@ -161,11 +238,15 @@ function SpecSheetBase({
               {(v as number).toFixed(2)}
               <span className="ml-0.5 font-mono text-[10px] text-amber">m</span>
             </div>
+            <div className="mt-0.5 font-mono text-[9px] tabular-nums text-dim">
+              {((v as number) * 39.3701).toFixed(1)} in
+            </div>
           </div>
         ))}
       </div>
 
       <SectionCard model={model} />
+      <HoldCard model={model} />
 
       <div>
         {model.specs.map((r) => (

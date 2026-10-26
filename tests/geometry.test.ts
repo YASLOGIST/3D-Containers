@@ -6,8 +6,11 @@ import { AKC_DIMENSIONS, akcProfile } from "../src/three/akc.ts";
 import { DPE_DIMENSIONS, dpeProfile } from "../src/three/dpe.ts";
 import { AKH_DIMENSIONS, akhProfile } from "../src/three/akh.ts";
 import { ALF_DIMENSIONS, alfProfile } from "../src/three/alf.ts";
+import { ALP_DIMENSIONS, alpProfile } from "../src/three/alp.ts";
 import { AMA_DIMENSIONS, amaProfile } from "../src/three/ama.ts";
+import { AMD_DIMENSIONS, amdProfile } from "../src/three/amd.ts";
 import { AGA_DIMENSIONS, agaProfile } from "../src/three/aga.ts";
+import { DQF_DIMENSIONS, dqfProfile } from "../src/three/dqf.ts";
 import { MODELS } from "../src/three/models.ts";
 import { PMC_DIMENSIONS, pmcProfile } from "../src/three/pmc.ts";
 import { offsetPolygon, type V2 } from "../src/three/primitives.ts";
@@ -81,6 +84,11 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       depth: DPE_DIMENSIONS.baseLength,
       height: DPE_DIMENSIONS.height,
     },
+    dqf: {
+      width: DQF_DIMENSIONS.baseWidth,
+      depth: DQF_DIMENSIONS.baseLength,
+      height: DQF_DIMENSIONS.height,
+    },
     akh: {
       width: AKH_DIMENSIONS.baseWidth,
       depth: AKH_DIMENSIONS.baseLength,
@@ -90,6 +98,11 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       width: ALF_DIMENSIONS.baseWidth,
       depth: ALF_DIMENSIONS.baseLength,
       height: ALF_DIMENSIONS.height,
+    },
+    alp: {
+      width: ALP_DIMENSIONS.baseWidth,
+      depth: ALP_DIMENSIONS.baseLength,
+      height: ALP_DIMENSIONS.height,
     },
     rkn: {
       width: RKN_DIMENSIONS.width,
@@ -105,6 +118,11 @@ test("model registry exposes consistent dimensions, ratings and controls", () =>
       width: AMA_DIMENSIONS.baseWidth,
       depth: AMA_DIMENSIONS.baseLength,
       height: AMA_DIMENSIONS.height,
+    },
+    amd: {
+      width: AMD_DIMENSIONS.baseWidth,
+      depth: AMD_DIMENSIONS.baseLength,
+      height: AMD_DIMENSIONS.height,
     },
     aga: {
       width: AGA_DIMENSIONS.baseWidth,
@@ -150,6 +168,8 @@ test("symmetric fleet sections (AKH/ALF/AMA) are CCW, mirrored and envelope-exac
   const cases = [
     { profile: akhProfile(), dims: AKH_DIMENSIONS, points: 6 },
     { profile: alfProfile(), dims: ALF_DIMENSIONS, points: 4 },
+    { profile: alpProfile(), dims: ALP_DIMENSIONS, points: 4 },
+    { profile: dqfProfile(), dims: DQF_DIMENSIONS, points: 4 },
     { profile: amaProfile(), dims: AMA_DIMENSIONS, points: 6 },
     { profile: agaProfile(), dims: AGA_DIMENSIONS, points: 6 },
   ];
@@ -203,6 +223,58 @@ test("single-slope sections (AKC/LD1, DPE/LD2) are CCW right trapezoids on the c
     assert.ok(inner.every(isFinitePoint));
     assert.ok(Math.abs(area(inner)) < Math.abs(area(profile)));
     assert.ok(Math.abs(area(inner)) > 0);
+  }
+});
+
+test("AMD contour-D section is a CCW asymmetric pentagon, tall on the centreline side", () => {
+  const p = amdProfile();
+  const d = AMD_DIMENSIONS;
+  assert.equal(p.length, 5);
+  assert.ok(p.every(isFinitePoint));
+  assert.ok(area(p) > 0);
+  assert.ok(Math.abs(p[2].x - d.baseWidth / 2) < 1e-9, "centreline wall at +baseWidth/2");
+  assert.ok(Math.abs(p[2].y - d.height) < 1e-9, "centreline wall runs full height");
+  assert.ok(Math.abs(p[3].x - d.roofBreakX) < 1e-9 && Math.abs(p[3].y - d.height) < 1e-9);
+  assert.ok(Math.abs(p[4].x + d.baseWidth / 2) < 1e-9 && Math.abs(p[4].y - d.kneeHeight) < 1e-9);
+  assert.ok(Math.abs(d.topWidth - (d.baseWidth / 2 - d.roofBreakX)) < 1e-9, "topWidth = roof flat");
+  const inner = offsetPolygon(p, 0.047);
+  assert.ok(inner.every(isFinitePoint) && Math.abs(area(inner)) < Math.abs(area(p)) && Math.abs(area(inner)) > 0);
+});
+
+test("hold-fit schematic data keeps every unit inside its fuselage circle", () => {
+  const GAP = 0.05;
+  for (const [id, model] of Object.entries(MODELS)) {
+    const h = model.hold;
+    const R = h.fuselageM / 2;
+    const single = (mirror: boolean): [number, number][] => {
+      const pts: [number, number][] = [[0, 0], [h.base, 0]];
+      if (h.knee) pts.push([h.base, h.knee]);
+      pts.push([h.top, h.height], [0, h.height]);
+      return pts.map(([x, y]): [number, number] => [mirror ? -(GAP / 2 + x) : GAP / 2 + x, y]);
+    };
+    const twin = (cx: number): [number, number][] => {
+      const pts: [number, number][] = [[-h.base / 2, 0], [h.base / 2, 0]];
+      if (h.knee) pts.push([h.base / 2, h.knee]);
+      pts.push([h.top / 2, h.height], [-h.top / 2, h.height]);
+      if (h.knee) pts.push([-h.base / 2, h.knee]);
+      return pts.map(([x, y]): [number, number] => [cx + x, y]);
+    };
+    const units =
+      h.mode === "single"
+        ? h.abreast === 2
+          ? [single(true), single(false)]
+          : [single(false)]
+        : h.abreast === 2
+          ? [twin(-(h.base / 2 + GAP / 2)), twin(h.base / 2 + GAP / 2)]
+          : [twin(0)];
+    assert.ok(h.floorDrop < R, `${id}: cargo floor must cut the fuselage circle`);
+    for (const unit of units) {
+      for (const [x, y] of unit) {
+        assert.ok(y >= -1e-9, `${id}: section point below hold floor`);
+        const d = Math.hypot(x, y - h.floorDrop);
+        assert.ok(d <= R + 0.02, `${id}: point (${x.toFixed(2)}, ${y.toFixed(2)}) escapes Ø${h.fuselageM} fuselage (d=${d.toFixed(2)})`);
+      }
+    }
   }
 });
 
