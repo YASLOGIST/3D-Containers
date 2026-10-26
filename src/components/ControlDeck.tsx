@@ -372,7 +372,7 @@ function ControlDeckBase({
       </Block>
 
       <p className="border-t border-line-soft pt-2 font-mono text-[9px] uppercase leading-relaxed tracking-[0.12em] text-dim">
-        keys · 1–0 models · f fit · o ortho · m measure · s section · c caps ·
+        keys · 1–0·q·e·r models · f fit · o ortho · m measure · s section · c caps ·
         d dims · p png
       </p>
     </Panel>

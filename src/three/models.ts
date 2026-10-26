@@ -17,16 +17,43 @@ import type {
 import { AKE_DIMENSIONS, contourProfile, createAKEContainer } from "./akeLD3";
 import { AKC_DIMENSIONS, akcProfile, createAKCContainer } from "./akc";
 import { DPE_DIMENSIONS, createDPEContainer, dpeProfile } from "./dpe";
+import { DQF_DIMENSIONS, createDQFContainer, dqfProfile } from "./dqf";
 import { AKH_DIMENSIONS, akhProfile, createAKHContainer } from "./akh";
 import { ALF_DIMENSIONS, alfProfile, createALFContainer } from "./alf";
+import { ALP_DIMENSIONS, alpProfile, createALPContainer } from "./alp";
 import { RKN_DIMENSIONS, createRKNContainer, rknProfile } from "./rkn";
 import { RAP_DIMENSIONS, createRAPContainer, rapProfile } from "./rap";
 import { AMA_DIMENSIONS, amaProfile, createAMAContainer } from "./ama";
+import { AMD_DIMENSIONS, amdProfile, createAMDContainer } from "./amd";
 import { AGA_DIMENSIONS, agaProfile, createAGAContainer } from "./aga";
 import { PMC_DIMENSIONS, createPMCContainer, pmcProfile } from "./pmc";
 import type { V2 } from "./primitives";
 
-export type ModelId = "ake" | "akc" | "dpe" | "akh" | "alf" | "rkn" | "rap" | "ama" | "aga" | "pmc";
+export type ModelId = "ake" | "akc" | "dpe" | "dqf" | "akh" | "alf" | "alp" | "rkn" | "rap" | "ama" | "amd" | "aga" | "pmc";
+
+/**
+ * Nominal aircraft-hold placement for the schematic hold-fit preview.
+ * Fuselage diameters are published airframe data; floorDrop (fuselage
+ * centre → cargo floor) and the simplified lateral section are NOMINAL —
+ * the card is a scale schematic, not a certified loading diagram.
+ */
+export interface HoldInfo {
+  aircraft: string;
+  deck: "lower" | "main";
+  /** fuselage outer diameter, metres */
+  fuselageM: number;
+  abreast: 1 | 2;
+  /** single = centre-anchored trapezoid pair; twin = bilaterally symmetric */
+  mode: "single" | "twin";
+  /** lateral section: base width, top width, height (m) */
+  base: number;
+  top: number;
+  height: number;
+  /** slope break height above the hold floor, metres */
+  knee?: number;
+  /** fuselage centre height above the cargo floor, metres (nominal) */
+  floorDrop: number;
+}
 
 /** Everything the UI can ask a model to build. */
 export interface ViewerOptions {
@@ -85,6 +112,8 @@ export interface ModelInfo {
   aircraft: string;
   /** certified cross-section polygon for the 2-D section preview card */
   sectionProfile: () => V2[];
+  /** nominal hold placement for the schematic hold-fit preview */
+  hold: HoldInfo;
   /** slope angle from vertical drawn on the dimension overlay, degrees */
   taperDeg?: number;
   /** caption under the slope angle, e.g. "WING ANGLE (EACH SIDE)" */
@@ -117,6 +146,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "akeLD3.ts",
     aircraft: "747 · 767 · 777 · 787 · A330 · A340 · A380 · MD-11 lower deck",
     sectionProfile: () => contourProfile(true),
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 2, mode: "single", base: 1.53, top: 2.01, height: 1.62, floorDrop: 1.7 },
     featureLabel: "cam-latch plug door · 112° swing",
     ratings: { tareKg: 92, maxGrossKg: 1588, payloadKg: 1496, volumeM3: 4.3 },
     specs: [
@@ -150,6 +180,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "akc.ts",
     aircraft: "747 · 767 · 777 · 787 · MD-11 lower deck",
     sectionProfile: akcProfile,
+    hold: { aircraft: "Boeing 747", deck: "lower", fuselageM: 6.5, abreast: 2, mode: "single", base: 1.562, top: 2.337, height: 1.626, floorDrop: 1.7 },
     featureLabel: "deep single contour · Boeing/MD-11 holds",
     ratings: { tareKg: 85, maxGrossKg: 1588, payloadKg: 1503, volumeM3: 4.8 },
     specs: [
@@ -183,6 +214,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "dpe.ts",
     aircraft: "767 lower deck (two abreast) · also 747/777/787",
     sectionProfile: dpeProfile,
+    hold: { aircraft: "Boeing 767", deck: "lower", fuselageM: 5.03, abreast: 2, mode: "single", base: 1.194, top: 1.562, height: 1.626, floorDrop: 1.7 },
     featureLabel: "767 half-width · two-abreast lower deck",
     ratings: { tareKg: 75, maxGrossKg: 1225, payloadKg: 1150, volumeM3: 3.4 },
     specs: [
@@ -194,6 +226,42 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Net payload", v: "1150 kg" },
     ],
     build: (o) => createDPEContainer(o),
+  },
+  dqf: {
+    id: "dqf",
+    code: "DQF",
+    name: "DQF · LD-8",
+    family: "full-width lower-deck container",
+    blurb:
+      "The 767's full-width lower-deck unit: two LD-2 contours mirrored on a 96 in base plate, wings reaching a 125 in roof span. One DQF does the work of a DPE pair — open the hold-fit card to see both arrangements in the same 767 tube.",
+    dims: {
+      width: DQF_DIMENSIONS.baseWidth,
+      depth: DQF_DIMENSIONS.baseLength,
+      height: DQF_DIMENSIONS.height,
+      topWidth: DQF_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    annotationKind: "dual-contour",
+    taperDeg: (Math.atan2((DQF_DIMENSIONS.topWidth - DQF_DIMENSIONS.baseWidth) / 2, DQF_DIMENSIONS.height - DQF_DIMENSIONS.kneeHeight) * 180) / Math.PI,
+    taperLabel: "WING ANGLE (EACH SIDE)",
+    volumeLabel: "6.9 m³ · 245 ft³",
+    sourceFile: "dqf.ts",
+    aircraft: "767 · 787 lower deck",
+    sectionProfile: dqfProfile,
+    hold: { aircraft: "Boeing 767", deck: "lower", fuselageM: 5.03, abreast: 1, mode: "twin", base: 2.438, top: 3.175, height: 1.626, floorDrop: 1.7 },
+    featureLabel: "767 full-width · twin-LD2 double contour",
+    ratings: { tareKg: 127, maxGrossKg: 2449, payloadKg: 2322, volumeM3: 6.9 },
+    specs: [
+      { k: "Overall top width", v: "3.18 m", tone: "steel" },
+      { k: "Wing angle", v: "13.5° each side", tone: "steel" },
+      { k: "Certified volume", v: "6.9 m³ · 245 ft³" },
+      { k: "Tare mass", v: "127 kg" },
+      { k: "Max gross", v: "2449 kg", tone: "amber" },
+      { k: "Net payload", v: "2322 kg" },
+    ],
+    build: (o) => createDQFContainer(o),
   },
   akh: {
     id: "akh",
@@ -218,6 +286,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "akh.ts",
     aircraft: "A319 · A320 · A321 lower deck",
     sectionProfile: akhProfile,
+    hold: { aircraft: "Airbus A320", deck: "lower", fuselageM: 3.95, abreast: 1, mode: "twin", base: 1.534, top: 2.438, height: 1.143, knee: 0.21, floorDrop: 1.2 },
     featureLabel: "A320-family lower deck · double-wing 45 in contour",
     ratings: { tareKg: 82, maxGrossKg: 1588, payloadKg: 1506, volumeM3: 3.3 },
     specs: [
@@ -253,6 +322,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "alf.ts",
     aircraft: "747 · 777 · 787 · A330 · A350 · A380 lower deck",
     sectionProfile: alfProfile,
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 1, mode: "twin", base: 3.175, top: 4.064, height: 1.626, floorDrop: 1.7 },
     featureLabel: "full-width lower deck · twin-LD3 double contour",
     ratings: { tareKg: 230, maxGrossKg: 3175, payloadKg: 2945, volumeM3: 8.95 },
     specs: [
@@ -264,6 +334,39 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Net payload", v: "2945 kg" },
     ],
     build: (o) => createALFContainer(o),
+  },
+  alp: {
+    id: "alp",
+    code: "ALP",
+    name: "ALP · LD-11",
+    family: "full-width lower-deck container",
+    blurb:
+      "The LD-6 footprint with no contour at all: a plain rectangular 125 × 60.4 in box that cubes out perfectly and stacks freight to every corner. Compare it with the ALF to price the fuselage wedge — about 1.7 m³ of certified volume.",
+    dims: {
+      width: ALP_DIMENSIONS.baseWidth,
+      depth: ALP_DIMENSIONS.baseLength,
+      height: ALP_DIMENSIONS.height,
+      topWidth: ALP_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    volumeLabel: "7.2 m³ · 253 ft³",
+    sourceFile: "alp.ts",
+    aircraft: "747 · 777 · 787 · DC-10 · MD-11 lower deck",
+    sectionProfile: alpProfile,
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 1, mode: "twin", base: 3.175, top: 3.175, height: 1.626, floorDrop: 1.7 },
+    featureLabel: "rectangular full-width · zero taper",
+    ratings: { tareKg: 185, maxGrossKg: 3176, payloadKg: 2991, volumeM3: 7.2 },
+    specs: [
+      { k: "Section", v: "rectangular", tone: "steel" },
+      { k: "Taper angle", v: "0.0° — no contour", tone: "steel" },
+      { k: "Certified volume", v: "7.2 m³ · 253 ft³" },
+      { k: "Tare mass", v: "185 kg" },
+      { k: "Max gross", v: "3176 kg", tone: "amber" },
+      { k: "Net payload", v: "2991 kg" },
+    ],
+    build: (o) => createALPContainer(o),
   },
   rkn: {
     id: "rkn",
@@ -285,6 +388,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "rkn.ts",
     aircraft: "Widebody lower deck (cold chain)",
     sectionProfile: rknProfile,
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 2, mode: "twin", base: 2.0, top: 2.0, height: 1.62, floorDrop: 1.7 },
     featureLabel: "active reefer · condenser fan · live setpoint",
     ratings: { tareKg: 285, maxGrossKg: 3500, payloadKg: 3215, volumeM3: 3.6 },
     setpointRange: { min: -25, max: 25, default: -18 },
@@ -318,6 +422,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "rap.ts",
     aircraft: "Widebody lower deck · freighter main deck (cold chain)",
     sectionProfile: rapProfile,
+    hold: { aircraft: "Boeing 777", deck: "lower", fuselageM: 6.2, abreast: 1, mode: "twin", base: 3.18, top: 3.18, height: 1.62, floorDrop: 1.7 },
     featureLabel: "twin-fan climate unit · glycol service ports",
     ratings: { tareKg: 450, maxGrossKg: 6033, payloadKg: 5583, volumeM3: 6.6 },
     setpointRange: { min: -20, max: 30, default: 4 },
@@ -354,6 +459,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "ama.ts",
     aircraft: "747F · 777F main deck",
     sectionProfile: amaProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "twin", base: 2.438, top: 1.9, height: 2.438, knee: 1.86, floorDrop: 1.0 },
     featureLabel: "main-deck box · 96 in height · PMC footprint",
     ratings: { tareKg: 314, maxGrossKg: 6804, payloadKg: 6490, volumeM3: 17.6 },
     specs: [
@@ -365,6 +471,40 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Net payload", v: "6490 kg" },
     ],
     build: (o) => createAMAContainer(o),
+  },
+  amd: {
+    id: "amd",
+    code: "AMD",
+    name: "AMD · M1H",
+    family: "main-deck contoured container",
+    blurb:
+      "The standard 747 freighter main-deck ULD: 118 in tall on the M base, with an asymmetric contour-D section — full height on the centreline wall, a long slope down the fuselage side — so a side-by-side pair fills the 747 tube. Knee and roof break are nominal (unpublished).",
+    dims: {
+      width: AMD_DIMENSIONS.baseWidth,
+      depth: AMD_DIMENSIONS.baseLength,
+      height: AMD_DIMENSIONS.height,
+      topWidth: AMD_DIMENSIONS.topWidth,
+    },
+    contourOption: false,
+    reeferOption: false,
+    palletOption: false,
+    annotationKind: "contoured",
+    volumeLabel: "21.2 m³ · 750 ft³",
+    sourceFile: "amd.ts",
+    aircraft: "747F · 747 Combi main deck · 777F centre",
+    sectionProfile: amdProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "single", base: 2.438, top: 1.069, height: 2.997, knee: 2.16, floorDrop: 1.0 },
+    featureLabel: "118 in contour-D · 747F main-deck standard",
+    ratings: { tareKg: 370, maxGrossKg: 6804, payloadKg: 6434, volumeM3: 21.2 },
+    specs: [
+      { k: "Roof flat (centre side)", v: "1.07 m (nominal)", tone: "steel" },
+      { k: "Contour", v: "D · asymmetric", tone: "steel" },
+      { k: "Certified volume", v: "21.2 m³ · 750 ft³" },
+      { k: "Tare mass", v: "370 kg" },
+      { k: "Max gross", v: "6804 kg", tone: "amber" },
+      { k: "Net payload", v: "6434 kg" },
+    ],
+    build: (o) => createAMDContainer(o),
   },
   aga: {
     id: "aga",
@@ -389,6 +529,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "aga.ts",
     aircraft: "747F · 747 Combi main deck · 777F centre",
     sectionProfile: agaProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "twin", base: 2.438, top: 1.9, height: 2.438, knee: 1.81, floorDrop: 1.0 },
     featureLabel: "20-ft main-deck box · PGA footprint · 11.3 t gross",
     ratings: { tareKg: 1000, maxGrossKg: 11340, payloadKg: 10340, volumeM3: 33.7 },
     specs: [
@@ -422,6 +563,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     sourceFile: "pmc.ts",
     aircraft: "Widebody main + lower decks",
     sectionProfile: pmcProfile,
+    hold: { aircraft: "Boeing 747F", deck: "main", fuselageM: 6.5, abreast: 2, mode: "twin", base: 2.438, top: 2.438, height: 2.438, floorDrop: 1.0 },
     featureLabel: "96 × 125 in pallet · 62 mm seat-track pitch",
     ratings: { tareKg: 120, maxGrossKg: 6804, payloadKg: 6684, volumeM3: 12.6 },
     specs: [

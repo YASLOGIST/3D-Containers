@@ -3,11 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import akeSource from "./three/akeLD3.ts?raw";
 import akcSource from "./three/akc.ts?raw";
 import dpeSource from "./three/dpe.ts?raw";
+import dqfSource from "./three/dqf.ts?raw";
 import akhSource from "./three/akh.ts?raw";
 import alfSource from "./three/alf.ts?raw";
+import alpSource from "./three/alp.ts?raw";
 import rknSource from "./three/rkn.ts?raw";
 import rapSource from "./three/rap.ts?raw";
 import amaSource from "./three/ama.ts?raw";
+import amdSource from "./three/amd.ts?raw";
 import agaSource from "./three/aga.ts?raw";
 import pmcSource from "./three/pmc.ts?raw";
 import profileSource from "./three/profileContainer.ts?raw";
@@ -47,11 +50,14 @@ const SOURCES = {
   "akeLD3.ts": akeSource,
   "akc.ts": akcSource,
   "dpe.ts": dpeSource,
+  "dqf.ts": dqfSource,
   "akh.ts": akhSource,
   "alf.ts": alfSource,
+  "alp.ts": alpSource,
   "rkn.ts": rknSource,
   "rap.ts": rapSource,
   "ama.ts": amaSource,
+  "amd.ts": amdSource,
   "aga.ts": agaSource,
   "pmc.ts": pmcSource,
   "profileContainer.ts": profileSource,
@@ -84,6 +90,11 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "LD-2 wrapper: 767 half-width P-base envelope bound to the profile engine via an explicit asymmetric section.",
     },
+    "dqf.ts": {
+      entry: "createDQFContainer()",
+      description:
+        "LD-8 wrapper: 767 full-width twin-LD2 trapezoid bound to the symmetric-profile engine.",
+    },
     "akh.ts": {
       entry: "createAKHContainer()",
       description:
@@ -93,6 +104,11 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createALFContainer()",
       description:
         "LD6 wrapper: full-width twin-contour envelope bound to the symmetric-profile engine.",
+    },
+    "alp.ts": {
+      entry: "createALPContainer()",
+      description:
+        "LD-11 wrapper: rectangular full-width lower-deck envelope bound to the profile engine.",
     },
     "rkn.ts": {
       entry: "createRKNContainer()",
@@ -109,6 +125,11 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       description:
         "M-1 wrapper: main-deck 96 in envelope with nominal roof chamfer, bound to the symmetric-profile engine.",
     },
+    "amd.ts": {
+      entry: "createAMDContainer()",
+      description:
+        "M1H wrapper: asymmetric 118 in contour-D section (explicit polygon) bound to the profile engine.",
+    },
     "aga.ts": {
       entry: "createAGAContainer()",
       description:
@@ -117,7 +138,7 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
     "profileContainer.ts": {
       entry: "createProfileContainer()",
       description:
-        "Parameterized engine for extruded-section ULDs (AKC, DPE, AKH, ALF, AMA, AGA): ring hull, edge frame, hinged door, blind end, chassis.",
+        "Parameterized engine for extruded-section ULDs (AKC, DPE, DQF, AKH, ALF, ALP, AMA, AMD, AGA): ring hull, edge frame, hinged door, blind end, chassis.",
     },
     "pmc.ts": {
       entry: "createPMCContainer()",
@@ -290,6 +311,45 @@ export default function App() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  /* Showcase: a 7 s choreographed door/load + explode cycle that returns
+     every control to its starting value. Pure UI animation over existing
+     non-structural state (door swing, explode, pallet load). */
+  const [showcase, setShowcase] = useState(false);
+  const showcaseRaf = useRef(0);
+  const stopShowcase = useCallback(() => {
+    cancelAnimationFrame(showcaseRaf.current);
+    setShowcase(false);
+  }, []);
+  const runShowcase = useCallback(() => {
+    if (showcase) {
+      stopShowcase();
+      return;
+    }
+    setShowcase(true);
+    const s0 = stateRef.current;
+    const pallet = MODELS[s0.model].palletOption;
+    const from = { door: s0.door, explode: s0.explode, load: s0.load };
+    const DURATION = 7000;
+    const start = performance.now();
+    const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+    const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const seg = (t: number, a: number, b: number) => ease(clamp01((t - a) / (b - a)));
+    const tick = (now: number) => {
+      const t = clamp01((now - start) / DURATION);
+      const open = seg(t, 0.02, 0.3) - seg(t, 0.74, 0.98);
+      const boom = seg(t, 0.38, 0.62) - seg(t, 0.74, 0.98);
+      if (pallet) {
+        patch({ load: from.load + (1 - from.load) * open, explode: from.explode + (1 - from.explode) * boom });
+      } else {
+        patch({ door: from.door + (1 - from.door) * open, explode: from.explode + (1 - from.explode) * boom });
+      }
+      if (t < 1) showcaseRaf.current = requestAnimationFrame(tick);
+      else setShowcase(false);
+    };
+    showcaseRaf.current = requestAnimationFrame(tick);
+  }, [patch, showcase, stopShowcase]);
+  useEffect(() => stopShowcase, [state.model, stopShowcase]);
+
   const toastId = useRef(0);
   const notify = useCallback((message: string) => {
     const id = ++toastId.current;
@@ -461,8 +521,8 @@ export default function App() {
       if (target?.isContentEditable) return;
       const ids = Object.keys(MODELS) as ModelId[];
       const k = e.key.toLowerCase();
-      if (k >= "1" && k <= "9") selectModel(ids[Number(k) - 1]);
-      else if (k === "0" && ids.length >= 10) selectModel(ids[9]);
+      const keyIndex = "1234567890qer".indexOf(k); // w stays the wireframe toggle
+      if (keyIndex >= 0 && keyIndex < ids.length) selectModel(ids[keyIndex]);
       else if (k === "f") viewer.current?.frameAll();
       else if (k === "i") viewer.current?.setView("iso");
       else if (k === "o")
@@ -603,6 +663,14 @@ export default function App() {
               </button>
             ))}
           </div>
+          <Btn
+            onClick={runShowcase}
+            disabled={!ready || !!error}
+            pressed={showcase}
+            title="Animated showcase: door/load cycle + exploded view, then back"
+          >
+            {showcase ? "■ showcase" : "▶ showcase"}
+          </Btn>
           <Btn
             onClick={() => doExport("glb")}
             disabled={!ready || !!error || exporting}
