@@ -1749,7 +1749,7 @@ export class AKEViewer {
       !!this.tweenCam ||
       this.controls.autoRotate ||
       this.elapsed - this.lastPointerMove < 0.3 ||
-      this.highlightBox.visible ||
+      (this.highlightBox.visible && !this.reducedMotion) ||
       this.fanActive() ||
       this.elapsed - this.lastControlsChange < 0.2;
     if (active) {
@@ -1785,7 +1785,9 @@ export class AKEViewer {
 
     const mat = this.highlightBox.material as THREE.LineBasicMaterial;
     if (this.highlightBox.visible) {
-      mat.opacity = 0.55 + Math.sin(performance.now() * 0.005) * 0.35;
+      mat.opacity = this.reducedMotion
+        ? 0.75
+        : 0.55 + Math.sin(performance.now() * 0.005) * 0.35;
       const key = `${this.highlighted}|${this.state.explode.toFixed(2)}|${this.state.door.toFixed(2)}`;
       if (key !== this.highlightKey && this.highlighted && this.container) {
         this.highlightKey = key;

@@ -78,3 +78,16 @@ test("distance formatting switches to millimetres below 100 mm", () => {
   assert.ok(Math.abs(mToIn(1) - 39.3701) < 1e-9);
   assert.ok(Math.abs(kgToLb(100) - 220.462) < 1e-6);
 });
+
+test("gross rating remains binding if the stated payload is inconsistent", () => {
+  const ratings = { tareKg: 100, maxGrossKg: 1000, payloadKg: 950, volumeM3: 5 };
+  const atLimit = computePlan({ ...ratings, cargoKg: 900, cargoM3: 1, divisor: 6000 });
+  assert.equal(atLimit.status, "ok");
+  assert.equal(atLimit.payloadPct, 100);
+  assert.equal(atLimit.remainingKg, 0);
+
+  const over = computePlan({ ...ratings, cargoKg: 901, cargoM3: 1, divisor: 6000 });
+  assert.equal(over.status, "overweight");
+  assert.equal(over.remainingKg, -1);
+  assert.equal(over.criticalDensityKgM3, 180);
+});
