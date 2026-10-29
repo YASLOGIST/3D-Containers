@@ -455,7 +455,7 @@ function LoadPlanner({ model }: { model: ModelInfo }) {
     plan.status === "empty"
       ? "NO CARGO ENTERED"
       : plan.status === "ok"
-        ? "WITHIN CERTIFIED LIMITS"
+        ? "WITHIN LISTED WEIGHT & VOLUME"
         : plan.status === "overweight"
           ? `OVERWEIGHT BY ${Math.abs(Math.round(plan.remainingKg))} KG`
           : plan.status === "overvolume"
@@ -549,9 +549,10 @@ function LoadPlanner({ model }: { model: ModelInfo }) {
         />
       </div>
       <p className="mt-1.5 text-[9.5px] leading-relaxed text-dim">
-        Estimated from certified ratings only. Real limits also depend on
-        aircraft position, restraint and contour — verify against the load
-        sheet before flying freight.
+        Indicative comparison only, not load approval. Actual limits depend on
+        the specific ULD, aircraft position, restraint and contour. Chargeable
+        weight may also depend on carrier rules and rounding. Verify against
+        the applicable load sheet and tariff.
       </p>
     </div>
   );

@@ -591,8 +591,8 @@ export default function App() {
       ? `upper contour ${(spec.dims.topWidth * 1000).toFixed(0)} mm · ${taperDegrees.toFixed(1)}° taper`
       : "prismatic base section · contour disabled"
     : spec.palletOption
-      ? "96 × 125 in pallet · netted build contour"
-      : "uniform cuboid · no slope";
+      ? "pallet deck · illustrative build contour"
+      : "nominal cross-section";
   const marquee = [
     `${spec.name} · ${spec.family}`,
     `width ${(spec.dims.width * 1000).toFixed(0)} mm`,

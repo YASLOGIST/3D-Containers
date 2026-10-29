@@ -28,7 +28,7 @@ export interface PlanResult {
   volumePct: number;
   /** volumetric (dimensional) weight of the cargo volume, kg */
   volumetricKg: number;
-  /** what an airline charges on: the heavier of actual vs volumetric */
+  /** estimated chargeable weight before carrier-specific rounding and rules */
   chargeableKg: number;
   /** cargo density; null when no volume is entered */
   densityKgM3: number | null;
@@ -44,7 +44,12 @@ const EPS = 1e-9;
 export function computePlan(input: PlanInput): PlanResult {
   const cargoKg = Math.max(0, input.cargoKg);
   const cargoM3 = Math.max(0, input.cargoM3);
-  const payloadKg = Math.max(0, input.payloadKg);
+  // Never report an in-limits load above the gross rating, even if a
+  // future registry entry has an inconsistent payload rating.
+  const payloadKg = Math.min(
+    Math.max(0, input.payloadKg),
+    Math.max(0, input.maxGrossKg - input.tareKg),
+  );
   const volumeM3 = Math.max(0, input.volumeM3);
   const divisor = input.divisor > 0 ? input.divisor : 6000;
 
