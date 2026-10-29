@@ -37,6 +37,7 @@ import {
 } from "@/three/AKEViewer";
 import { decodeShareState, encodeShareState } from "@/lib/state";
 import { formatDistance } from "@/lib/units";
+import type { CargoScenario } from "@/lib/planner";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
 import { ControlDeck } from "@/components/ControlDeck";
@@ -243,6 +244,15 @@ export default function App() {
   const [bootState] = useState<ViewerState>(initialState);
 
   const [state, setState] = useState<ViewerState>(bootState);
+  // A shipment belongs to the workbench, not to a particular model or tab.
+  const [cargoScenario, setCargoScenario] = useState<CargoScenario>(() => {
+    const ratings = MODELS[bootState.model].ratings;
+    return {
+      cargoKg: String(Math.round(ratings.payloadKg / 2)),
+      cargoM3: String(Math.round(ratings.volumeM3 * 50) / 100),
+      divisor: "6000",
+    };
+  });
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [measured, setMeasured] = useState<{
@@ -828,7 +838,7 @@ export default function App() {
                 code={`${spec.code} envelope`}
                 className="h-full overflow-y-auto scroll-slim"
               >
-                <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
+                <SpecSheet cargoScenario={cargoScenario} setCargoScenario={setCargoScenario} stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
               </Panel>
             </div>
           )}
@@ -1001,7 +1011,7 @@ export default function App() {
         {sheet && (
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
             {tab === "spec" && (
-              <SpecSheet stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
+              <SpecSheet cargoScenario={cargoScenario} setCargoScenario={setCargoScenario} stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
             )}
             {tab === "parts" && (
               <PartsList

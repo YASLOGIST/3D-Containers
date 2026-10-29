@@ -7,6 +7,21 @@
  * depend on aircraft position, restraint, contour and centre-of-gravity.
  */
 
+/** Parse an explicitly entered, non-negative cargo quantity. Blank and
+ * malformed values must not silently become an apparently safe zero load. */
+export function parseCargoQuantity(raw: string): number | null {
+  const value = raw.trim();
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number <= 1_000_000_000 ? number : null;
+}
+
+export interface CargoScenario {
+  cargoKg: string;
+  cargoM3: string;
+  divisor: "6000" | "5000";
+}
+
 export interface PlanInput {
   tareKg: number;
   maxGrossKg: number;
