@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { computePlan } from "../src/lib/planner.ts";
+import { computePlan, parseCargoQuantity } from "../src/lib/planner.ts";
 import { formatDistance, kgToLb, mToIn } from "../src/lib/units.ts";
 import { MODELS } from "../src/three/models.ts";
 
@@ -90,4 +90,26 @@ test("gross rating remains binding if the stated payload is inconsistent", () =>
   assert.equal(over.status, "overweight");
   assert.equal(over.remainingKg, -1);
   assert.equal(over.criticalDensityKgM3, 180);
+});
+
+
+test("cargo quantity parsing rejects incomplete and unsafe input", () => {
+  for (const raw of ["", " ", "-1", "NaN", "Infinity", "1e3", "1,5", ".", "1000000001"]) {
+    assert.equal(parseCargoQuantity(raw), null, raw);
+  }
+  assert.equal(parseCargoQuantity("0"), 0);
+  assert.equal(parseCargoQuantity(" 12.345 "), 12.345);
+  assert.equal(parseCargoQuantity(".5"), 0.5);
+  assert.equal(parseCargoQuantity("1000000000"), 1_000_000_000);
+});
+
+test("the same entered cargo can be evaluated against different ULD ratings", () => {
+  const cargoKg = parseCargoQuantity("1400.25")!;
+  const cargoM3 = parseCargoQuantity("4.25")!;
+  const akePlan = computePlan({ ...MODELS.ake.ratings, cargoKg, cargoM3, divisor: 6000 });
+  const dpePlan = computePlan({ ...MODELS.dpe.ratings, cargoKg, cargoM3, divisor: 6000 });
+  assert.equal(akePlan.status, "ok");
+  assert.equal(dpePlan.status, "both");
+  assert.equal(akePlan.grossKg - MODELS.ake.ratings.tareKg, cargoKg);
+  assert.equal(dpePlan.grossKg - MODELS.dpe.ratings.tareKg, cargoKg);
 });

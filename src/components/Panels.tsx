@@ -1,7 +1,7 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, type Dispatch, type SetStateAction } from "react";
 import type { Assembly } from "@/three/primitives";
 import { highlightTS } from "@/lib/io";
-import { computePlan } from "@/lib/planner";
+import { computePlan, parseCargoQuantity, type CargoScenario } from "@/lib/planner";
 import { kgToLb } from "@/lib/units";
 import { MODELS, type ModelId, type ModelInfo } from "@/three/models";
 import { MODEL_IDS } from "@/lib/state";
@@ -25,9 +25,8 @@ export type Stats = {
 };
 
 /**
- * 2-D certified-section preview: the generator's own profile polygon plotted
- * to scale inside its certified envelope rectangle (dashed). Pure registry /
- * generator data — what you see is the exact section the 3-D hull extrudes.
+ * Registry reference section, plotted inside its rectangular overall span.
+ * This does not track optional geometry changes in the live viewer.
  */
 function SectionCard({ model }: { model: ModelInfo }) {
   const pts = model.sectionProfile();
@@ -55,7 +54,7 @@ function SectionCard({ model }: { model: ModelInfo }) {
   return (
     <div className="border border-line-soft bg-void/40 px-2 pb-1.5 pt-2">
       <div className="mb-1 flex items-center justify-between">
-        <span className="stencil text-[9.5px] text-dim">certified section</span>
+        <span className="stencil text-[9.5px] text-dim">registry reference section</span>
         <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-steel">{slope}</span>
       </div>
       <svg
@@ -176,12 +175,16 @@ function HoldCard({ model }: { model: ModelInfo }) {
 }
 
 function SpecSheetBase({
+  cargoScenario,
+  setCargoScenario,
   stats,
   measured,
   model,
   compareModel,
   onSelectModel,
 }: {
+  cargoScenario: CargoScenario;
+  setCargoScenario: Dispatch<SetStateAction<CargoScenario>>;
   stats: Stats | null;
   measured: { x: number; y: number; z: number } | null;
   model: ModelInfo;
@@ -198,8 +201,7 @@ function SpecSheetBase({
         : model.contourOption || model.annotationKind === "contoured"
           ? "contoured"
           : "uniform cuboid";
-  // Certified outer envelope the solid must stay inscribed in (measured with
-  // the door latched / pallet load stowed by the viewer).
+  // Compare overall spans only; these cannot establish contour fit or position.
   const envelope = {
     x: Math.max(dims.width, dims.topWidth),
     y: model.palletOption ? dims.height + (dims.contourHeight ?? 0) : dims.height,
@@ -207,13 +209,13 @@ function SpecSheetBase({
   };
   const deltaMm = measured
     ? {
-        x: Math.round((measured.x - envelope.x) * 1000),
-        y: Math.round((measured.y - envelope.y) * 1000),
-        z: Math.round((measured.z - envelope.z) * 1000),
+        x: (measured.x - envelope.x) * 1000,
+        y: (measured.y - envelope.y) * 1000,
+        z: (measured.z - envelope.z) * 1000,
       }
     : null;
-  const inscribed = deltaMm ? deltaMm.x <= 1 && deltaMm.y <= 1 && deltaMm.z <= 1 : null;
-  const fmtDelta = (v: number) => `${v > 0 ? "+" : ""}${v}`;
+  const spansWithinTolerance = deltaMm ? deltaMm.x <= 1 && deltaMm.y <= 1 && deltaMm.z <= 1 : null;
+  const fmtDelta = (v: number) => `${v > 0.005 ? "+" : ""}${Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2)}`;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
@@ -281,27 +283,24 @@ function SpecSheetBase({
           tone="steel"
         />
         <Row
-          k="Δ vs certified (mm)"
+          k="Δ vs reference spans (mm)"
           v={
             deltaMm
               ? `${fmtDelta(deltaMm.x)} · ${fmtDelta(deltaMm.y)} · ${fmtDelta(deltaMm.z)}`
               : "—"
           }
-          tone={inscribed === false ? "amber" : "steel"}
+          tone={spansWithinTolerance === false ? "amber" : "steel"}
         />
         <Row
-          k="Envelope verdict"
-          v={inscribed === null ? "—" : inscribed ? "INSCRIBED ✓" : "EXCEEDS ENVELOPE"}
-          tone={inscribed === false ? "amber" : "steel"}
+          k="Overall span check"
+          v={spansWithinTolerance === null ? "—" : spansWithinTolerance ? "WITHIN 1 MM" : "SPAN EXCEEDS 1 MM"}
+          tone={spansWithinTolerance === false ? "amber" : "steel"}
         />
         <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
-          {model.palletOption
-            ? "The plate is a flat sheet: every vertex sits exactly on the certified base, and the contour block is a transparent build guide."
-            : model.contourOption || model.annotationKind
-              ? "Measured door-closed: filleted corners keep the solid inscribed in the certified envelope — negative Δ is the fillet allowance, no vertex crosses the boundary."
-              : "Measured door-closed: every vertex of the generated cuboid lands on the certified envelope."}{" "}
-          {model.family.charAt(0).toUpperCase() + model.family.slice(1)} —{" "}
-          {model.volumeLabel}.
+          Door closed and pallet load stowed. This compares bounding-box
+          dimensions with the registry's overall spans, allowing 1 mm excess.
+          It does not check position, contour clearance or certify the model.
+          The section above is a registry reference, not a live geometry check.
         </p>
       </div>
 
@@ -340,7 +339,7 @@ function SpecSheetBase({
         </div>
       )}
 
-      <LoadPlanner key={model.id} model={model} />
+      <LoadPlanner model={model} scenario={cargoScenario} setScenario={setCargoScenario} />
       {onSelectModel && <FleetCard model={model} onSelect={onSelectModel} />}
     </div>
   );
@@ -437,30 +436,33 @@ function FleetCard({
   );
 }
 
-function LoadPlanner({ model }: { model: ModelInfo }) {
+function LoadPlanner({ model, scenario, setScenario }: {
+  model: ModelInfo;
+  scenario: CargoScenario;
+  setScenario: Dispatch<SetStateAction<CargoScenario>>;
+}) {
   const { ratings } = model;
-  const [cargoKg, setCargoKg] = useState(() => Math.round(ratings.payloadKg / 2));
-  const [cargoM3, setCargoM3] = useState(() => Math.round(ratings.volumeM3 * 50) / 100);
-  const [divisor, setDivisor] = useState<"6000" | "5000">("6000");
-  const plan = computePlan({
-    ...ratings,
-    cargoKg,
-    cargoM3,
-    divisor: Number(divisor),
-  });
-  const maxKg = Math.ceil(ratings.payloadKg * 1.25);
-  const maxM3 = Math.round(ratings.volumeM3 * 125) / 100;
-  const over = plan.status !== "ok" && plan.status !== "empty";
-  const statusText =
-    plan.status === "empty"
+  const cargoKg = parseCargoQuantity(scenario.cargoKg);
+  const cargoM3 = parseCargoQuantity(scenario.cargoM3);
+  const plan = cargoKg !== null && cargoM3 !== null
+    ? computePlan({ ...ratings, cargoKg, cargoM3, divisor: Number(scenario.divisor) })
+    : null;
+  const maxKg = Math.max(Math.ceil(ratings.payloadKg * 1.25), cargoKg ?? 0);
+  const maxM3 = Math.max(Math.ceil(ratings.volumeM3 * 125) / 100, cargoM3 ?? 0);
+  const over = plan !== null && plan.status !== "ok" && plan.status !== "empty";
+  const statusText = !plan
+    ? "ENTER VALID CARGO MASS AND VOLUME"
+    : plan.status === "empty"
       ? "NO CARGO ENTERED"
       : plan.status === "ok"
         ? "WITHIN LISTED WEIGHT & VOLUME"
         : plan.status === "overweight"
-          ? `OVERWEIGHT BY ${Math.abs(Math.round(plan.remainingKg))} KG`
+          ? "OVERWEIGHT"
           : plan.status === "overvolume"
-            ? `OVER VOLUME BY ${(cargoM3 - ratings.volumeM3).toFixed(2)} M³`
+            ? "OVER VOLUME"
             : "OVERWEIGHT AND OVER VOLUME";
+  const update = (key: "cargoKg" | "cargoM3", value: string) =>
+    setScenario((previous) => ({ ...previous, [key]: value }));
 
   return (
     <div className="border-t border-line-soft pt-2">
@@ -472,33 +474,41 @@ function LoadPlanner({ model }: { model: ModelInfo }) {
         </span>
       </div>
 
-      <Slider
-        label="cargo mass"
-        value={cargoKg}
-        min={0}
-        max={maxKg}
-        step={5}
-        onChange={setCargoKg}
-        display={`${cargoKg.toLocaleString()} kg`}
-      />
-      <Slider
-        label="cargo volume"
-        value={cargoM3}
-        min={0}
-        max={maxM3}
-        step={0.05}
-        onChange={setCargoM3}
-        display={`${cargoM3.toFixed(2)} m³`}
-      />
+      <p className="mb-2 text-[10px] leading-relaxed text-mute">
+        Enter a shipment once, then switch models to compare the same load.
+        Values stay in this session; they are not included in share links.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {([
+          ["cargoKg", "Cargo mass · kg", scenario.cargoKg, cargoKg],
+          ["cargoM3", "Cargo volume · m³", scenario.cargoM3, cargoM3],
+        ] as const).map(([key, label, value, parsed]) => (
+          <label key={key} className="block font-mono text-[10px] uppercase tracking-[0.08em] text-mute">
+            {label}
+            <input
+              type="text"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => update(key, e.target.value)}
+              aria-invalid={parsed === null}
+              className="mt-1 block w-full border border-line bg-void px-2 py-1.5 text-[12px] text-ink"
+            />
+          </label>
+        ))}
+      </div>
+      {(cargoKg === null || cargoM3 === null) && (
+        <p className="mt-1 text-[10px] text-signal">Use non-negative numbers with a decimal point (maximum 1,000,000,000).</p>
+      )}
+      {cargoKg !== null && <Slider label="adjust cargo mass" value={cargoKg} min={0} max={maxKg} step={1} onChange={(v) => update("cargoKg", String(v))} display={`${cargoKg.toLocaleString()} kg`} />}
+      {cargoM3 !== null && <Slider label="adjust cargo volume" value={cargoM3} min={0} max={maxM3} step={0.01} onChange={(v) => update("cargoM3", String(v))} display={`${cargoM3.toLocaleString()} m³`} />}
 
-      <PlanBar label="payload" pct={plan.payloadPct} />
-      <PlanBar label="volume" pct={plan.volumePct} />
+      {plan && <><PlanBar label="payload" pct={plan.payloadPct} /><PlanBar label="volume" pct={plan.volumePct} /></>}
 
       <div
         role="status"
         className={cn(
           "mt-2 border px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]",
-          plan.status === "ok"
+          plan?.status === "ok"
             ? "border-jade/50 bg-jade/10 text-jade"
             : over
               ? "border-signal/60 bg-signal/10 text-signal"
@@ -509,7 +519,7 @@ function LoadPlanner({ model }: { model: ModelInfo }) {
         {statusText}
       </div>
 
-      <div className="mt-1">
+      {plan && <div className="mt-1">
         <Row k="Gross (tare + cargo)" v={`${plan.grossKg.toLocaleString()} kg`} tone="amber" />
         <Row
           k="Payload remaining"
@@ -532,15 +542,15 @@ function LoadPlanner({ model }: { model: ModelInfo }) {
               : `${Math.round(plan.densityKgM3)} kg/m³ · ${plan.limiting}-limited`
           }
         />
-      </div>
+      </div>}
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-dim">
           volumetric divisor cm³/kg
         </span>
         <Segmented
-          value={divisor}
-          onChange={setDivisor}
+          value={scenario.divisor}
+          onChange={(divisor) => setScenario((previous) => ({ ...previous, divisor }))}
           ariaLabel="Volumetric divisor"
           options={[
             { value: "6000", label: "6000" },

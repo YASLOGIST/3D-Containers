@@ -667,9 +667,8 @@ export class AKEViewer {
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
-    // Measure the as-certified envelope: door latched, pallet load stowed,
-    // assemblies home. Measuring with the door swung would inflate Z and
-    // make the spec sheet's "inscribed in envelope" claim false.
+    // Measure overall spans with door latched, pallet load stowed and
+    // assemblies home. This is not a contour or certification check.
     this.container.setDoorOpen(0);
     this.container.setLoad?.(0);
     this.container.group.updateMatrixWorld(true);
