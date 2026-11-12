@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
+import { rigidDoorPose, stepDampedDoor, UNLATCH_FRACTION } from "../src/three/doorKinematics.ts";
 
 import {
+  projectedFeaturePixels,
+  projectedOrthoFeaturePixels,
+  isDoorInteractionTarget,
   orthoFitSizeFor,
   sectionPlaneFor,
 } from "../src/three/AKEViewer.ts";
@@ -59,4 +63,60 @@ test("orthographic fit covers the sphere in both view axes", () => {
   assert.ok(portrait * 0.5 >= 2, "frustum width covers the diameter");
   // Degenerate aspects stay finite.
   assert.ok(Number.isFinite(orthoFitSizeFor(2, 0, 1)));
+});
+
+test("screen-space micro detail LOD is projection-consistent", () => {
+  const close = projectedFeaturePixels(0.011, 1.5, 900, 40);
+  const far = projectedFeaturePixels(0.011, 12, 900, 40);
+  assert.ok(close > 1.2, "near heads become resolved");
+  assert.ok(far < 1.2, "distant heads stay below pixel threshold");
+  assert.ok(close > far);
+  assert.equal(projectedFeaturePixels(0.011, 0, 900, 40), 0);
+  assert.equal(projectedFeaturePixels(0.011, 1, 0, 40), 0);
+  assert.ok(projectedOrthoFeaturePixels(0.011, 900, 3) > 1.2);
+  assert.ok(projectedOrthoFeaturePixels(0.011, 900, 20) < 1.2);
+  assert.equal(projectedOrthoFeaturePixels(0.011, 900, 0), 0);
+});
+
+
+test("rigid door poses are gated and boundary-safe", () => {
+  const max = THREE.MathUtils.degToRad(112);
+  const locked = rigidDoorPose(0, max);
+  const releasing = rigidDoorPose(UNLATCH_FRACTION / 2, max);
+  const unlatched = rigidDoorPose(UNLATCH_FRACTION, max);
+  const open = rigidDoorPose(1, max);
+  assert.equal(locked.engagement, 1);
+  assert.equal(releasing.swingRadians, 0);
+  assert.ok(releasing.latchRadians > 0);
+  assert.equal(unlatched.swingRadians, 0);
+  assert.equal(unlatched.engagement, 0);
+  assert.ok(Math.abs(open.swingRadians - max) < 1e-8);
+  assert.equal(rigidDoorPose(-15, max).swingRadians, 0);
+  assert.equal(rigidDoorPose(Number.NaN, max).swingRadians, 0);
+});
+
+test("door inertia converges smoothly without a fake impact rebound", () => {
+  let position = 0;
+  let velocity = 0;
+  let previous = -1;
+  for (let i = 0; i < 240; i++) {
+    const step = stepDampedDoor(position, velocity, 1, 1 / 60);
+    position = step.position;
+    velocity = step.velocity;
+    assert.ok(position >= previous - 1e-7, "open direction remains monotonic");
+    assert.ok(position >= 0 && position <= 1);
+    previous = position;
+  }
+  assert.equal(position, 1);
+  assert.equal(velocity, 0);
+});
+
+
+test("only deliberate closure parts, not the entire hull or brand plate, are direct-action targets", () => {
+  for (const part of ["Latch handle", "Door handle bar", "Handling stencil", "AKE tensioned coated textile curtain"]) {
+    assert.equal(isDoorInteractionTarget(part), true);
+  }
+  for (const part of ["Door leaf", "Hull — contour tube", "ULD identification plate", "Air Cargo Aviation monogram - user supplied"]) {
+    assert.equal(isDoorInteractionTarget(part), false);
+  }
 });

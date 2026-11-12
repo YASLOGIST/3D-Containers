@@ -12,7 +12,7 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { makeBrushedMetal, makeSpeckle } from "./textures";
+import { makeBrushedMetal, makeCoatedPanel, makeSpeckle } from "./textures";
 
 /* ========================================================================== */
 /* 1. Finishes — shared across every container family                         */
@@ -35,9 +35,9 @@ export const FINISHES: Record<
   mill: {
     label: "Mill Aluminium",
     note: "5052-H32 sheet, bare",
-    color: "#b8bec4",
+    color: "#9fa9b2",
     metalness: 1.0,
-    roughness: 0.33,
+    roughness: 0.49,
     clearcoat: 0.05,
     clearcoatRoughness: 0.6,
   },
@@ -46,7 +46,7 @@ export const FINISHES: Record<
     note: "Type II hard coat",
     color: "#59616a",
     metalness: 1.0,
-    roughness: 0.26,
+    roughness: 0.45,
     clearcoat: 0.18,
     clearcoatRoughness: 0.35,
   },
@@ -54,19 +54,19 @@ export const FINISHES: Record<
     label: "Cargo Yellow",
     note: "Ramp handling livery",
     color: "#e9a516",
-    metalness: 0.72,
-    roughness: 0.29,
-    clearcoat: 0.75,
-    clearcoatRoughness: 0.16,
+    metalness: 0.08,
+    roughness: 0.52,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.38,
   },
   airline: {
     label: "Airline Blue",
     note: "Two-pack enamel",
     color: "#1e5f8c",
-    metalness: 0.66,
-    roughness: 0.24,
-    clearcoat: 0.85,
-    clearcoatRoughness: 0.12,
+    metalness: 0.08,
+    roughness: 0.43,
+    clearcoat: 0.42,
+    clearcoatRoughness: 0.3,
   },
   titanium: {
     label: "Bead-blast Ti",
@@ -438,9 +438,10 @@ export interface BaseMaterials {
  * response; a generator may extend the returned set with its own materials.
  */
 export function createBaseMaterials(finish: FinishId): BaseMaterials {
-  const brushed = makeBrushedMetal(1024, 1);
-  brushed.roughnessMap.repeat.set(2.5, 2.5);
-  brushed.normalMap.repeat.set(2.5, 2.5);
+  const isPainted = finish === "cargo" || finish === "airline";
+  const surface = isPainted ? makeCoatedPanel(1024) : makeBrushedMetal(1024, 1);
+  surface.roughnessMap.repeat.set(2.5, 2.5);
+  surface.normalMap.repeat.set(2.5, 2.5);
   const speckle = makeSpeckle(512);
   speckle.repeat.set(4, 4);
 
@@ -450,12 +451,12 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       color: new THREE.Color(f.color),
       metalness: f.metalness,
       roughness: f.roughness,
-      roughnessMap: brushed.roughnessMap,
-      normalMap: brushed.normalMap,
-      normalScale: new THREE.Vector2(0.32, 0.32),
+      roughnessMap: surface.roughnessMap,
+      normalMap: surface.normalMap,
+      normalScale: new THREE.Vector2(isPainted ? 0.18 : 0.32, isPainted ? 0.18 : 0.32),
       clearcoat: f.clearcoat,
       clearcoatRoughness: f.clearcoatRoughness,
-      envMapIntensity: 1.15,
+      envMapIntensity: 0.85,
     }),
     hullInner: new THREE.MeshStandardMaterial({
       color: "#98a0a7",
@@ -465,16 +466,16 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       envMapIntensity: 0.6,
     }),
     alloy: new THREE.MeshStandardMaterial({
-      color: "#c4cbd1",
+      color: "#aeb9c2",
       metalness: 1.0,
-      roughness: 0.24,
-      envMapIntensity: 1.3,
+      roughness: 0.36,
+      envMapIntensity: 0.85,
     }),
     steel: new THREE.MeshStandardMaterial({
-      color: "#d5dade",
+      color: "#b7bec5",
       metalness: 1.0,
-      roughness: 0.15,
-      envMapIntensity: 1.45,
+      roughness: 0.28,
+      envMapIntensity: 0.9,
     }),
     dark: new THREE.MeshStandardMaterial({
       color: "#1b1f23",

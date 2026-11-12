@@ -30,6 +30,9 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { rigidDoorPose } from "./doorKinematics";
+import { createAKEFabricDoor, type FabricDoor } from "./akeFabricDoor";
+import { addAKEPrecisionDetails, addCaptiveFasteners } from "./akePrecisionDetails";
 import { makeIdPlate, makeLivery, makeStencil } from "./textures";
 import {
   Assembly,
@@ -144,8 +147,10 @@ export interface BuildOptions {
   detail: boolean;
   /** instanced rivet runs along every frame member */
   rivets: boolean;
-  /** 0..1 door swing */
+  /** 0..1 door swing or textile opening */
   doorOpen: number;
+  /** Closure family is representative, not a manufacturer certification. */
+  doorType: "rigid" | "fabric";
 }
 
 export const DEFAULT_OPTIONS: BuildOptions = {
@@ -154,6 +159,7 @@ export const DEFAULT_OPTIONS: BuildOptions = {
   detail: true,
   rivets: true,
   doorOpen: 0,
+  doorType: "rigid",
 };
 
 /* ========================================================================== */
@@ -363,25 +369,47 @@ export function createAKEContainer(
       ),
     );
 
-    // fuselage roller-guide wear pads, bonded to the upper contoured wall
+    // Roller-contact wear pads use a visible aluminium retaining surround;
+    // a flat black rectangle alone reads as a missing patch of hull.
+    const insertMaterial = new THREE.MeshStandardMaterial({
+      color: "#525e67", metalness: 0.07, roughness: 0.82,
+      envMapIntensity: 0.28,
+    });
+    const padScrews: {at: THREE.Vector3; normal: THREE.Vector3}[] = [];
     for (const z of [-0.5, 0.5]) {
       const padY = CHASSIS + (H - CHASSIS) * 0.82;
-      A_HULL.group.add(
-        wallBox(
-          mat.dark,
-          0.13,
-          0.19,
-          RAIL_T * 0.6,
-          nSlant,
-          slantUp,
-          new THREE.Vector3(
-            wallX(nominal, padY) - nSlant.x * (RAIL_T * 0.3),
-            padY - nSlant.y * (RAIL_T * 0.3),
-            z,
-          ),
-          "Roller guide pad",
-          0.01,
-        ),
+      const center = new THREE.Vector3(
+        wallX(nominal, padY), padY, z,
+      );
+      const bezelCenter = center.clone().addScaledVector(nSlant, -0.007);
+      const wearCenter = center.clone().addScaledVector(nSlant, -0.0045);
+      A_HULL.group.add(wallBox(
+        mat.alloy, 0.16, 0.22, 0.004,
+        nSlant, slantUp, bezelCenter,
+        "Roller guide pad - aluminium retainer", 0.012,
+      ));
+      A_HULL.group.add(wallBox(
+        insertMaterial, 0.124, 0.18, 0.003,
+        nSlant, slantUp, wearCenter,
+        "Roller guide pad - rubber contact insert", 0.009,
+      ));
+      if (o.rivets) {
+        const outward = wearCenter.clone().addScaledVector(nSlant, 0.0022);
+        for (const dz of [-0.067, 0.067]) {
+          for (const dy of [-0.091, 0.091]) {
+            padScrews.push({
+              at: outward.clone().addScaledVector(slantUp, dy)
+                .add(new THREE.Vector3(0, 0, dz)),
+              normal: nSlant,
+            });
+          }
+        }
+      }
+    }
+    if (padScrews.length) {
+      addCaptiveFasteners(
+        A_HULL.group, padScrews, mat.steel,
+        "AKE roller pad retaining fasteners",
       );
     }
 
@@ -751,29 +779,38 @@ export function createAKEContainer(
     { depth: 0.016, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.017);
-  doorPivot.add(mesh(sealGeo, mat.dark, "Door gasket", false));
+  const sealMesh = mesh(sealGeo, mat.dark, "Door gasket", false);
+  doorPivot.add(sealMesh);
+
+  const latchSpindles: THREE.Group[] = [];
 
   // cam latch rods with fold-flat handles
   for (const rx of [X0 + FRAME_W + 0.06, X0 + BW - 0.1]) {
     const rodLen = H - CHASSIS - 0.2;
+    const spindle = new THREE.Group();
+    spindle.name = "Articulated cam latch spindle";
+    spindle.position.set(px(rx), 0, FACE + 0.013);
+    doorPivot.add(spindle);
+    latchSpindles.push(spindle);
     const rod = mesh(
       new THREE.CylinderGeometry(0.012, 0.012, rodLen, 14),
       mat.steel,
       "Cam latch rod",
     );
-    rod.position.set(px(rx), CHASSIS + rodLen / 2 + 0.1, FACE + 0.013);
-    doorPivot.add(rod);
+    rod.position.set(0, CHASSIS + rodLen / 2 + 0.1, 0);
+    spindle.add(rod);
 
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
       const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
-      hub.position.set(px(rx), hy, FACE + 0.013);
-      doorPivot.add(hub);
-      // fold-flat lever: kept inside the frame rebate so the closed door
-      // never breaks the certified envelope
+      hub.position.set(0, hy, 0);
+      spindle.add(hub);
+      const cam = box(mat.alloy, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
+      cam.position.set(0.032, hy, -0.015);
+      spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
-      handle.position.set(px(rx) + 0.009, hy - 0.045, FACE + 0.017);
+      handle.position.set(0.009, hy - 0.045, 0.023);
       handle.rotation.x = -0.1;
-      doorPivot.add(handle);
+      spindle.add(handle);
     }
   }
 
@@ -808,7 +845,7 @@ export function createAKEContainer(
   bar.position.set(px(X0 + BW / 2), CHASSIS + 0.46, FACE + 0.022);
   doorPivot.add(bar);
 
-  const pullTex = makeStencil("PULL \u25BC", "#ffb020", 512, 160);
+  const pullTex = makeStencil("UNLATCH → PULL", "#ffb020", 640, 160);
   const pullMat = mat.stencil.clone();
   pullMat.map = pullTex;
   doorPivot.add(
@@ -828,13 +865,57 @@ export function createAKEContainer(
       0.34,
       0.18,
       nDoor,
-      new THREE.Vector3(px(X0 + BW / 2 - 0.02), H - 0.34, FACE + 0.003),
+      new THREE.Vector3(px(X0 + BW * 0.40), H - 0.34, FACE + 0.003),
       leafIdMat,
       "Door data plate",
     ),
   );
 
-  doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  if (o.detail) {
+    addAKEPrecisionDetails({
+      hull: A_HULL.group,
+      blind: A_END.group,
+      doorPivot,
+      profile: nominal,
+      length: BL,
+      height: H,
+      doorFace: FACE,
+      doorHingeX: HINGE_X,
+      blindFaceZ,
+      alloy: mat.alloy,
+      steel: mat.steel,
+      includeFasteners: o.rivets,
+    });
+  }
+
+  const setRigidPose = (progress: number) => {
+    const pose = rigidDoorPose(progress, MAX_DOOR);
+    latchSpindles.forEach((spindle, i) => {
+      spindle.rotation.y = (i === 0 ? 1 : -1) * pose.latchRadians;
+    });
+    doorPivot.rotation.y = -pose.swingRadians;
+    sealMesh.position.z = -0.002 * (1 - pose.engagement);
+  };
+
+  let fabricDoor: FabricDoor | null = null;
+  if (o.doorType === "fabric") {
+    // Suppress only rigid closure hardware; retain the shared front frame.
+    for (const part of A_DOOR.group.children) {
+      if (part !== ringDoor) part.visible = false;
+    }
+    fabricDoor = createAKEFabricDoor({
+      profile: nominal,
+      openingBottom: CHASSIS + FRAME_W + 0.01,
+      openingTop: H - FRAME_W - 0.01,
+      inset: FRAME_W + 0.015,
+      frontZ: BL / 2 - END_FRAME + 0.005,
+      open: o.doorOpen,
+      detailed: o.detail,
+    });
+    A_DOOR.group.add(fabricDoor.group);
+  } else {
+    setRigidPose(o.doorOpen);
+  }
 
   /* --- 7.10 side livery on the contoured wall ------------------------- */
   const liverySide = makeLivery({
@@ -886,6 +967,15 @@ export function createAKEContainer(
     a.group.traverse((obj) => {
       const m = obj as THREE.Mesh;
       if (!m.geometry) return;
+      // Alternate closure meshes remain available for editing, but should
+      // never inflate the visible scene's triangles/draw budget.
+      let ancestor: THREE.Object3D | null = obj;
+      let shown = true;
+      while (ancestor) {
+        if (!ancestor.visible) { shown = false; break; }
+        ancestor = ancestor.parent;
+      }
+      if (!shown) return;
       meshCount++;
       const inst = (m as THREE.InstancedMesh).isInstancedMesh
         ? (m as THREE.InstancedMesh).count
@@ -931,7 +1021,9 @@ export function createAKEContainer(
       mat.shell.needsUpdate = true;
     },
     setDoorOpen(t: number) {
-      doorPivot.rotation.y = -THREE.MathUtils.clamp(t, 0, 1) * MAX_DOOR;
+      const v = THREE.MathUtils.clamp(t, 0, 1);
+      if (fabricDoor) fabricDoor.setOpen(v);
+      else setRigidPose(v);
     },
     dispose() {
       const geos = new Set<THREE.BufferGeometry>();

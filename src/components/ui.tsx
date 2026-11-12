@@ -93,7 +93,7 @@ export function Btn({
         tone === "ghost"
           ? "border-transparent text-mute hover:text-ink"
           : active
-            ? "border-amber/70 bg-amber/15 text-amber shadow-[0_0_18px_-6px_rgba(255,176,32,0.8)]"
+            ? "border-amber/70 bg-amber/15 text-amber shadow-[0_0_18px_-6px_rgba(90,188,235,0.8)]"
             : "border-line bg-raise/60 text-mute hover:border-amber/40 hover:bg-raise hover:text-ink",
         className,
       )}
@@ -131,7 +131,7 @@ export function Segmented<T extends string>({
           className={cn(
             "flex-1 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors",
             value === o.value
-              ? "bg-amber/90 text-void shadow-[0_0_14px_-4px_rgba(255,176,32,0.9)]"
+              ? "bg-amber/90 text-void shadow-[0_0_14px_-4px_rgba(90,188,235,0.9)]"
               : "text-dim hover:bg-raise hover:text-ink",
           )}
         >
@@ -170,7 +170,7 @@ export function Toggle({
           className={cn(
             "absolute top-[1px] h-[10px] w-[10px] transition-all duration-200",
             value
-              ? "left-[13px] bg-amber shadow-[0_0_8px_rgba(255,176,32,0.9)]"
+              ? "left-[13px] bg-amber shadow-[0_0_8px_rgba(90,188,235,0.9)]"
               : "left-[1px] bg-dim group-hover:bg-mute",
           )}
         />

@@ -23,6 +23,8 @@ test("share state round-trips the full workbench configuration", () => {
     finish: "graphite",
     contour: false,
     door: 0.5,
+    akeDoor: "fabric",
+    surfaceCondition: "factory",
     explode: 0.25,
     setpoint: 4,
     projection: "ortho",
@@ -60,4 +62,17 @@ test("decoder tolerates empty and malformed hashes", () => {
     model: "rkn",
     reefer: false,
   });
+});
+
+
+test("AKE closure choice survives URLs and ignores unsupported variants", () => {
+  assert.equal(decodeShareState("#m=ake&akeDoor=fabric").akeDoor, "fabric");
+  assert.equal(decodeShareState("#m=ake&akeDoor=wooden").akeDoor, undefined);
+  assert.ok(encodeShareState({ ...DEFAULT_STATE, akeDoor: "fabric" }).includes("akeDoor=fabric"));
+});
+
+
+test("surface patina condition is shared safely", () => {
+  assert.equal(decodeShareState("#condition=factory").surfaceCondition, "factory");
+  assert.equal(decodeShareState("#condition=unknown").surfaceCondition, undefined);
 });

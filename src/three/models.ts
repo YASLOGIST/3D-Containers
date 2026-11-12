@@ -2,7 +2,7 @@
  * ============================================================================
  *  models.ts — the registry that lets one viewer drive several container
  *  families. Each entry carries its display metadata (for the UI), its
- *  certified dimensions (for the dimension overlay) and the builder function.
+ *  reference dimensions (for the dimension overlay) and the builder function.
  *
  *  Adding a container = write one generator file that implements ContainerBase,
  *  then add a single entry here. No viewer, exporter or UI logic changes.
@@ -66,6 +66,7 @@ export interface ViewerOptions {
   detail: boolean;
   rivets: boolean;
   doorOpen: number;
+  akeDoor: "rigid" | "fabric";
   reefer: boolean;
   setpoint: number;
   /** 0..1 cargo-load contour (pallets only) */
@@ -81,7 +82,7 @@ export interface ModelInfo {
   /** descriptive family line */
   family: string;
   blurb: string;
-  /** certified envelope in metres */
+  /** nominal reference envelope in metres */
   dims: {
     width: number;
     depth: number;
@@ -102,7 +103,7 @@ export interface ModelInfo {
     payloadKg: number;
     volumeM3: number;
   };
-  /** certified controller range for active refrigeration models */
+  /** model-specific nominal controller range; confirm by maker */
   setpointRange?: { min: number; max: number; default: number };
   /** does the contour toggle apply to this model? */
   contourOption: boolean;
@@ -114,7 +115,7 @@ export interface ModelInfo {
   annotationKind?: "contoured" | "dual-contour" | "roof-chamfer";
   /** nominal aircraft/deck compatibility line (published ULD guides) */
   aircraft: string;
-  /** certified cross-section polygon for the 2-D section preview card */
+  /** reference cross-section polygon for the 2-D section preview card */
   sectionProfile: () => V2[];
   /** nominal hold placement for the schematic hold-fit preview */
   hold: HoldInfo;
@@ -122,7 +123,7 @@ export interface ModelInfo {
   taperDeg?: number;
   /** caption under the slope angle, e.g. "WING ANGLE (EACH SIDE)" */
   taperLabel?: string;
-  /** human-readable certified volume */
+  /** human-readable reference volume */
   volumeLabel: string;
   /** extra spec rows for the specification sheet */
   specs: { k: string; v: string; tone?: "amber" | "steel" }[];
@@ -156,12 +157,12 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Upper contour", v: "2.01 m", tone: "steel" },
       { k: "Taper angle", v: "16.5°", tone: "steel" },
-      { k: "Certified volume", v: "4.3 m³ · 152 ft³" },
+      { k: "Reference volume", v: "4.3 m³ · 152 ft³" },
       { k: "Tare mass", v: "92 kg" },
       { k: "Max gross", v: "1588 kg", tone: "amber" },
       { k: "Net payload", v: "1496 kg" },
     ],
-    build: (o) => createAKEContainer(o),
+    build: (o) => createAKEContainer({ ...o, doorType: o.akeDoor }),
   },
   akc: {
     id: "akc",
@@ -190,7 +191,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Upper contour", v: "2.34 m", tone: "steel" },
       { k: "Taper angle", v: "25.5°", tone: "steel" },
-      { k: "Certified volume", v: "4.8 m³ · 170 ft³" },
+      { k: "Reference volume", v: "4.8 m³ · 170 ft³" },
       { k: "Tare mass", v: "85 kg" },
       { k: "Max gross", v: "1588 kg", tone: "amber" },
       { k: "Net payload", v: "1503 kg" },
@@ -224,7 +225,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Upper contour", v: "1.56 m", tone: "steel" },
       { k: "Taper angle", v: "12.8°", tone: "steel" },
-      { k: "Certified volume", v: "3.4 m³ · 120 ft³" },
+      { k: "Reference volume", v: "3.4 m³ · 120 ft³" },
       { k: "Tare mass", v: "75 kg" },
       { k: "Max gross", v: "1225 kg", tone: "amber" },
       { k: "Net payload", v: "1150 kg" },
@@ -260,7 +261,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Overall top width", v: "3.18 m", tone: "steel" },
       { k: "Wing angle", v: "13.5° each side", tone: "steel" },
-      { k: "Certified volume", v: "6.9 m³ · 245 ft³" },
+      { k: "Reference volume", v: "6.9 m³ · 245 ft³" },
       { k: "Tare mass", v: "127 kg" },
       { k: "Max gross", v: "2449 kg", tone: "amber" },
       { k: "Net payload", v: "2322 kg" },
@@ -293,7 +294,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Section", v: "rectangular · vertical walls", tone: "steel" },
       { k: "Taper angle", v: "0.0° — straight walls", tone: "steel" },
-      { k: "Certified volume", v: "5.5 m³ · 195 ft³" },
+      { k: "Reference volume", v: "5.5 m³ · 195 ft³" },
       { k: "Tare mass", v: "120 kg" },
       { k: "Max gross", v: "2449 kg", tone: "amber" },
       { k: "Net payload", v: "2329 kg" },
@@ -329,7 +330,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Overall top width", v: "2.44 m", tone: "steel" },
       { k: "Wing angle", v: "28.2° each side", tone: "steel" },
-      { k: "Certified volume", v: "3.3 m³ · 116 ft³" },
+      { k: "Reference volume", v: "3.3 m³ · 116 ft³" },
       { k: "Tare mass", v: "82 kg" },
       { k: "Max gross", v: "1588 kg", tone: "amber" },
       { k: "Net payload", v: "1506 kg" },
@@ -365,7 +366,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Overall top width", v: "4.06 m", tone: "steel" },
       { k: "Wing angle", v: "16.1° each side", tone: "steel" },
-      { k: "Certified volume", v: "8.9 m³ · 316 ft³" },
+      { k: "Reference volume", v: "8.9 m³ · 316 ft³" },
       { k: "Tare mass", v: "230 kg" },
       { k: "Max gross", v: "3175 kg", tone: "amber" },
       { k: "Net payload", v: "2945 kg" },
@@ -398,7 +399,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Section", v: "rectangular", tone: "steel" },
       { k: "Taper angle", v: "0.0° — no contour", tone: "steel" },
-      { k: "Certified volume", v: "7.2 m³ · 253 ft³" },
+      { k: "Reference volume", v: "7.2 m³ · 253 ft³" },
       { k: "Tare mass", v: "185 kg" },
       { k: "Max gross", v: "3176 kg", tone: "amber" },
       { k: "Net payload", v: "2991 kg" },
@@ -431,7 +432,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Section", v: "rectangular · contour code P", tone: "steel" },
       { k: "Taper angle", v: "0.0° — straight walls", tone: "steel" },
-      { k: "Certified volume", v: "10.8 m³ · 381 ft³" },
+      { k: "Reference volume", v: "10.8 m³ · 381 ft³" },
       { k: "Tare mass", v: "270 kg" },
       { k: "Max gross", v: "6033 kg", tone: "amber" },
       { k: "Net payload", v: "5763 kg" },
@@ -535,7 +536,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Roof flat", v: "2.60 m (nominal)", tone: "steel" },
       { k: "Roof chamfer", v: "30.5° each side", tone: "steel" },
-      { k: "Certified volume", v: "17.6 m³ · 621 ft³" },
+      { k: "Reference volume", v: "17.6 m³ · 621 ft³" },
       { k: "Tare mass", v: "314 kg" },
       { k: "Max gross", v: "6804 kg", tone: "amber" },
       { k: "Net payload", v: "6490 kg" },
@@ -569,7 +570,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Roof flat (centre side)", v: "1.07 m (nominal)", tone: "steel" },
       { k: "Contour", v: "D · asymmetric", tone: "steel" },
-      { k: "Certified volume", v: "21.2 m³ · 750 ft³" },
+      { k: "Reference volume", v: "21.2 m³ · 750 ft³" },
       { k: "Tare mass", v: "370 kg" },
       { k: "Max gross", v: "6804 kg", tone: "amber" },
       { k: "Net payload", v: "6434 kg" },
@@ -605,7 +606,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
     specs: [
       { k: "Roof flat", v: "1.90 m (nominal)", tone: "steel" },
       { k: "Roof chamfer", v: "26.6° each side", tone: "steel" },
-      { k: "Certified volume", v: "33.7 m³ · 1190 ft³" },
+      { k: "Reference volume", v: "33.7 m³ · 1190 ft³" },
       { k: "Tare mass", v: "1000 kg" },
       { k: "Max gross", v: "11340 kg", tone: "amber" },
       { k: "Net payload", v: "10340 kg" },

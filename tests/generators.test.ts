@@ -8,7 +8,8 @@ import type {
   ViewerContainer,
   ViewerOptions,
 } from "../src/three/primitives.ts";
-import { makeBrushedMetal } from "../src/three/textures.ts";
+import { makeBrushedMetal, makeInServicePatina } from "../src/three/textures.ts";
+import { addAirCargoOperatorMark, AIR_MARK_NAME } from "../src/three/airServiceBrand.ts";
 
 type FakeCanvas = {
   width: number;
@@ -88,6 +89,7 @@ const options: ViewerOptions = {
   detail: true,
   rivets: true,
   doorOpen: 0,
+  akeDoor: "rigid",
   reefer: true,
   setpoint: -18,
   load: 0.35,
@@ -167,4 +169,259 @@ test("rebuilding a generator yields stable triangle counts", () => {
   const second = MODELS.rap.build(options);
   assert.equal(second.stats.triangles, firstTriangles);
   second.dispose();
+});
+
+
+test("AKE precision detailing is conditional, parented and envelope-safe", () => {
+  const detailed = MODELS.ake.build({ ...options, detail: true, rivets: true });
+  const simplified = MODELS.ake.build({ ...options, detail: false, rivets: false });
+  const noFasteners = MODELS.ake.build({ ...options, detail: true, rivets: false });
+
+  const names = (model: ViewerContainer) => {
+    const found: string[] = [];
+    model.group.traverse((o) => found.push(o.name));
+    return found;
+  };
+  const fullNames = names(detailed);
+  const lightNames = names(simplified);
+  const withoutFasteners = names(noFasteners);
+
+  assert.ok(fullNames.includes("AKE panel joint - raised seam"));
+  assert.ok(fullNames.includes("AKE door pressed reinforcement channel"));
+  assert.ok(fullNames.includes("AKE blind-end service cover"));
+  assert.ok(fullNames.includes("Roller guide pad - aluminium retainer"));
+  assert.ok(fullNames.includes("Roller guide pad - rubber contact insert"));
+  assert.ok(fullNames.includes("AKE roller pad retaining fasteners"));
+  assert.ok(fullNames.includes("AKE skin joint microfasteners"));
+  const tiny = detailed.group.getObjectByName("AKE skin joint microfasteners")!;
+  // Camera-only LOD leaves the original mesh visible for GLB export.
+  assert.equal(tiny.layers.isEnabled(1), true);
+  assert.equal(tiny.visible, true);
+  assert.ok(fullNames.includes("AKE door captive screw heads"));
+  assert.ok(!lightNames.includes("AKE panel joint - raised seam"));
+  assert.ok(!withoutFasteners.includes("AKE skin joint microfasteners"));
+  assert.ok(withoutFasteners.includes("AKE door pressed reinforcement channel"));
+  assert.ok(detailed.stats.triangles > simplified.stats.triangles);
+
+  const bb = bounds(detailed).box;
+  // Precision details must not blow out the reference envelope.
+  assert.ok(bb.min.x >= -1.02 && bb.max.x <= 1.02);
+  assert.ok(bb.min.y >= -0.02 && bb.max.y <= 1.64);
+  assert.ok(bb.min.z >= -0.80 && bb.max.z <= 0.80);
+
+  const face = detailed.group.getObjectByName("AKE door pressed reinforcement channel");
+  assert.ok(face);
+  const before = face.getWorldPosition(new THREE.Vector3());
+  detailed.setDoorOpen(0.5);
+  detailed.group.updateMatrixWorld(true);
+  const after = face.getWorldPosition(new THREE.Vector3());
+  assert.ok(before.distanceTo(after) > 0.005, "detail must follow door rotation");
+
+  detailed.dispose();
+  simplified.dispose();
+  noFasteners.dispose();
+});
+
+test("painted and bare-metal finishes have distinct physically meaningful maps", () => {
+  const enamel = MODELS.ake.build({ ...options, finish: "airline" });
+  const bare = MODELS.ake.build({ ...options, finish: "mill" });
+  const painted = enamel.materials.shell;
+  const metal = bare.materials.shell;
+
+  assert.ok(painted.metalness <= 0.15, "paint is a dielectric, not polished aluminum");
+  assert.ok(metal.metalness >= 0.95, "bare aluminum remains metallic");
+  assert.ok(painted.roughness >= 0.35);
+  assert.ok(metal.roughness >= 0.35);
+  assert.notEqual(painted.normalMap?.image, metal.normalMap?.image);
+  assert.notEqual(painted.roughnessMap?.image, metal.roughnessMap?.image);
+  enamel.dispose();
+  bare.dispose();
+});
+
+
+test("AKE flexible textile and metal closures preserve variants and valid motion", () => {
+  const solid = MODELS.ake.build({ ...options, akeDoor: "rigid" });
+  const soft = MODELS.ake.build({ ...options, akeDoor: "fabric" });
+  const get = (m: ViewerContainer, name: string) => m.group.getObjectByName(name);
+  const fabric = get(soft, "AKE tensioned coated textile curtain") as THREE.Mesh;
+  const rigidLeaf = get(solid, "Door leaf") as THREE.Mesh;
+  const hiddenLeaf = get(soft, "Door leaf") as THREE.Mesh;
+  assert.ok(fabric);
+  assert.ok(rigidLeaf);
+  assert.equal(hiddenLeaf?.parent?.visible, false, "rigid door is hidden in fabric mode");
+  assert.ok(soft.stats.triangles > 1000);
+  const mesh = fabric.geometry as THREE.BufferGeometry;
+  const arr = mesh.attributes.position as THREE.BufferAttribute;
+  const yBefore = arr.getY(0);
+  const zBefore = arr.getZ(0);
+  soft.setDoorOpen(0.85);
+  const yAfter = arr.getY(0);
+  const zAfter = arr.getZ(0);
+  assert.ok(yAfter > yBefore + 0.1, "fabric bottom edge lifts");
+  assert.ok(Number.isFinite(zAfter));
+  assert.ok(Math.abs(zAfter - zBefore) < 0.1);
+  const world = bounds(soft).box;
+  assert.ok(world.min.y > -0.04 && world.max.y < 1.65);
+  assert.ok(world.min.z > -0.85 && world.max.z < 0.85);
+  soft.setDoorOpen(1);
+  assert.ok(Number.isFinite(mesh.boundingSphere?.radius));
+  assert.equal(get(soft, "AKE fabric tension strap")?.visible, true);
+  assert.equal(get(solid, "AKE tensioned coated textile curtain"), undefined);
+  solid.dispose();
+  soft.dispose();
+});
+
+
+test("service patina texture is cached by source, but clones remain independently disposable", () => {
+  const first = makeInServicePatina(256);
+  const second = makeInServicePatina(256);
+  assert.notEqual(first, second);
+  assert.equal(first.image, second.image);
+  assert.ok(first.name.startsWith("uld-patina:service:"));
+  assert.equal(first.colorSpace, THREE.SRGBColorSpace);
+  first.dispose();
+  second.dispose();
+});
+
+
+test("AKH interlocks mechanical latch release before the hinge opens", () => {
+  const specimen = MODELS.akh.build({ ...options, doorOpen: 0 });
+  const leaf = specimen.doorPivot;
+  assert.ok(leaf, "a rigid leaf must have a pivot");
+  const spindles: THREE.Object3D[] = [];
+  specimen.group.traverse((part) => {
+    if (part.name === "Articulated cam latch spindle") spindles.push(part);
+  });
+  assert.equal(spindles.length, 2, "both locking spindles must be present");
+  assert.ok(specimen.group.getObjectByName("Rotating latch cam"));
+  assert.ok(specimen.group.getObjectByName("Latch keeper"));
+  const gasket = specimen.group.getObjectByName("Door gasket");
+  assert.ok(gasket);
+  assert.ok(Math.abs(gasket.position.z) < 1e-10, "latched gasket is seated");
+  specimen.setDoorOpen(0.1);
+  assert.ok(gasket.position.z < 0, "gasket relaxes during cam release");
+  assert.ok(Math.abs(leaf.rotation.y) < 1e-10, "door must remain closed while unlocking");
+  assert.ok(Math.abs(spindles[0].rotation.y) > 0.01, "cam starts to rotate");
+  specimen.setDoorOpen(0.35);
+  assert.ok(leaf.rotation.y < 0, "swing starts after full cam release");
+  assert.ok(Math.abs(spindles[0].rotation.y) > 0.9, "cam is fully disengaged");
+  specimen.setDoorOpen(0);
+  assert.ok(Math.abs(leaf.rotation.y) < 1e-10);
+  assert.equal(spindles[0].rotation.y, 0);
+  specimen.dispose();
+});
+
+test("AKE rigid door obeys the same unlocking gate; fabric stays independently liftable", () => {
+  const rigid = MODELS.ake.build({ ...options, akeDoor: "rigid", doorOpen: 0 });
+  const door = rigid.doorPivot;
+  const cam = rigid.group.getObjectByName("Articulated cam latch spindle");
+  assert.ok(door && cam);
+  const akeGasket = rigid.group.getObjectByName("Door gasket");
+  assert.ok(akeGasket);
+  rigid.setDoorOpen(0.1);
+  assert.ok(akeGasket.position.z < 0);
+  assert.ok(Math.abs(door.rotation.y) < 1e-10);
+  assert.ok(Math.abs(cam.rotation.y) > 0);
+  rigid.setDoorOpen(0.3);
+  assert.ok(door.rotation.y < 0);
+  rigid.dispose();
+  const fabric = MODELS.ake.build({ ...options, akeDoor: "fabric", doorOpen: 0 });
+  const cloth = fabric.group.getObjectByName("AKE tensioned coated textile curtain") as THREE.Mesh;
+  assert.ok(cloth);
+  const before = (cloth.geometry.attributes.position as THREE.BufferAttribute).getY(0);
+  fabric.setDoorOpen(0.4);
+  assert.ok((cloth.geometry.attributes.position as THREE.BufferAttribute).getY(0) > before);
+  fabric.dispose();
+});
+
+
+function assertClearPrint(container: ViewerContainer, mark: THREE.Mesh<THREE.PlaneGeometry>, id: string) {
+  container.group.updateMatrixWorld(true);
+  const { width, height } = mark.geometry.parameters;
+  const clearance = 0.012;
+  const halfWidth = width / 2 + clearance;
+  const halfHeight = height / 2 + clearance;
+  const rayDepth = 0.12;
+  const normal = new THREE.Vector3(0, 0, 1).transformDirection(mark.matrixWorld);
+  const direction = normal.clone().negate();
+  const ray = new THREE.Raycaster(undefined, undefined, 0, rayDepth + 0.002);
+  const candidates: THREE.Mesh[] = [];
+  const inverse = mark.matrixWorld.clone().invert();
+  const transform = new THREE.Matrix4();
+  const footprint = new THREE.Box3(
+    new THREE.Vector3(-halfWidth, -halfHeight, -0.002),
+    new THREE.Vector3(halfWidth, halfHeight, rayDepth),
+  );
+  container.group.traverseVisible((part) => {
+    if (!(part instanceof THREE.Mesh) || part === mark) return;
+    const instanceBounds = part instanceof THREE.InstancedMesh;
+    if (instanceBounds) part.computeBoundingBox();
+    part.geometry.computeBoundingBox();
+    const box = (instanceBounds ? part.boundingBox : part.geometry.boundingBox)?.clone();
+    if (box?.applyMatrix4(transform.multiplyMatrices(inverse, part.matrixWorld)).intersectsBox(footprint)) {
+      candidates.push(part);
+    }
+  });
+  const columns = Math.ceil(2 * halfWidth / 0.015);
+  const rows = Math.ceil(2 * halfHeight / 0.015);
+  const origin = new THREE.Vector3();
+  for (let row = 0; row <= rows; row++) {
+    for (let col = 0; col <= columns; col++) {
+      origin.set(
+        THREE.MathUtils.lerp(-halfWidth, halfWidth, col / columns),
+        THREE.MathUtils.lerp(-halfHeight, halfHeight, row / rows),
+        rayDepth,
+      ).applyMatrix4(mark.matrixWorld);
+      ray.set(origin, direction);
+      const hit = ray.intersectObjects(candidates, false)[0];
+      assert.equal(hit?.object.name, mark.parent?.name, `${id} footprint meets ${hit?.object.name ?? "open air"}`);
+      assert.ok(Math.abs(hit.distance - rayDepth - 0.0005) < 1e-5, `${id} must be flush`);
+    }
+  }
+}
+
+test("the whole aviation lockup fits a clear surface on all 17 ULD families", () => {
+  const previousImage = Object.getOwnPropertyDescriptor(globalThis, "Image");
+  const originalLoad = THREE.TextureLoader.prototype.load;
+  Object.defineProperty(globalThis, "Image", {
+    value: class FakeImage {},
+    configurable: true,
+  });
+  THREE.TextureLoader.prototype.load = () => new THREE.Texture();
+
+  try {
+    const ids = Object.keys(MODELS) as ModelId[];
+    assert.equal(ids.length, 17);
+    for (const variant of [...ids, "ake-fabric"] as const) {
+      const id = variant === "ake-fabric" ? "ake" : variant;
+      const akeDoor = variant === "ake-fabric" ? "fabric" : "rigid";
+      const container = MODELS[id].build({ ...options, akeDoor, load: 0 });
+      try {
+        assert.equal(addAirCargoOperatorMark(container, id, options.finish, "/mark.png"), true);
+        const marks: THREE.Mesh<THREE.PlaneGeometry>[] = [];
+        container.group.traverseVisible((part) => {
+          if (part.name === AIR_MARK_NAME) marks.push(part as THREE.Mesh<THREE.PlaneGeometry>);
+        });
+        assert.equal(marks.length, 1, variant);
+        const [mark] = marks;
+        const material = mark.material as THREE.MeshStandardMaterial;
+        assert.equal(material.transparent, true);
+        assert.ok(material.map);
+        assertClearPrint(container, mark, variant);
+        const closed = mark.getWorldPosition(new THREE.Vector3());
+        if (mark.parent?.name === "Door leaf" || akeDoor === "fabric") {
+          container.setDoorOpen(0.7);
+          const opened = mark.getWorldPosition(new THREE.Vector3());
+          if (akeDoor === "fabric") assert.deepEqual(opened, closed);
+          else assert.ok(opened.distanceTo(closed) > 0.05, variant);
+        }
+      } finally {
+        container.dispose();
+      }
+    }
+  } finally {
+    THREE.TextureLoader.prototype.load = originalLoad;
+    if (previousImage) Object.defineProperty(globalThis, "Image", previousImage);
+    else delete (globalThis as typeof globalThis & { Image?: unknown }).Image;
+  }
 });

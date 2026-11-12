@@ -17,7 +17,7 @@ function canvas2d(w: number, h: number) {
 function toTexture(c: HTMLCanvasElement, srgb = false) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = 16;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.needsUpdate = true;
   return t;
@@ -45,7 +45,7 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
     const { c, ctx } = canvas2d(size, size);
 
     // base grey (mid roughness)
-    ctx.fillStyle = "#8a8a8a";
+    ctx.fillStyle = "#b9b9b9";
     ctx.fillRect(0, 0, size, size);
 
     // coarse grain
@@ -107,6 +107,122 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Painted sheet / subtle orange-peel microfinish                      */
+/* ------------------------------------------------------------------ */
+
+const coatedSources = new Map<string, {
+  roughnessMap: THREE.Texture;
+  normalMap: THREE.Texture;
+}>();
+
+/**
+ * Painted ULD panels are dielectric coatings, not bare metal.
+ * The repeatable shallow grain gives a diffuse orange-peel response without
+ * loading image assets or adding geometry. The 1024px source is cached.
+ */
+export function makeCoatedPanel(size = 1024) {
+  const key = "coated:" + size;
+  let pair = coatedSources.get(key);
+  if (!pair) {
+    const rand = seededRandom(0xc0a7ed ^ size);
+    const { c, ctx } = canvas2d(size, size);
+    ctx.fillStyle = "#d5d5d5";
+    ctx.fillRect(0, 0, size, size);
+
+    for (let i = 0; i < size * 6; i++) {
+      const x = rand() * size;
+      const y = rand() * size;
+      const dark = rand() < 0.5;
+      ctx.fillStyle = dark
+        ? "rgba(28,28,28,0.10)"
+        : "rgba(255,255,255,0.13)";
+      const d = 0.6 + rand() * 2;
+      ctx.fillRect(x, y, d, d);
+    }
+
+    const src = ctx.getImageData(0, 0, size, size).data;
+    const { c: nc, ctx: nctx } = canvas2d(size, size);
+    const out = nctx.createImageData(size, size);
+    const at = (x: number, y: number) =>
+      src[(((y + size) % size) * size + ((x + size) % size)) * 4] / 255;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (at(x + 1, y) - at(x - 1, y)) * 0.7;
+        const dy = (at(x, y + 1) - at(x, y - 1)) * 0.7;
+        const mag = Math.hypot(dx, dy, 1);
+        const i = (y * size + x) * 4;
+        out.data[i] = ((-dx / mag) * 0.5 + 0.5) * 255;
+        out.data[i + 1] = ((-dy / mag) * 0.5 + 0.5) * 255;
+        out.data[i + 2] = (1 / mag) * 0.5 * 255 + 127;
+        out.data[i + 3] = 255;
+      }
+    }
+    nctx.putImageData(out, 0, 0);
+    pair = { roughnessMap: toTexture(c), normalMap: toTexture(nc) };
+    coatedSources.set(key, pair);
+  }
+  const roughnessMap = pair.roughnessMap.clone();
+  const normalMap = pair.normalMap.clone();
+  roughnessMap.needsUpdate = true;
+  normalMap.needsUpdate = true;
+  return { roughnessMap, normalMap };
+}
+
+/* ------------------------------------------------------------------ */
+/* Controlled in-service panel patina                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A very subdued albedo-modulation map: scuff marks and drag traces break up
+ * unrealistic perfect uniformity. Because no real serial/usage history is
+ * known, this is an optional ART DIRECTED appearance, not defect evidence.
+ * Close inspection uses shallow surface geometry and the existing PBR normals.
+ */
+export function makeInServicePatina(size = 1024): THREE.Texture {
+  return cachedTexture(`uld-patina:service:${size}`, () => {
+    const rand = seededRandom(0x4f574e ^ size);
+    const { c, ctx } = canvas2d(size, size);
+    ctx.fillStyle = "#f8f8f7";
+    ctx.fillRect(0, 0, size, size);
+
+    // Grouped contact marks rather than full-field isotropic random dirt.
+    for (let cluster = 0; cluster < 32; cluster++) {
+      const cx = rand() * size;
+      const cy = rand() * size;
+      const radius = (10 + rand() * 32) * size / 1024;
+      for (let dot = 0; dot < 28; dot++) {
+        const dx = (rand() - 0.5) * radius * 2;
+        const dy = (rand() - 0.5) * radius;
+        const x = cx + dx;
+        const y = cy + dy;
+        const alpha = (0.02 + rand() * 0.045).toFixed(3);
+        ctx.fillStyle = `rgba(42,46,48,${alpha})`;
+        ctx.fillRect(x, y, 1.2 + rand() * 5, 0.6 + rand() * 2);
+      }
+    }
+
+    // Horizontal brushed handling scratches: fine marks, never theatrical
+    // broad black streaks. Bright hairlines suggest freshly abraded metal.
+    for (let i = 0; i < 125; i++) {
+      const x = rand() * size, y = rand() * size;
+      const length = (4 + rand() * 92) * size / 1024;
+      const light = rand() > 0.52;
+      ctx.strokeStyle = light
+        ? `rgba(255,255,255,${(0.15 + rand() * 0.32).toFixed(3)})`
+        : `rgba(44,46,50,${(0.025 + rand() * 0.06).toFixed(3)})`;
+      ctx.lineWidth = 0.5 + rand() * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + length, y + (rand() - 0.5) * 1.4);
+      ctx.stroke();
+    }
+    const map = toTexture(c, true);
+    map.repeat.set(1.65, 1.65);
+    return map;
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Stencils, plates and placards                                       */
 /* ------------------------------------------------------------------ */
 
@@ -126,7 +242,7 @@ export function makeIdPlate(o: PlacardOptions) {
   const key = `id-plate:${JSON.stringify(o)}`;
   return cachedTexture(key, () => {
     const rand = seededRandom(0x1d91a7e);
-    const W = 1024;
+    const W = 1536;
     const H = Math.round((W * o.height) / o.width);
     const { c, ctx } = canvas2d(W, H);
     const s = W / 1024;
@@ -155,26 +271,27 @@ export function makeIdPlate(o: PlacardOptions) {
 
     // rivets
     ctx.fillStyle = "#6d757c";
+    const inset = 30 * s;
     for (const [rx, ry] of [
-      [30, 30],
-      [W - 30, 30],
-      [30, H - 30],
-      [W - 30, H - 30],
+      [inset, inset],
+      [W - inset, inset],
+      [inset, H - inset],
+      [W - inset, H - inset],
     ]) {
       ctx.beginPath();
-      ctx.arc(rx * s, ry * s, 7 * s, 0, Math.PI * 2);
+      ctx.arc(rx, ry, 7 * s, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.fillStyle = "#1b1f23";
     ctx.textBaseline = "top";
     ctx.font = `700 ${74 * s}px "Chakra Petch", sans-serif`;
-    ctx.fillText(o.id, 56 * s, 52 * s);
+    ctx.fillText(o.id, 56 * s, 52 * s, 310 * s);
     ctx.font = `500 ${34 * s}px "IBM Plex Mono", monospace`;
     ctx.fillStyle = "#333a40";
     ctx.fillText(
       o.carrier,
-      56 * s + ctx.measureText(o.id).width * 0 + 330 * s,
+      386 * s,
       74 * s,
     );
 
@@ -195,14 +312,14 @@ export function makeIdPlate(o: PlacardOptions) {
       ctx.fillText(k, x, y);
       ctx.fillStyle = "#14181b";
       ctx.font = `600 ${34 * s}px "IBM Plex Mono", monospace`;
-      ctx.fillText(v, x + 250 * s, y - 2 * s);
+      ctx.fillText(v, x + 250 * s, y - 2 * s, 210 * s);
       ctx.font = `500 ${30 * s}px "IBM Plex Mono", monospace`;
     });
 
     drawBarcode(ctx, 56 * s, H - 132 * s, 560 * s, 86 * s, o.serial);
     ctx.fillStyle = "#22282c";
     ctx.font = `500 ${26 * s}px "IBM Plex Mono", monospace`;
-    ctx.fillText(o.serial, 640 * s, H - 104 * s);
+    ctx.fillText(o.serial, 640 * s, H - 104 * s, 328 * s);
     ctx.fillText("IATA ULD / AS1811", 640 * s, H - 68 * s);
 
     return toTexture(c, true);

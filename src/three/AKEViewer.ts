@@ -4,6 +4,9 @@
  * furniture and the mesh exporters.
  */
 import * as THREE from "three";
+import { addAirCargoOperatorMark, AIR_MARK_NAME } from "./airServiceBrand";
+import { stepDampedDoor } from "./doorKinematics";
+import { MICRO_DETAIL_LAYER } from "./akePrecisionDetails";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
@@ -14,7 +17,7 @@ import type { Assembly, ViewerContainer } from "./primitives";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
-import { makeApronTexture, makeSkyTexture } from "./textures";
+import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { formatDistance } from "@/lib/units";
 
 const reducedMotionPreferred = () =>
@@ -34,6 +37,8 @@ export interface ViewerState {
   detail: boolean;
   rivets: boolean;
   door: number;
+  akeDoor: "rigid" | "fabric";
+  surfaceCondition: "factory" | "service";
   explode: number;
   metalness: number;
   roughness: number;
@@ -70,9 +75,11 @@ export const DEFAULT_STATE: ViewerState = {
   detail: true,
   rivets: true,
   door: 0,
+  akeDoor: "rigid",
+  surfaceCondition: "service",
   explode: 0,
   metalness: 1,
-  roughness: 0.33,
+  roughness: 0.49,
   envIntensity: 1,
   wireframe: false,
   dimensions: true,
@@ -107,36 +114,36 @@ const MOODS: Record<MoodId, Mood> = {
   hangar: {
     sky: ["#0e141b", "#1a222b", "#080a0d"],
     bgIntensity: 1.0,
-    exposure: 1.05,
+    exposure: 0.87,
     fog: "#0b0e12",
     floor: "#2c3238",
-    key: { color: "#ffffff", intensity: 3.1, pos: [4.2, 6.4, 3.2] },
-    fill: { color: "#9fc4dd", intensity: 0.75 },
-    rim: { color: "#ffb020", intensity: 2.4 },
-    hemi: 0.45,
+    key: { color: "#f0f4f8", intensity: 1.85, pos: [4.2, 6.4, 3.2] },
+    fill: { color: "#aec7da", intensity: 0.54 },
+    rim: { color: "#ffcb83", intensity: 0.75 },
+    hemi: 0.34,
     envFromSky: false,
   },
   dusk: {
     sky: ["#1a1512", "#33241a", "#0a0806"],
     bgIntensity: 1.1,
-    exposure: 1.18,
+    exposure: 0.95,
     fog: "#120d0a",
     floor: "#241d18",
     key: { color: "#ffd6a8", intensity: 1.5, pos: [-5, 3.4, 2.4] },
     fill: { color: "#5d7f96", intensity: 0.5 },
-    rim: { color: "#ff8c2e", intensity: 3.4 },
+    rim: { color: "#ff9b54", intensity: 1.3 },
     hemi: 0.28,
     envFromSky: true,
   },
   studio: {
     sky: ["#e6ebef", "#c3cbd2", "#8f979e"],
     bgIntensity: 1.0,
-    exposure: 0.94,
+    exposure: 0.84,
     fog: "#aeb6bd",
     floor: "#9aa1a7",
-    key: { color: "#ffffff", intensity: 2.4, pos: [3.4, 6.8, 4.2] },
+    key: { color: "#ffffff", intensity: 1.85, pos: [3.4, 6.8, 4.2] },
     fill: { color: "#ffffff", intensity: 1.1 },
-    rim: { color: "#ffd9a0", intensity: 1.2 },
+    rim: { color: "#ffd9a0", intensity: 0.68 },
     hemi: 0.7,
     envFromSky: false,
   },
@@ -147,6 +154,14 @@ export interface HoverInfo {
   assembly: string;
   assemblyId: string;
 }
+
+const HANDLE_TARGETS = new Set([
+  "Latch handle",
+  "Door handle bar",
+  "Handling stencil",
+  "AKE tensioned coated textile curtain",
+]);
+export const isDoorInteractionTarget = (part: string) => HANDLE_TARGETS.has(part);
 
 export interface PerfInfo {
   fps: number;
@@ -159,6 +174,31 @@ export interface PerfInfo {
 /* ------------------------------------------------------------------ */
 /* Pure inspection maths (unit-tested in tests/viewer-math.test.ts)    */
 /* ------------------------------------------------------------------ */
+
+/** Screen-space projected diameter of a real feature in a perspective view. */
+export function projectedFeaturePixels(
+  diameterM: number,
+  distanceM: number,
+  viewportHeightPx: number,
+  verticalFovDeg: number,
+): number {
+  if (![diameterM, distanceM, viewportHeightPx, verticalFovDeg].every(Number.isFinite)
+      || diameterM <= 0 || distanceM <= 0 || viewportHeightPx <= 0
+      || verticalFovDeg <= 1 || verticalFovDeg >= 179) return 0;
+  return diameterM * viewportHeightPx
+    / (2 * distanceM * Math.tan(THREE.MathUtils.degToRad(verticalFovDeg) / 2));
+}
+
+/** Ortho feature size is independent of camera distance. */
+export function projectedOrthoFeaturePixels(
+  diameterM: number,
+  viewportHeightPx: number,
+  orthographicHeightM: number,
+): number {
+  if (![diameterM, viewportHeightPx, orthographicHeightM].every(Number.isFinite)
+      || diameterM <= 0 || viewportHeightPx <= 0 || orthographicHeightM <= 0) return 0;
+  return diameterM * viewportHeightPx / orthographicHeightM;
+}
 
 /** Orthographic frustum height fitting a bounding sphere in both axes. */
 export function orthoFitSizeFor(radius: number, aspect: number, margin: number) {
@@ -270,6 +310,8 @@ export class AKEViewer {
   private highlightKey = "";
 
   private state: ViewerState;
+  private displayedDoor = 0;
+  private doorVelocity = 0;
   private raf = 0;
   private clock = new THREE.Clock();
   private frames = 0;
@@ -287,6 +329,8 @@ export class AKEViewer {
   private homeCamera = new THREE.Vector3(4.4, 2.9, 4.6);
   private introFrom = new THREE.Vector3();
   private readonly introTo = new THREE.Vector3();
+  /** Viewer-only microfastener LOD; the meshes stay visible in GLB export. */
+  private microLayerEnabled = false;
   private ro: ResizeObserver;
   /** shadow maps re-render only when light-receiving geometry actually moves */
   private shadowDirty = true;
@@ -332,12 +376,15 @@ export class AKEViewer {
       onPerf?: (p: PerfInfo) => void;
       onBuild?: (c: ViewerContainer, measured: { x: number; y: number; z: number }) => void;
       onError?: (message: string | null) => void;
+      onDoorToggle?: (next: number) => void;
       onMeasure?: (m: MeasureInfo) => void;
       onSection?: (s: SectionInfo) => void;
     } = {},
+    private readonly aviationPrintUrl?: string,
   ) {
     this.host = host;
     this.state = { ...state };
+    this.displayedDoor = state.door;
     this.reducedMotion = reducedMotionPreferred();
     this.baseDpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -457,7 +504,9 @@ export class AKEViewer {
     c.target.copy(target);
     c.enableDamping = true;
     c.dampingFactor = 0.06;
-    c.minDistance = 1.4;
+    // Close-range inspection without preventing sub-centimetre hardware views.
+    // Zooming past the shell is intentionally possible for cavity inspection.
+    c.minDistance = 0.85;
     c.maxDistance = 18;
     c.minZoom = 0.35;
     c.maxZoom = 9;
@@ -662,11 +711,13 @@ export class AKEViewer {
       detail: this.state.detail,
       rivets: this.state.rivets,
       doorOpen: this.state.door,
+      akeDoor: this.state.akeDoor,
       reefer: this.state.reefer,
       setpoint: this.state.setpoint,
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
+    addAirCargoOperatorMark(this.container, this.state.model, this.state.finish, this.aviationPrintUrl);
     // Measure overall spans with door latched, pallet load stowed and
     // assemblies home. This is not a contour or certification check.
     this.container.setDoorOpen(0);
@@ -677,6 +728,8 @@ export class AKEViewer {
       .getSize(new THREE.Vector3());
     this.measuredSize = { x: measuredSize.x, y: measuredSize.y, z: measuredSize.z };
     this.container.setDoorOpen(this.state.door);
+    this.displayedDoor = this.state.door;
+    this.doorVelocity = 0;
     this.container.setLoad?.(this.state.load);
     this.applyMaterialState();
     this.applyExplode();
@@ -787,6 +840,12 @@ export class AKEViewer {
     if (!this.container) return;
     const c = this.container;
     c.setFinish(this.state.finish);
+    // Appearance only: does not change geometry, mass or load ratings.
+    const shell = c.materials.shell;
+    if (this.state.surfaceCondition === "service" && !shell.map) {
+      shell.map = makeInServicePatina();
+      shell.needsUpdate = true;
+    }
     this.eachMaterial((m) => {
       const std = m as THREE.MeshStandardMaterial;
       if ("wireframe" in std) std.wireframe = this.state.wireframe;
@@ -887,6 +946,8 @@ export class AKEViewer {
     this.container.group.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.geometry) return;
+      // Tiny surface heads do not define a solid section cavity.
+      if (m.layers.isEnabled(MICRO_DETAIL_LAYER)) return;
       const mm = m.material as THREE.Material | THREE.Material[] | undefined;
       const list = Array.isArray(mm) ? mm : mm ? [mm] : [];
       if (list.some((x) => x.transparent)) return;
@@ -1186,13 +1247,30 @@ export class AKEViewer {
    * of the plane must not register.
    */
   private firstVisibleHit(hits: THREE.Intersection[]) {
-    return hits.find(
-      (h) =>
-        h.object.visible &&
-        (h.object as THREE.Mesh).isMesh &&
+    return hits.find((h) => {
+      let object: THREE.Object3D | null = h.object;
+      while (object) {
+        if (!object.visible) return false;
+        object = object.parent;
+      }
+      return (h.object as THREE.Mesh).isMesh &&
         (!this.state.section ||
-          this.sectionPlane.distanceToPoint(h.point) >= -1e-4),
-    );
+          this.sectionPlane.distanceToPoint(h.point) >= -1e-4);
+    });
+  }
+
+  /** Screen-space interaction with the real model's pull bar.
+   * The narrow bar geometry is not a usable touch target on phones; use a
+   * bounded 42 px hit region only when the ray hits the actual door face. */
+  private nearDoorPull(clientX: number, clientY: number): boolean {
+    const bar = this.container?.group.getObjectByName("Door handle bar");
+    if (!bar) return false;
+    const point = bar.getWorldPosition(new THREE.Vector3()).project(this.camera);
+    if (point.z < -1 || point.z > 1) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x = rect.left + (point.x + 1) * rect.width * 0.5;
+    const y = rect.top + (1 - point.y) * rect.height * 0.5;
+    return Math.hypot(x - clientX, y - clientY) < 42;
   }
 
   private onPointerDown = (e: PointerEvent) => {
@@ -1204,8 +1282,8 @@ export class AKEViewer {
   private onPointerUp = (e: PointerEvent) => {
     const down = this.pointerDownAt;
     this.pointerDownAt = null;
-    if (!this.measureMode || !down || !this.container) return;
-    // A click places a point; an orbit drag must not.
+    if (!down || !this.container) return;
+    // A click places a point or operates the closure; orbit drags never do.
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     if (moved > 6 || performance.now() - down.t > 600) return;
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1217,6 +1295,14 @@ export class AKEViewer {
     const hits = this.raycaster.intersectObject(this.container.group, true);
     const hit = this.firstVisibleHit(hits);
     if (!hit) return;
+    if (!this.measureMode) {
+      const part = (hit.object.userData.part as string) || hit.object.name;
+      const nearLeafPull = part === "Door leaf" &&
+        this.nearDoorPull(e.clientX, e.clientY);
+      if ((!isDoorInteractionTarget(part) && !nearLeafPull) || this.state.section) return;
+      this.cb.onDoorToggle?.(this.state.door > 0.45 ? 0 : 1);
+      return;
+    }
     if (this.measurePoints.length >= 2) this.measurePoints = [];
     this.measurePoints = [...this.measurePoints, hit.point.clone()];
     this.rebuildMeasureVisuals();
@@ -1275,20 +1361,32 @@ export class AKEViewer {
     this.scene.add(group);
   }
 
-  /** Current viewport as a PNG (rendered fresh, no drawing-buffer retention). */
+  /** Capture the viewport at up to 2× with a 4K pixel budget. */
   async snapshotPNG(): Promise<Blob> {
-    if (this.shadowDirty) {
-      this.renderer.shadowMap.needsUpdate = true;
-      this.shadowDirty = false;
+    const renderer = this.renderer;
+    const liveRatio = renderer.getPixelRatio();
+    const { x: width, y: height } = renderer.getSize(new THREE.Vector2());
+    const captureRatio = Math.max(liveRatio, Math.min(2, Math.sqrt(8_294_400 / (width * height))));
+    try {
+      if (captureRatio !== liveRatio) renderer.setPixelRatio(captureRatio);
+      if (this.shadowDirty) {
+        renderer.shadowMap.needsUpdate = true;
+        this.shadowDirty = false;
+      }
+      renderer.render(this.scene, this.camera);
+      // toBlob snapshots the drawing buffer before encoding asynchronously.
+      return new Promise((resolve, reject) => {
+        renderer.domElement.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error("snapshot unavailable")),
+          "image/png",
+        );
+      });
+    } finally {
+      if (captureRatio !== liveRatio) {
+        renderer.setPixelRatio(liveRatio);
+        this.wake();
+      }
     }
-    this.renderer.render(this.scene, this.camera);
-    return new Promise((resolve, reject) => {
-      this.renderer.domElement.toBlob(
-        (blob) =>
-          blob ? resolve(blob) : reject(new Error("snapshot unavailable")),
-        "image/png",
-      );
-    });
   }
 
   /* ---------------- state ---------------- */
@@ -1314,7 +1412,11 @@ export class AKEViewer {
     const structural =
       (patch.contour !== undefined && patch.contour !== prev.contour) ||
       (patch.detail !== undefined && patch.detail !== prev.detail) ||
-      (patch.rivets !== undefined && patch.rivets !== prev.rivets);
+      (patch.rivets !== undefined && patch.rivets !== prev.rivets) ||
+      (patch.akeDoor !== undefined && patch.akeDoor !== prev.akeDoor) ||
+      (patch.surfaceCondition !== undefined && patch.surfaceCondition !== prev.surfaceCondition) ||
+      // Painted and bare-metal finishes use different physical surface maps.
+      (patch.finish !== undefined && patch.finish !== prev.finish);
     if (structural) {
       this.rebuild();
       this.setSurface(this.state.metalness, this.state.roughness);
@@ -1335,7 +1437,12 @@ export class AKEViewer {
     }
 
     if (patch.finish) this.container?.setFinish(patch.finish);
-    if (patch.door !== undefined) this.container?.setDoorOpen(patch.door);
+    if (patch.door !== undefined && this.reducedMotion) {
+      // Motion accessibility: instantly apply the requested pose.
+      this.displayedDoor = patch.door;
+      this.doorVelocity = 0;
+      this.container?.setDoorOpen(patch.door);
+    }
     if (patch.explode !== undefined) this.applyExplode();
     if (patch.dimensions !== undefined && this.annot)
       this.annot.group.visible = patch.dimensions;
@@ -1647,7 +1754,13 @@ export class AKEViewer {
     )
       return;
     this.hovered = h;
-    this.renderer.domElement.style.cursor = h ? "crosshair" : "grab";
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const pointerX = rect.left + (this.pointer.x + 1) * rect.width * 0.5;
+    const pointerY = rect.top + (1 - this.pointer.y) * rect.height * 0.5;
+    const onPull = h?.part === "Door leaf" && this.nearDoorPull(pointerX, pointerY);
+    this.renderer.domElement.style.cursor =
+      h && !this.measureMode && (isDoorInteractionTarget(h.part) || onPull)
+        ? "pointer" : h ? "crosshair" : "grab";
     this.cb.onHover?.(h);
   }
 
@@ -1681,6 +1794,38 @@ export class AKEViewer {
       assembly: assembly?.label ?? MODELS[this.state.model].name,
       assemblyId: assembly?.id ?? "",
     });
+  }
+
+  /** Render sub-centimetre hardware only when it occupies useful pixels.
+   * Camera layers rather than Object3D.visible preserve GLB export fidelity.
+   * A small hysteresis band prevents chatter at the transition distance. */
+  private updateMicroDetails() {
+    const heightPx = this.host.clientHeight * this.baseDpr * this.dprScale;
+    const featureSizeM = 0.011;
+    const projected = this.state.projection === "ortho"
+      ? projectedOrthoFeaturePixels(
+          featureSizeM, heightPx, this.orthoSize / Math.max(this.ortho.zoom, 0.1),
+        )
+      : projectedFeaturePixels(
+          featureSizeM,
+          this.camera.position.distanceTo(this.controls.target),
+          heightPx,
+          this.persp.fov,
+        );
+    const next = this.microLayerEnabled
+      ? projected > 0.75
+      : projected > 1.2;
+    if (next === this.microLayerEnabled) return;
+    this.microLayerEnabled = next;
+    if (next) {
+      this.persp.layers.enable(MICRO_DETAIL_LAYER);
+      this.ortho.layers.enable(MICRO_DETAIL_LAYER);
+      this.raycaster.layers.enable(MICRO_DETAIL_LAYER);
+    } else {
+      this.persp.layers.disable(MICRO_DETAIL_LAYER);
+      this.ortho.layers.disable(MICRO_DETAIL_LAYER);
+      this.raycaster.layers.disable(MICRO_DETAIL_LAYER);
+    }
   }
 
   /* ---------------- loop ---------------- */
@@ -1730,6 +1875,21 @@ export class AKEViewer {
       if (this.tweenCam.t >= 1) this.tweenCam = null;
     }
 
+    // Independent kinematic easing: operator unlatches first, and the door
+    // swings only after keeper disengagement. No arbitrary frame-rate jumps.
+    const doorMoving = Math.abs(this.displayedDoor - this.state.door) > 0.0004
+      || Math.abs(this.doorVelocity) > 0.005;
+    if (doorMoving && !this.reducedMotion) {
+      const next = stepDampedDoor(
+        this.displayedDoor, this.doorVelocity, this.state.door, dt,
+      );
+      this.displayedDoor = next.position;
+      this.doorVelocity = next.velocity;
+      this.container?.setDoorOpen(this.displayedDoor);
+      this.markShadowsDirty();
+      this.sectionBoxCache = null;
+    }
+
     this.controls.autoRotate =
       this.state.autoRotate &&
       !this.reducedMotion &&
@@ -1747,6 +1907,7 @@ export class AKEViewer {
       this.intro > 0 ||
       !!this.tweenCam ||
       this.controls.autoRotate ||
+      doorMoving ||
       this.elapsed - this.lastPointerMove < 0.3 ||
       (this.highlightBox.visible && !this.reducedMotion) ||
       this.fanActive() ||
@@ -1773,6 +1934,8 @@ export class AKEViewer {
       if (this.elapsed - this.lastIdleRender < 0.25) return;
       this.lastIdleRender = this.elapsed;
     }
+
+    this.updateMicroDetails();
 
     // Picking is bounded to ~20 Hz; it is unnecessary work at display rate.
     this.pickTimer -= dt;
@@ -1877,7 +2040,7 @@ export class AKEViewer {
       const buf = (await exporter.parseAsync(this.exportRoot(), {
         binary: true,
         onlyVisible: true,
-        maxTextureSize: 1024,
+        maxTextureSize: 1536,
       })) as ArrayBuffer;
       return new Blob([buf], { type: "model/gltf-binary" });
     } finally {
@@ -1886,8 +2049,21 @@ export class AKEViewer {
     }
   }
 
+  private detachGeometryExportOverlays() {
+    const restoreCaps = this.detachStencilCaps();
+    const print = this.container?.group.getObjectByName(AIR_MARK_NAME);
+    const panel = print?.parent;
+    // OBJ/STL in this viewer export geometry only. Omit the ink overlay
+    // because its transparent pixels would otherwise become a solid quad.
+    print?.removeFromParent();
+    return () => {
+      if (print && panel) panel.add(print);
+      restoreCaps();
+    };
+  }
+
   exportOBJ(): string {
-    const restore = this.detachStencilCaps();
+    const restore = this.detachGeometryExportOverlays();
     try {
       return new OBJExporter().parse(this.exportRoot());
     } finally {
@@ -1897,7 +2073,7 @@ export class AKEViewer {
   }
 
   exportSTL(): DataView {
-    const restore = this.detachStencilCaps();
+    const restore = this.detachGeometryExportOverlays();
     try {
       return new STLExporter().parse(this.exportRoot(), {
         binary: true,

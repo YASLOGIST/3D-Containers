@@ -181,8 +181,8 @@
     width: 14px;
     margin-top: -5.5px;
     border-radius: 3px;
-    background: linear-gradient(180deg, #ffd06a, #e39407);
-    border: 1px solid #7c5204;
+    background: linear-gradient(180deg, var(--color-amber), var(--color-amber-deep));
+    border: 1px solid var(--color-amber-deep);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   }
   .range-uld::-moz-range-track {
@@ -194,8 +194,8 @@
     height: 13px;
     width: 13px;
     border-radius: 3px;
-    background: #ffb020;
-    border: 1px solid #7c5204;
+    background: var(--color-amber);
+    border: 1px solid var(--color-amber-deep);
   }
 
   .anim-in {
@@ -276,7 +276,7 @@
   color: #8fbd6a;
 }
 .code-scroll .c-key {
-  color: #ffb020;
+  color: var(--color-amber);
 }
 .code-scroll .c-num {
   color: #79b8c9;
@@ -287,4 +287,56 @@
 }
 .code-scroll .c-fn {
   color: #ffd479;
+}
+
+
+/* YASLOGIST service family palette: current workspace = AIR. Land/Ocean
+ * may select distinct palettes later without mutating the 3D model geometry.
+ * Safety and handling decals retain their hazard yellow separately. */
+.air-service-theme {
+  --color-amber: #6fc7f0;
+  --color-amber-deep: #2676a8;
+  --color-steel: #a6dff2;
+  --color-line: #273b4a;
+  --color-line-soft: #1d303e;
+}
+
+
+/* AIR / identity artwork — full-color transparent source kept crisp.
+   Soft halo sits BEHIND the mark, never as a blur on the original artwork. */
+.aviation-emblem-frame {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  flex: 0 0 3rem;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+}
+.aviation-emblem-frame::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 81%;
+  height: 81%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(130, 214, 250, 0.26) 0%, rgba(72, 160, 216, 0.16) 42%, transparent 75%);
+  filter: blur(7px);
+  pointer-events: none;
+}
+.aviation-emblem-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 1.5px rgba(237, 250, 255, 0.21))
+          drop-shadow(0 0 6px rgba(77, 177, 233, 0.19));
+}
+@media (min-width: 640px) {
+  .aviation-emblem-frame {
+    flex-basis: 3.5rem;
+    width: 3.5rem;
+    height: 3.5rem;
+  }
 }

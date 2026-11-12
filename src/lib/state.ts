@@ -35,6 +35,8 @@ export function encodeShareState(s: ViewerState): string {
   p.set("d", b01(s.detail));
   p.set("r", b01(s.rivets));
   p.set("door", String(r3(s.door)));
+  p.set("akeDoor", s.akeDoor);
+  p.set("condition", s.surfaceCondition);
   p.set("x", String(r3(s.explode)));
   p.set("met", String(r3(s.metalness)));
   p.set("rgh", String(r3(s.roughness)));
@@ -92,6 +94,10 @@ export function decodeShareState(hash: string): Partial<ViewerState> {
 
   const model = oneOf<ModelId>(get("m"), MODEL_IDS);
   if (model) out.model = model;
+  const closure = oneOf(get("akeDoor"), ["rigid", "fabric"] as const);
+  if (closure) out.akeDoor = closure;
+  const condition = oneOf(get("condition"), ["factory", "service"] as const);
+  if (condition) out.surfaceCondition = condition;
   const finish = oneOf<FinishId>(get("f"), FINISH_IDS);
   if (finish) out.finish = finish;
   const mood = oneOf(get("mood"), MOOD_IDS);
