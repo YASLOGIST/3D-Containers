@@ -300,3 +300,43 @@
   --color-line: #273b4a;
   --color-line-soft: #1d303e;
 }
+
+
+/* AIR / identity artwork — full-color transparent source kept crisp.
+   Soft halo sits BEHIND the mark, never as a blur on the original artwork. */
+.aviation-emblem-frame {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  flex: 0 0 3rem;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+}
+.aviation-emblem-frame::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 81%;
+  height: 81%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(130, 214, 250, 0.26) 0%, rgba(72, 160, 216, 0.16) 42%, transparent 75%);
+  filter: blur(7px);
+  pointer-events: none;
+}
+.aviation-emblem-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 1.5px rgba(237, 250, 255, 0.21))
+          drop-shadow(0 0 6px rgba(77, 177, 233, 0.19));
+}
+@media (min-width: 640px) {
+  .aviation-emblem-frame {
+    flex-basis: 3.5rem;
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+}

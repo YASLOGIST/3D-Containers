@@ -16,7 +16,7 @@ Do not invent land/ocean marks or reuse the aviation identity as if it were a fi
 
 - `air/original-color-emblem.png`: full-resolution circular blue and navy AIR CARGO & AVIATION emblem. Use as **primary service identity** in the website header, landing material, service cards and desktop/mobile navigation.
 - `air/original-minimal-monogram.jpg`: full-resolution monochrome YL / airplane mark with service description. Use as **secondary technical identity** on a discreet ULD operator-mark decal, technical plate, documentation and monochrome reproduction.
-- Runtime-optimized transparent logos are under `src/assets/branding/` and generated from these originals, not redrawn or changed in meaning.
+- Runtime-optimized transparent logos are under `src/assets/branding/` and generated from these originals, not redrawn or changed in meaning. The header emblem uses a full-color 384 × 384 RGBA raster (not a limited-color indexed palette) and a small independent CSS halo; it is displayed at 48 px mobile / 56 px desktop so its fine lettering remains clearer without excessive bundle weight.
 
 ## Presentation rules
 

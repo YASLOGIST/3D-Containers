@@ -690,9 +690,12 @@ export default function App() {
       {/* ---------------- top bar ---------------- */}
       <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
-          <img src={aviationEmblem} alt="Air Cargo and Aviation service emblem"
-            className="h-9 w-9 shrink-0 object-contain drop-shadow-[0_0_8px_rgba(94,189,230,0.24)] sm:h-11 sm:w-11"
-            draggable={false} />
+          <span className="aviation-emblem-frame" aria-hidden="true">
+            <img src={aviationEmblem} alt=""
+              className="aviation-emblem-image"
+              decoding="async"
+              draggable={false} />
+          </span>
           <div>
             <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.19em] text-[#90bfdf] sm:text-[9px]">
               YASLOGIST / AIR CARGO &amp; AVIATION
