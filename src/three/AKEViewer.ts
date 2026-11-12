@@ -4,6 +4,8 @@
  * furniture and the mesh exporters.
  */
 import * as THREE from "three";
+import { addAirCargoOperatorMark } from "./airServiceBrand";
+import { stepDampedDoor } from "./doorKinematics";
 import { MICRO_DETAIL_LAYER } from "./akePrecisionDetails";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -153,6 +155,14 @@ export interface HoverInfo {
   assemblyId: string;
 }
 
+const HANDLE_TARGETS = new Set([
+  "Latch handle",
+  "Door handle bar",
+  "Handling stencil",
+  "AKE tensioned coated textile curtain",
+]);
+export const isDoorInteractionTarget = (part: string) => HANDLE_TARGETS.has(part);
+
 export interface PerfInfo {
   fps: number;
   triangles: number;
@@ -300,6 +310,8 @@ export class AKEViewer {
   private highlightKey = "";
 
   private state: ViewerState;
+  private displayedDoor = 0;
+  private doorVelocity = 0;
   private raf = 0;
   private clock = new THREE.Clock();
   private frames = 0;
@@ -364,12 +376,15 @@ export class AKEViewer {
       onPerf?: (p: PerfInfo) => void;
       onBuild?: (c: ViewerContainer, measured: { x: number; y: number; z: number }) => void;
       onError?: (message: string | null) => void;
+      onDoorToggle?: (next: number) => void;
       onMeasure?: (m: MeasureInfo) => void;
       onSection?: (s: SectionInfo) => void;
     } = {},
+    private readonly aviationMonogramUrl?: string,
   ) {
     this.host = host;
     this.state = { ...state };
+    this.displayedDoor = state.door;
     this.reducedMotion = reducedMotionPreferred();
     this.baseDpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -702,6 +717,7 @@ export class AKEViewer {
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
+    addAirCargoOperatorMark(this.container, this.aviationMonogramUrl);
     // Measure overall spans with door latched, pallet load stowed and
     // assemblies home. This is not a contour or certification check.
     this.container.setDoorOpen(0);
@@ -712,6 +728,8 @@ export class AKEViewer {
       .getSize(new THREE.Vector3());
     this.measuredSize = { x: measuredSize.x, y: measuredSize.y, z: measuredSize.z };
     this.container.setDoorOpen(this.state.door);
+    this.displayedDoor = this.state.door;
+    this.doorVelocity = 0;
     this.container.setLoad?.(this.state.load);
     this.applyMaterialState();
     this.applyExplode();
@@ -1229,13 +1247,30 @@ export class AKEViewer {
    * of the plane must not register.
    */
   private firstVisibleHit(hits: THREE.Intersection[]) {
-    return hits.find(
-      (h) =>
-        h.object.visible &&
-        (h.object as THREE.Mesh).isMesh &&
+    return hits.find((h) => {
+      let object: THREE.Object3D | null = h.object;
+      while (object) {
+        if (!object.visible) return false;
+        object = object.parent;
+      }
+      return (h.object as THREE.Mesh).isMesh &&
         (!this.state.section ||
-          this.sectionPlane.distanceToPoint(h.point) >= -1e-4),
-    );
+          this.sectionPlane.distanceToPoint(h.point) >= -1e-4);
+    });
+  }
+
+  /** Screen-space interaction with the real model's pull bar.
+   * The narrow bar geometry is not a usable touch target on phones; use a
+   * bounded 42 px hit region only when the ray hits the actual door face. */
+  private nearDoorPull(clientX: number, clientY: number): boolean {
+    const bar = this.container?.group.getObjectByName("Door handle bar");
+    if (!bar) return false;
+    const point = bar.getWorldPosition(new THREE.Vector3()).project(this.camera);
+    if (point.z < -1 || point.z > 1) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const x = rect.left + (point.x + 1) * rect.width * 0.5;
+    const y = rect.top + (1 - point.y) * rect.height * 0.5;
+    return Math.hypot(x - clientX, y - clientY) < 42;
   }
 
   private onPointerDown = (e: PointerEvent) => {
@@ -1247,8 +1282,8 @@ export class AKEViewer {
   private onPointerUp = (e: PointerEvent) => {
     const down = this.pointerDownAt;
     this.pointerDownAt = null;
-    if (!this.measureMode || !down || !this.container) return;
-    // A click places a point; an orbit drag must not.
+    if (!down || !this.container) return;
+    // A click places a point or operates the closure; orbit drags never do.
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     if (moved > 6 || performance.now() - down.t > 600) return;
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1260,6 +1295,14 @@ export class AKEViewer {
     const hits = this.raycaster.intersectObject(this.container.group, true);
     const hit = this.firstVisibleHit(hits);
     if (!hit) return;
+    if (!this.measureMode) {
+      const part = (hit.object.userData.part as string) || hit.object.name;
+      const nearLeafPull = part === "Door leaf" &&
+        this.nearDoorPull(e.clientX, e.clientY);
+      if ((!isDoorInteractionTarget(part) && !nearLeafPull) || this.state.section) return;
+      this.cb.onDoorToggle?.(this.state.door > 0.45 ? 0 : 1);
+      return;
+    }
     if (this.measurePoints.length >= 2) this.measurePoints = [];
     this.measurePoints = [...this.measurePoints, hit.point.clone()];
     this.rebuildMeasureVisuals();
@@ -1382,7 +1425,12 @@ export class AKEViewer {
     }
 
     if (patch.finish) this.container?.setFinish(patch.finish);
-    if (patch.door !== undefined) this.container?.setDoorOpen(patch.door);
+    if (patch.door !== undefined && this.reducedMotion) {
+      // Motion accessibility: instantly apply the requested pose.
+      this.displayedDoor = patch.door;
+      this.doorVelocity = 0;
+      this.container?.setDoorOpen(patch.door);
+    }
     if (patch.explode !== undefined) this.applyExplode();
     if (patch.dimensions !== undefined && this.annot)
       this.annot.group.visible = patch.dimensions;
@@ -1694,7 +1742,13 @@ export class AKEViewer {
     )
       return;
     this.hovered = h;
-    this.renderer.domElement.style.cursor = h ? "crosshair" : "grab";
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const pointerX = rect.left + (this.pointer.x + 1) * rect.width * 0.5;
+    const pointerY = rect.top + (1 - this.pointer.y) * rect.height * 0.5;
+    const onPull = h?.part === "Door leaf" && this.nearDoorPull(pointerX, pointerY);
+    this.renderer.domElement.style.cursor =
+      h && !this.measureMode && (isDoorInteractionTarget(h.part) || onPull)
+        ? "pointer" : h ? "crosshair" : "grab";
     this.cb.onHover?.(h);
   }
 
@@ -1809,6 +1863,21 @@ export class AKEViewer {
       if (this.tweenCam.t >= 1) this.tweenCam = null;
     }
 
+    // Independent kinematic easing: operator unlatches first, and the door
+    // swings only after keeper disengagement. No arbitrary frame-rate jumps.
+    const doorMoving = Math.abs(this.displayedDoor - this.state.door) > 0.0004
+      || Math.abs(this.doorVelocity) > 0.005;
+    if (doorMoving && !this.reducedMotion) {
+      const next = stepDampedDoor(
+        this.displayedDoor, this.doorVelocity, this.state.door, dt,
+      );
+      this.displayedDoor = next.position;
+      this.doorVelocity = next.velocity;
+      this.container?.setDoorOpen(this.displayedDoor);
+      this.markShadowsDirty();
+      this.sectionBoxCache = null;
+    }
+
     this.controls.autoRotate =
       this.state.autoRotate &&
       !this.reducedMotion &&
@@ -1826,6 +1895,7 @@ export class AKEViewer {
       this.intro > 0 ||
       !!this.tweenCam ||
       this.controls.autoRotate ||
+      doorMoving ||
       this.elapsed - this.lastPointerMove < 0.3 ||
       (this.highlightBox.visible && !this.reducedMotion) ||
       this.fanActive() ||

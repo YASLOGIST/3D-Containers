@@ -159,7 +159,7 @@ The repository's [CI workflow](.github/workflows/ci.yml) runs tests and build on
 
 ## `06 /` Engineering notes
 
-**Realism validation:** The AKE industrial detail layer now includes distinct rigid-metal / textile-curtain closure demonstrations, factory/service surface conditions, physically grounded metal and paint responses, and distance-adaptive microhardware. The viewer settings are shareable; manufacturer-specific geometry and live loading remain unverified. See [REALISM_VALIDATION.md](docs/REALISM_VALIDATION.md) for evidence, cautions and device gates.
+**Realism validation:** The AKE industrial detail layer includes distinct rigid-metal / textile-curtain closure demonstrations, factory/service surface conditions, physically grounded metal and paint responses, and distance-adaptive microhardware. Rigid profile-container doors now release twin cam spindles before hinged rotation, with a clickable operator handle; the timing, damping and gasket motion are illustrative rather than OEM-certified physical forces. The workbench uses user-provided **YASLOGIST Air Cargo & Aviation** service branding, keeping hazard decals and ULD identification separate. See [REALISM_VALIDATION.md](docs/REALISM_VALIDATION.md) and [BRAND_ARCHITECTURE.md](assets/branding/BRAND_ARCHITECTURE.md). Manufacturer-specific geometry and live loading remain unverified.
 
 | Area | Status in this repository | Evidence / limitations |
 | :--- | :--- | :--- |

@@ -1,5 +1,7 @@
 import { memo } from "react";
 import { FINISHES, type FinishId } from "@/three/primitives";
+import { rigidDoorPose, UNLATCH_FRACTION } from "@/three/doorKinematics";
+import { ULD_CONSTANTS } from "@/three/primitives";
 import { MODELS, type ModelId } from "@/three/models";
 import type {
   MoodId,
@@ -72,7 +74,7 @@ function ControlDeckBase({
                 className={cn(
                   "group relative h-8 flex-1 border transition-all duration-200",
                   active
-                    ? "border-amber shadow-[0_0_16px_-4px_rgba(255,176,32,0.9)]"
+                    ? "border-amber shadow-[0_0_16px_-4px_rgba(90,188,235,0.9)]"
                     : "border-line hover:border-mute",
                 )}
                 style={{
@@ -162,12 +164,17 @@ function ControlDeckBase({
       <Block label={spec.palletOption ? "Cargo build" : "Kinematics"}>
         {!spec.palletOption && (
           <Slider
-            label={state.model === "ake" && state.akeDoor === "fabric" ? "curtain lift" : "door swing"}
+            label={state.model === "ake" && state.akeDoor === "fabric"
+              ? "curtain lift" : "release latches / open"}
             value={state.door}
             min={0}
             max={1}
             onChange={(v) => set({ door: v })}
-            display={state.model === "ake" && state.akeDoor === "fabric" ? `${Math.round(state.door * 100)}%` : `${Math.round(state.door * 112)}°`}
+            display={state.model === "ake" && state.akeDoor === "fabric"
+              ? `${Math.round(state.door * 100)}%`
+              : state.door < UNLATCH_FRACTION
+                ? `UNLATCH ${Math.round(state.door / UNLATCH_FRACTION * 100)}%`
+                : `OPEN ${Math.round(rigidDoorPose(state.door, ULD_CONSTANTS.MAX_DOOR).swingRadians * 180 / Math.PI)}°`}
           />
         )}
         {spec.palletOption && (

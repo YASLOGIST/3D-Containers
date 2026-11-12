@@ -281,3 +281,54 @@ test("service patina texture is cached by source, but clones remain independentl
   first.dispose();
   second.dispose();
 });
+
+
+test("AKH interlocks mechanical latch release before the hinge opens", () => {
+  const specimen = MODELS.akh.build({ ...options, doorOpen: 0 });
+  const leaf = specimen.doorPivot;
+  assert.ok(leaf, "a rigid leaf must have a pivot");
+  const spindles: THREE.Object3D[] = [];
+  specimen.group.traverse((part) => {
+    if (part.name === "Articulated cam latch spindle") spindles.push(part);
+  });
+  assert.equal(spindles.length, 2, "both locking spindles must be present");
+  assert.ok(specimen.group.getObjectByName("Rotating latch cam"));
+  assert.ok(specimen.group.getObjectByName("Latch keeper"));
+  const gasket = specimen.group.getObjectByName("Door gasket");
+  assert.ok(gasket);
+  assert.ok(Math.abs(gasket.position.z) < 1e-10, "latched gasket is seated");
+  specimen.setDoorOpen(0.1);
+  assert.ok(gasket.position.z < 0, "gasket relaxes during cam release");
+  assert.ok(Math.abs(leaf.rotation.y) < 1e-10, "door must remain closed while unlocking");
+  assert.ok(Math.abs(spindles[0].rotation.y) > 0.01, "cam starts to rotate");
+  specimen.setDoorOpen(0.35);
+  assert.ok(leaf.rotation.y < 0, "swing starts after full cam release");
+  assert.ok(Math.abs(spindles[0].rotation.y) > 0.9, "cam is fully disengaged");
+  specimen.setDoorOpen(0);
+  assert.ok(Math.abs(leaf.rotation.y) < 1e-10);
+  assert.equal(spindles[0].rotation.y, 0);
+  specimen.dispose();
+});
+
+test("AKE rigid door obeys the same unlocking gate; fabric stays independently liftable", () => {
+  const rigid = MODELS.ake.build({ ...options, akeDoor: "rigid", doorOpen: 0 });
+  const door = rigid.doorPivot;
+  const cam = rigid.group.getObjectByName("Articulated cam latch spindle");
+  assert.ok(door && cam);
+  const akeGasket = rigid.group.getObjectByName("Door gasket");
+  assert.ok(akeGasket);
+  rigid.setDoorOpen(0.1);
+  assert.ok(akeGasket.position.z < 0);
+  assert.ok(Math.abs(door.rotation.y) < 1e-10);
+  assert.ok(Math.abs(cam.rotation.y) > 0);
+  rigid.setDoorOpen(0.3);
+  assert.ok(door.rotation.y < 0);
+  rigid.dispose();
+  const fabric = MODELS.ake.build({ ...options, akeDoor: "fabric", doorOpen: 0 });
+  const cloth = fabric.group.getObjectByName("AKE tensioned coated textile curtain") as THREE.Mesh;
+  assert.ok(cloth);
+  const before = (cloth.geometry.attributes.position as THREE.BufferAttribute).getY(0);
+  fabric.setDoorOpen(0.4);
+  assert.ok((cloth.geometry.attributes.position as THREE.BufferAttribute).getY(0) > before);
+  fabric.dispose();
+});

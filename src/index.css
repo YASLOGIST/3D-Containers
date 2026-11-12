@@ -181,8 +181,8 @@
     width: 14px;
     margin-top: -5.5px;
     border-radius: 3px;
-    background: linear-gradient(180deg, #ffd06a, #e39407);
-    border: 1px solid #7c5204;
+    background: linear-gradient(180deg, var(--color-amber), var(--color-amber-deep));
+    border: 1px solid var(--color-amber-deep);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   }
   .range-uld::-moz-range-track {
@@ -194,8 +194,8 @@
     height: 13px;
     width: 13px;
     border-radius: 3px;
-    background: #ffb020;
-    border: 1px solid #7c5204;
+    background: var(--color-amber);
+    border: 1px solid var(--color-amber-deep);
   }
 
   .anim-in {
@@ -276,7 +276,7 @@
   color: #8fbd6a;
 }
 .code-scroll .c-key {
-  color: #ffb020;
+  color: var(--color-amber);
 }
 .code-scroll .c-num {
   color: #79b8c9;
@@ -287,4 +287,16 @@
 }
 .code-scroll .c-fn {
   color: #ffd479;
+}
+
+
+/* YASLOGIST service family palette: current workspace = AIR. Land/Ocean
+ * may select distinct palettes later without mutating the 3D model geometry.
+ * Safety and handling decals retain their hazard yellow separately. */
+.air-service-theme {
+  --color-amber: #6fc7f0;
+  --color-amber-deep: #2676a8;
+  --color-steel: #a6dff2;
+  --color-line: #273b4a;
+  --color-line-soft: #1d303e;
 }

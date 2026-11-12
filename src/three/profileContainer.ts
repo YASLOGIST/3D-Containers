@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { rigidDoorPose } from "./doorKinematics";
 import { makeIdPlate, makeLivery, makeStencil } from "./textures";
 import {
   assemblyFactory,
@@ -500,23 +501,35 @@ export function createProfileContainer(
     { depth: 0.016, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.017);
-  doorPivot.add(mesh(sealGeo, mat.dark, "Door gasket", false));
+  const sealMesh = mesh(sealGeo, mat.dark, "Door gasket", false);
+  doorPivot.add(sealMesh);
 
   const rodXs = [leafCx - leafBottomSpan * 0.34, leafCx + leafBottomSpan * 0.34];
+  const latchSpindles: THREE.Group[] = [];
   for (const rx of rodXs) {
     const rodLen = clampedLen(rx, H - CHASSIS - 0.2);
+    const spindle = new THREE.Group();
+    spindle.name = "Articulated cam latch spindle";
+    spindle.position.set(px(rx), 0, FACE + 0.013);
+    doorPivot.add(spindle);
+    latchSpindles.push(spindle);
     const rod = mesh(new THREE.CylinderGeometry(0.012, 0.012, rodLen, 14), mat.steel, "Cam latch rod");
-    rod.position.set(px(rx), ribBaseY + rodLen / 2, FACE + 0.013);
-    doorPivot.add(rod);
+    rod.position.set(0, ribBaseY + rodLen / 2, 0);
+    spindle.add(rod);
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
       if (hy > leafTopAtX(rx) - 0.08) continue; // hub would float past a sloped leaf edge
       const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
-      hub.position.set(px(rx), hy, FACE + 0.013);
-      doorPivot.add(hub);
+      hub.position.set(0, hy, 0);
+      spindle.add(hub);
+      // The off-axis cam rotates away from the fixed keeper before the
+      // door leaf can swing. It is representative geometry, not load rated.
+      const cam = box(mat.alloy, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
+      cam.position.set(0.032, hy, -0.015);
+      spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
-      handle.position.set(px(rx) + 0.009, hy - 0.045, FACE + 0.017);
+      handle.position.set(0.009, hy - 0.045, 0.023);
       handle.rotation.x = -0.1;
-      doorPivot.add(handle);
+      spindle.add(handle);
     }
   }
   for (const rx of rodXs) {
@@ -563,7 +576,7 @@ export function createProfileContainer(
   bar.position.set(px(leafCx), CHASSIS + 0.46, FACE + 0.022);
   doorPivot.add(bar);
 
-  const pullTex = makeStencil("PULL ▼", "#ffb020", 512, 160);
+  const pullTex = makeStencil("UNLATCH → PULL", "#ffb020", 640, 160);
   const pullMat = mat.stencil.clone();
   pullMat.map = pullTex;
   doorPivot.add(decal(0.26, 0.082, nDoor,
@@ -573,7 +586,17 @@ export function createProfileContainer(
   doorPivot.add(decal(0.34, 0.18, nDoor,
     new THREE.Vector3(px(leafCx - 0.02), H - 0.34, FACE + 0.003), leafIdMat, "Door data plate"));
 
-  doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  const setRigidPose = (progress: number) => {
+    const pose = rigidDoorPose(progress, MAX_DOOR);
+    latchSpindles.forEach((spindle, i) => {
+      spindle.rotation.y = (i === 0 ? 1 : -1) * pose.latchRadians;
+    });
+    doorPivot.rotation.y = -pose.swingRadians;
+    // 2 mm illustrative seal relaxation during cam release. This is NOT
+    // contact-force or pressure simulation and has no load-rating effect.
+    sealMesh.position.z = -0.002 * (1 - pose.engagement);
+  };
+  setRigidPose(o.doorOpen);
 
   /* --- side livery + warning stencil ------------------------------------ */
   const liverySide = makeLivery({
@@ -659,7 +682,7 @@ export function createProfileContainer(
       mat.shell.needsUpdate = true;
     },
     setDoorOpen(t: number) {
-      doorPivot.rotation.y = -THREE.MathUtils.clamp(t, 0, 1) * MAX_DOOR;
+      setRigidPose(t);
     },
     dispose() {
       const geos = new Set<THREE.BufferGeometry>();

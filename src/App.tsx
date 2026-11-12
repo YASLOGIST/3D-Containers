@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import aviationEmblem from "./assets/branding/air-cargo-emblem.png";
+import aviationMonogram from "./assets/branding/air-cargo-monogram.png";
 
 import akeSource from "./three/akeLD3.ts?raw";
+import doorMotionSource from "./three/doorKinematics.ts?raw";
+import airMarkSource from "./three/airServiceBrand.ts?raw";
 import fabricDoorSource from "./three/akeFabricDoor.ts?raw";
 import precisionDetailsSource from "./three/akePrecisionDetails.ts?raw";
 import akcSource from "./three/akc.ts?raw";
@@ -55,6 +59,8 @@ import { cn } from "@/utils/cn";
 
 const SOURCES = {
   "akeLD3.ts": akeSource,
+  "doorKinematics.ts": doorMotionSource,
+  "airServiceBrand.ts": airMarkSource,
   "akeFabricDoor.ts": fabricDoorSource,
   "akePrecisionDetails.ts": precisionDetailsSource,
   "akc.ts": akcSource,
@@ -92,6 +98,14 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createAKEContainer()",
       description:
         "Contoured LD-3 generator: one offset polygon drives hull, frames, door and hardware.",
+    },
+    "doorKinematics.ts": {
+      entry: "rigidDoorPose() / stepDampedDoor()",
+      description: "Two-stage latch release and door swing, with deterministic damped display motion; no certified contact pressure.",
+    },
+    "airServiceBrand.ts": {
+      entry: "addAirCargoOperatorMark()",
+      description: "Small user-supplied aviation identity placard attached to the door without replacing serial, load or warning plates.",
     },
     "akeFabricDoor.ts": {
       entry: "createAKEFabricDoor()",
@@ -316,11 +330,15 @@ export default function App() {
           onPerf: setPerf,
           onMeasure: setMeasure,
           onSection: setSectionInfo,
+          onDoorToggle: (next) => {
+            setState((current) => ({ ...current, door: next }));
+            v?.setState({ door: next });
+          },
           onError: (message) => {
             setError(message);
             if (message) setReady(true);
           },
-        });
+        }, aviationMonogram);
         viewer.current = v;
       } catch (cause) {
         setError(
@@ -640,7 +658,7 @@ export default function App() {
     : `${Math.round(state.sectionPos * 100)}%`;
 
   return (
-    <div className="relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
+    <div className="air-service-theme relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
       {/* ---------------- 3-D viewport ---------------- */}
       <div
         ref={host}
@@ -672,15 +690,20 @@ export default function App() {
       {/* ---------------- top bar ---------------- */}
       <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
-          <Mark />
+          <img src={aviationEmblem} alt="Air Cargo and Aviation service emblem"
+            className="h-9 w-9 shrink-0 object-contain drop-shadow-[0_0_8px_rgba(94,189,230,0.24)] sm:h-11 sm:w-11"
+            draggable={false} />
           <div>
+            <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.19em] text-[#90bfdf] sm:text-[9px]">
+              YASLOGIST / AIR CARGO &amp; AVIATION
+            </div>
             <h1 className="font-display text-[17px] font-bold leading-none tracking-[0.02em] text-ink sm:text-[23px]">
               {spec.code}
               <span className="text-amber">·</span>
               {spec.name.split("·")[1]?.trim()}
             </h1>
             <p className="mt-1 hidden font-mono text-[9.5px] uppercase tracking-[0.22em] text-dim sm:block sm:text-[10px]">
-              procedural uld geometry lab
+              ULD visual engineering lab · representative models
             </p>
           </div>
         </div>
@@ -705,7 +728,7 @@ export default function App() {
                 className={cn(
                   "shrink-0 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
                   state.model === id
-                    ? "bg-amber text-void shadow-[0_0_14px_-4px_rgba(255,176,32,0.9)]"
+                    ? "bg-amber text-void shadow-[0_0_14px_-4px_rgba(90,188,235,0.9)]"
                     : "text-dim hover:bg-raise hover:text-ink",
                 )}
               >
@@ -1116,35 +1139,6 @@ export default function App() {
 }
 
 /* ------------------------------------------------------------------ */
-
-function Mark() {
-  return (
-    <svg viewBox="0 0 44 40" className="h-9 w-9 shrink-0" aria-hidden>
-      <defs>
-        <linearGradient id="mk" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffd479" />
-          <stop offset="1" stopColor="#c2790a" />
-        </linearGradient>
-      </defs>
-      {/* isometric LD-3 silhouette: vertical back wall, leaning contour wall */}
-      <path
-        d="M6 34 L6 12 L26 6 L38 10 L38 30 L18 36 Z"
-        fill="#151a20"
-        stroke="#39434d"
-        strokeWidth="1.2"
-      />
-      <path d="M6 12 L26 6 L26 28 L6 34 Z" fill="url(#mk)" opacity="0.9" />
-      <path d="M26 6 L38 10 L38 30 L26 28 Z" fill="#8d959c" opacity="0.55" />
-      <path d="M6 34 L18 36 L38 30 L26 28 Z" fill="#0e1216" />
-      <path
-        d="M10 16 L22 12 M10 21 L22 17 M10 26 L22 22"
-        stroke="#2b333b"
-        strokeWidth="1"
-      />
-      <circle cx="32" cy="20" r="1.6" fill="#ffb020" />
-    </svg>
-  );
-}
 
 function DlIcon() {
   return (

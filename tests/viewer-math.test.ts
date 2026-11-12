@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
+import { rigidDoorPose, stepDampedDoor, UNLATCH_FRACTION } from "../src/three/doorKinematics.ts";
 
 import {
   projectedFeaturePixels,
   projectedOrthoFeaturePixels,
+  isDoorInteractionTarget,
   orthoFitSizeFor,
   sectionPlaneFor,
 } from "../src/three/AKEViewer.ts";
@@ -74,4 +76,47 @@ test("screen-space micro detail LOD is projection-consistent", () => {
   assert.ok(projectedOrthoFeaturePixels(0.011, 900, 3) > 1.2);
   assert.ok(projectedOrthoFeaturePixels(0.011, 900, 20) < 1.2);
   assert.equal(projectedOrthoFeaturePixels(0.011, 900, 0), 0);
+});
+
+
+test("rigid door poses are gated and boundary-safe", () => {
+  const max = THREE.MathUtils.degToRad(112);
+  const locked = rigidDoorPose(0, max);
+  const releasing = rigidDoorPose(UNLATCH_FRACTION / 2, max);
+  const unlatched = rigidDoorPose(UNLATCH_FRACTION, max);
+  const open = rigidDoorPose(1, max);
+  assert.equal(locked.engagement, 1);
+  assert.equal(releasing.swingRadians, 0);
+  assert.ok(releasing.latchRadians > 0);
+  assert.equal(unlatched.swingRadians, 0);
+  assert.equal(unlatched.engagement, 0);
+  assert.ok(Math.abs(open.swingRadians - max) < 1e-8);
+  assert.equal(rigidDoorPose(-15, max).swingRadians, 0);
+  assert.equal(rigidDoorPose(Number.NaN, max).swingRadians, 0);
+});
+
+test("door inertia converges smoothly without a fake impact rebound", () => {
+  let position = 0;
+  let velocity = 0;
+  let previous = -1;
+  for (let i = 0; i < 240; i++) {
+    const step = stepDampedDoor(position, velocity, 1, 1 / 60);
+    position = step.position;
+    velocity = step.velocity;
+    assert.ok(position >= previous - 1e-7, "open direction remains monotonic");
+    assert.ok(position >= 0 && position <= 1);
+    previous = position;
+  }
+  assert.equal(position, 1);
+  assert.equal(velocity, 0);
+});
+
+
+test("only deliberate closure parts, not the entire hull or brand plate, are direct-action targets", () => {
+  for (const part of ["Latch handle", "Door handle bar", "Handling stencil", "AKE tensioned coated textile curtain"]) {
+    assert.equal(isDoorInteractionTarget(part), true);
+  }
+  for (const part of ["Door leaf", "Hull — contour tube", "ULD identification plate", "Air Cargo Aviation monogram - user supplied"]) {
+    assert.equal(isDoorInteractionTarget(part), false);
+  }
 });
