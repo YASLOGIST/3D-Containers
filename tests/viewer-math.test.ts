@@ -3,6 +3,8 @@ import test from "node:test";
 import * as THREE from "three";
 
 import {
+  projectedFeaturePixels,
+  projectedOrthoFeaturePixels,
   orthoFitSizeFor,
   sectionPlaneFor,
 } from "../src/three/AKEViewer.ts";
@@ -59,4 +61,17 @@ test("orthographic fit covers the sphere in both view axes", () => {
   assert.ok(portrait * 0.5 >= 2, "frustum width covers the diameter");
   // Degenerate aspects stay finite.
   assert.ok(Number.isFinite(orthoFitSizeFor(2, 0, 1)));
+});
+
+test("screen-space micro detail LOD is projection-consistent", () => {
+  const close = projectedFeaturePixels(0.011, 1.5, 900, 40);
+  const far = projectedFeaturePixels(0.011, 12, 900, 40);
+  assert.ok(close > 1.2, "near heads become resolved");
+  assert.ok(far < 1.2, "distant heads stay below pixel threshold");
+  assert.ok(close > far);
+  assert.equal(projectedFeaturePixels(0.011, 0, 900, 40), 0);
+  assert.equal(projectedFeaturePixels(0.011, 1, 0, 40), 0);
+  assert.ok(projectedOrthoFeaturePixels(0.011, 900, 3) > 1.2);
+  assert.ok(projectedOrthoFeaturePixels(0.011, 900, 20) < 1.2);
+  assert.equal(projectedOrthoFeaturePixels(0.011, 900, 0), 0);
 });

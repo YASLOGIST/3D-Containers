@@ -66,6 +66,7 @@ export interface ViewerOptions {
   detail: boolean;
   rivets: boolean;
   doorOpen: number;
+  akeDoor: "rigid" | "fabric";
   reefer: boolean;
   setpoint: number;
   /** 0..1 cargo-load contour (pallets only) */
@@ -161,7 +162,7 @@ export const MODELS: Record<ModelId, ModelInfo> = {
       { k: "Max gross", v: "1588 kg", tone: "amber" },
       { k: "Net payload", v: "1496 kg" },
     ],
-    build: (o) => createAKEContainer(o),
+    build: (o) => createAKEContainer({ ...o, doorType: o.akeDoor }),
   },
   akc: {
     id: "akc",

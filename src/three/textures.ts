@@ -169,6 +169,60 @@ export function makeCoatedPanel(size = 1024) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Controlled in-service panel patina                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A very subdued albedo-modulation map: scuff marks and drag traces break up
+ * unrealistic perfect uniformity. Because no real serial/usage history is
+ * known, this is an optional ART DIRECTED appearance, not defect evidence.
+ * Close inspection uses shallow surface geometry and the existing PBR normals.
+ */
+export function makeInServicePatina(size = 1024): THREE.Texture {
+  return cachedTexture(`uld-patina:service:${size}`, () => {
+    const rand = seededRandom(0x4f574e ^ size);
+    const { c, ctx } = canvas2d(size, size);
+    ctx.fillStyle = "#f8f8f7";
+    ctx.fillRect(0, 0, size, size);
+
+    // Grouped contact marks rather than full-field isotropic random dirt.
+    for (let cluster = 0; cluster < 32; cluster++) {
+      const cx = rand() * size;
+      const cy = rand() * size;
+      const radius = (10 + rand() * 32) * size / 1024;
+      for (let dot = 0; dot < 28; dot++) {
+        const dx = (rand() - 0.5) * radius * 2;
+        const dy = (rand() - 0.5) * radius;
+        const x = cx + dx;
+        const y = cy + dy;
+        const alpha = (0.02 + rand() * 0.045).toFixed(3);
+        ctx.fillStyle = `rgba(42,46,48,${alpha})`;
+        ctx.fillRect(x, y, 1.2 + rand() * 5, 0.6 + rand() * 2);
+      }
+    }
+
+    // Horizontal brushed handling scratches: fine marks, never theatrical
+    // broad black streaks. Bright hairlines suggest freshly abraded metal.
+    for (let i = 0; i < 125; i++) {
+      const x = rand() * size, y = rand() * size;
+      const length = (4 + rand() * 92) * size / 1024;
+      const light = rand() > 0.52;
+      ctx.strokeStyle = light
+        ? `rgba(255,255,255,${(0.15 + rand() * 0.32).toFixed(3)})`
+        : `rgba(44,46,50,${(0.025 + rand() * 0.06).toFixed(3)})`;
+      ctx.lineWidth = 0.5 + rand() * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + length, y + (rand() - 0.5) * 1.4);
+      ctx.stroke();
+    }
+    const map = toTexture(c, true);
+    map.repeat.set(1.65, 1.65);
+    return map;
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Stencils, plates and placards                                       */
 /* ------------------------------------------------------------------ */
 

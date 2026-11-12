@@ -30,7 +30,8 @@
  * ============================================================================
  */
 import * as THREE from "three";
-import { addAKEPrecisionDetails } from "./akePrecisionDetails";
+import { createAKEFabricDoor, type FabricDoor } from "./akeFabricDoor";
+import { addAKEPrecisionDetails, addCaptiveFasteners } from "./akePrecisionDetails";
 import { makeIdPlate, makeLivery, makeStencil } from "./textures";
 import {
   Assembly,
@@ -145,8 +146,10 @@ export interface BuildOptions {
   detail: boolean;
   /** instanced rivet runs along every frame member */
   rivets: boolean;
-  /** 0..1 door swing */
+  /** 0..1 door swing or textile opening */
   doorOpen: number;
+  /** Closure family is representative, not a manufacturer certification. */
+  doorType: "rigid" | "fabric";
 }
 
 export const DEFAULT_OPTIONS: BuildOptions = {
@@ -155,6 +158,7 @@ export const DEFAULT_OPTIONS: BuildOptions = {
   detail: true,
   rivets: true,
   doorOpen: 0,
+  doorType: "rigid",
 };
 
 /* ========================================================================== */
@@ -364,25 +368,47 @@ export function createAKEContainer(
       ),
     );
 
-    // fuselage roller-guide wear pads, bonded to the upper contoured wall
+    // Roller-contact wear pads use a visible aluminium retaining surround;
+    // a flat black rectangle alone reads as a missing patch of hull.
+    const insertMaterial = new THREE.MeshStandardMaterial({
+      color: "#525e67", metalness: 0.07, roughness: 0.82,
+      envMapIntensity: 0.28,
+    });
+    const padScrews: {at: THREE.Vector3; normal: THREE.Vector3}[] = [];
     for (const z of [-0.5, 0.5]) {
       const padY = CHASSIS + (H - CHASSIS) * 0.82;
-      A_HULL.group.add(
-        wallBox(
-          mat.dark,
-          0.13,
-          0.19,
-          RAIL_T * 0.6,
-          nSlant,
-          slantUp,
-          new THREE.Vector3(
-            wallX(nominal, padY) - nSlant.x * (RAIL_T * 0.3),
-            padY - nSlant.y * (RAIL_T * 0.3),
-            z,
-          ),
-          "Roller guide pad",
-          0.01,
-        ),
+      const center = new THREE.Vector3(
+        wallX(nominal, padY), padY, z,
+      );
+      const bezelCenter = center.clone().addScaledVector(nSlant, -0.007);
+      const wearCenter = center.clone().addScaledVector(nSlant, -0.0045);
+      A_HULL.group.add(wallBox(
+        mat.alloy, 0.16, 0.22, 0.004,
+        nSlant, slantUp, bezelCenter,
+        "Roller guide pad - aluminium retainer", 0.012,
+      ));
+      A_HULL.group.add(wallBox(
+        insertMaterial, 0.124, 0.18, 0.003,
+        nSlant, slantUp, wearCenter,
+        "Roller guide pad - rubber contact insert", 0.009,
+      ));
+      if (o.rivets) {
+        const outward = wearCenter.clone().addScaledVector(nSlant, 0.0022);
+        for (const dz of [-0.067, 0.067]) {
+          for (const dy of [-0.091, 0.091]) {
+            padScrews.push({
+              at: outward.clone().addScaledVector(slantUp, dy)
+                .add(new THREE.Vector3(0, 0, dz)),
+              normal: nSlant,
+            });
+          }
+        }
+      }
+    }
+    if (padScrews.length) {
+      addCaptiveFasteners(
+        A_HULL.group, padScrews, mat.steel,
+        "AKE roller pad retaining fasteners",
       );
     }
 
@@ -852,7 +878,25 @@ export function createAKEContainer(
     });
   }
 
-  doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  let fabricDoor: FabricDoor | null = null;
+  if (o.doorType === "fabric") {
+    // Suppress only rigid closure hardware; retain the shared front frame.
+    for (const part of A_DOOR.group.children) {
+      if (part !== ringDoor) part.visible = false;
+    }
+    fabricDoor = createAKEFabricDoor({
+      profile: nominal,
+      openingBottom: CHASSIS + FRAME_W + 0.01,
+      openingTop: H - FRAME_W - 0.01,
+      inset: FRAME_W + 0.015,
+      frontZ: BL / 2 - END_FRAME + 0.005,
+      open: o.doorOpen,
+      detailed: o.detail,
+    });
+    A_DOOR.group.add(fabricDoor.group);
+  } else {
+    doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  }
 
   /* --- 7.10 side livery on the contoured wall ------------------------- */
   const liverySide = makeLivery({
@@ -904,6 +948,15 @@ export function createAKEContainer(
     a.group.traverse((obj) => {
       const m = obj as THREE.Mesh;
       if (!m.geometry) return;
+      // Alternate closure meshes remain available for editing, but should
+      // never inflate the visible scene's triangles/draw budget.
+      let ancestor: THREE.Object3D | null = obj;
+      let shown = true;
+      while (ancestor) {
+        if (!ancestor.visible) { shown = false; break; }
+        ancestor = ancestor.parent;
+      }
+      if (!shown) return;
       meshCount++;
       const inst = (m as THREE.InstancedMesh).isInstancedMesh
         ? (m as THREE.InstancedMesh).count
@@ -949,7 +1002,9 @@ export function createAKEContainer(
       mat.shell.needsUpdate = true;
     },
     setDoorOpen(t: number) {
-      doorPivot.rotation.y = -THREE.MathUtils.clamp(t, 0, 1) * MAX_DOOR;
+      const v = THREE.MathUtils.clamp(t, 0, 1);
+      if (fabricDoor) fabricDoor.setOpen(v);
+      else doorPivot.rotation.y = -v * MAX_DOOR;
     },
     dispose() {
       const geos = new Set<THREE.BufferGeometry>();

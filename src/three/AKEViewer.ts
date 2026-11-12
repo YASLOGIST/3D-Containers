@@ -4,6 +4,7 @@
  * furniture and the mesh exporters.
  */
 import * as THREE from "three";
+import { MICRO_DETAIL_LAYER } from "./akePrecisionDetails";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
@@ -14,7 +15,7 @@ import type { Assembly, ViewerContainer } from "./primitives";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
-import { makeApronTexture, makeSkyTexture } from "./textures";
+import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { formatDistance } from "@/lib/units";
 
 const reducedMotionPreferred = () =>
@@ -34,6 +35,8 @@ export interface ViewerState {
   detail: boolean;
   rivets: boolean;
   door: number;
+  akeDoor: "rigid" | "fabric";
+  surfaceCondition: "factory" | "service";
   explode: number;
   metalness: number;
   roughness: number;
@@ -70,9 +73,11 @@ export const DEFAULT_STATE: ViewerState = {
   detail: true,
   rivets: true,
   door: 0,
+  akeDoor: "rigid",
+  surfaceCondition: "service",
   explode: 0,
   metalness: 1,
-  roughness: 0.44,
+  roughness: 0.49,
   envIntensity: 1,
   wireframe: false,
   dimensions: true,
@@ -107,36 +112,36 @@ const MOODS: Record<MoodId, Mood> = {
   hangar: {
     sky: ["#0e141b", "#1a222b", "#080a0d"],
     bgIntensity: 1.0,
-    exposure: 1.05,
+    exposure: 0.87,
     fog: "#0b0e12",
     floor: "#2c3238",
-    key: { color: "#ffffff", intensity: 3.1, pos: [4.2, 6.4, 3.2] },
-    fill: { color: "#9fc4dd", intensity: 0.75 },
-    rim: { color: "#ffb020", intensity: 2.4 },
-    hemi: 0.45,
+    key: { color: "#f0f4f8", intensity: 1.85, pos: [4.2, 6.4, 3.2] },
+    fill: { color: "#aec7da", intensity: 0.54 },
+    rim: { color: "#ffcb83", intensity: 0.75 },
+    hemi: 0.34,
     envFromSky: false,
   },
   dusk: {
     sky: ["#1a1512", "#33241a", "#0a0806"],
     bgIntensity: 1.1,
-    exposure: 1.18,
+    exposure: 0.95,
     fog: "#120d0a",
     floor: "#241d18",
     key: { color: "#ffd6a8", intensity: 1.5, pos: [-5, 3.4, 2.4] },
     fill: { color: "#5d7f96", intensity: 0.5 },
-    rim: { color: "#ff8c2e", intensity: 3.4 },
+    rim: { color: "#ff9b54", intensity: 1.3 },
     hemi: 0.28,
     envFromSky: true,
   },
   studio: {
     sky: ["#e6ebef", "#c3cbd2", "#8f979e"],
     bgIntensity: 1.0,
-    exposure: 0.94,
+    exposure: 0.84,
     fog: "#aeb6bd",
     floor: "#9aa1a7",
-    key: { color: "#ffffff", intensity: 2.4, pos: [3.4, 6.8, 4.2] },
+    key: { color: "#ffffff", intensity: 1.85, pos: [3.4, 6.8, 4.2] },
     fill: { color: "#ffffff", intensity: 1.1 },
-    rim: { color: "#ffd9a0", intensity: 1.2 },
+    rim: { color: "#ffd9a0", intensity: 0.68 },
     hemi: 0.7,
     envFromSky: false,
   },
@@ -159,6 +164,31 @@ export interface PerfInfo {
 /* ------------------------------------------------------------------ */
 /* Pure inspection maths (unit-tested in tests/viewer-math.test.ts)    */
 /* ------------------------------------------------------------------ */
+
+/** Screen-space projected diameter of a real feature in a perspective view. */
+export function projectedFeaturePixels(
+  diameterM: number,
+  distanceM: number,
+  viewportHeightPx: number,
+  verticalFovDeg: number,
+): number {
+  if (![diameterM, distanceM, viewportHeightPx, verticalFovDeg].every(Number.isFinite)
+      || diameterM <= 0 || distanceM <= 0 || viewportHeightPx <= 0
+      || verticalFovDeg <= 1 || verticalFovDeg >= 179) return 0;
+  return diameterM * viewportHeightPx
+    / (2 * distanceM * Math.tan(THREE.MathUtils.degToRad(verticalFovDeg) / 2));
+}
+
+/** Ortho feature size is independent of camera distance. */
+export function projectedOrthoFeaturePixels(
+  diameterM: number,
+  viewportHeightPx: number,
+  orthographicHeightM: number,
+): number {
+  if (![diameterM, viewportHeightPx, orthographicHeightM].every(Number.isFinite)
+      || diameterM <= 0 || viewportHeightPx <= 0 || orthographicHeightM <= 0) return 0;
+  return diameterM * viewportHeightPx / orthographicHeightM;
+}
 
 /** Orthographic frustum height fitting a bounding sphere in both axes. */
 export function orthoFitSizeFor(radius: number, aspect: number, margin: number) {
@@ -287,6 +317,8 @@ export class AKEViewer {
   private homeCamera = new THREE.Vector3(4.4, 2.9, 4.6);
   private introFrom = new THREE.Vector3();
   private readonly introTo = new THREE.Vector3();
+  /** Viewer-only microfastener LOD; the meshes stay visible in GLB export. */
+  private microLayerEnabled = false;
   private ro: ResizeObserver;
   /** shadow maps re-render only when light-receiving geometry actually moves */
   private shadowDirty = true;
@@ -457,7 +489,9 @@ export class AKEViewer {
     c.target.copy(target);
     c.enableDamping = true;
     c.dampingFactor = 0.06;
-    c.minDistance = 1.4;
+    // Close-range inspection without preventing sub-centimetre hardware views.
+    // Zooming past the shell is intentionally possible for cavity inspection.
+    c.minDistance = 0.85;
     c.maxDistance = 18;
     c.minZoom = 0.35;
     c.maxZoom = 9;
@@ -662,6 +696,7 @@ export class AKEViewer {
       detail: this.state.detail,
       rivets: this.state.rivets,
       doorOpen: this.state.door,
+      akeDoor: this.state.akeDoor,
       reefer: this.state.reefer,
       setpoint: this.state.setpoint,
       load: this.state.load,
@@ -787,6 +822,12 @@ export class AKEViewer {
     if (!this.container) return;
     const c = this.container;
     c.setFinish(this.state.finish);
+    // Appearance only: does not change geometry, mass or load ratings.
+    const shell = c.materials.shell;
+    if (this.state.surfaceCondition === "service" && !shell.map) {
+      shell.map = makeInServicePatina();
+      shell.needsUpdate = true;
+    }
     this.eachMaterial((m) => {
       const std = m as THREE.MeshStandardMaterial;
       if ("wireframe" in std) std.wireframe = this.state.wireframe;
@@ -887,6 +928,8 @@ export class AKEViewer {
     this.container.group.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.geometry) return;
+      // Tiny surface heads do not define a solid section cavity.
+      if (m.layers.isEnabled(MICRO_DETAIL_LAYER)) return;
       const mm = m.material as THREE.Material | THREE.Material[] | undefined;
       const list = Array.isArray(mm) ? mm : mm ? [mm] : [];
       if (list.some((x) => x.transparent)) return;
@@ -1315,6 +1358,8 @@ export class AKEViewer {
       (patch.contour !== undefined && patch.contour !== prev.contour) ||
       (patch.detail !== undefined && patch.detail !== prev.detail) ||
       (patch.rivets !== undefined && patch.rivets !== prev.rivets) ||
+      (patch.akeDoor !== undefined && patch.akeDoor !== prev.akeDoor) ||
+      (patch.surfaceCondition !== undefined && patch.surfaceCondition !== prev.surfaceCondition) ||
       // Painted and bare-metal finishes use different physical surface maps.
       (patch.finish !== undefined && patch.finish !== prev.finish);
     if (structural) {
@@ -1685,6 +1730,38 @@ export class AKEViewer {
     });
   }
 
+  /** Render sub-centimetre hardware only when it occupies useful pixels.
+   * Camera layers rather than Object3D.visible preserve GLB export fidelity.
+   * A small hysteresis band prevents chatter at the transition distance. */
+  private updateMicroDetails() {
+    const heightPx = this.host.clientHeight * this.baseDpr * this.dprScale;
+    const featureSizeM = 0.011;
+    const projected = this.state.projection === "ortho"
+      ? projectedOrthoFeaturePixels(
+          featureSizeM, heightPx, this.orthoSize / Math.max(this.ortho.zoom, 0.1),
+        )
+      : projectedFeaturePixels(
+          featureSizeM,
+          this.camera.position.distanceTo(this.controls.target),
+          heightPx,
+          this.persp.fov,
+        );
+    const next = this.microLayerEnabled
+      ? projected > 0.75
+      : projected > 1.2;
+    if (next === this.microLayerEnabled) return;
+    this.microLayerEnabled = next;
+    if (next) {
+      this.persp.layers.enable(MICRO_DETAIL_LAYER);
+      this.ortho.layers.enable(MICRO_DETAIL_LAYER);
+      this.raycaster.layers.enable(MICRO_DETAIL_LAYER);
+    } else {
+      this.persp.layers.disable(MICRO_DETAIL_LAYER);
+      this.ortho.layers.disable(MICRO_DETAIL_LAYER);
+      this.raycaster.layers.disable(MICRO_DETAIL_LAYER);
+    }
+  }
+
   /* ---------------- loop ---------------- */
 
   private loop = () => {
@@ -1775,6 +1852,8 @@ export class AKEViewer {
       if (this.elapsed - this.lastIdleRender < 0.25) return;
       this.lastIdleRender = this.elapsed;
     }
+
+    this.updateMicroDetails();
 
     // Picking is bounded to ~20 Hz; it is unnecessary work at display rate.
     this.pickTimer -= dt;

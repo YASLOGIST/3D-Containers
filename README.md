@@ -159,7 +159,7 @@ The repository's [CI workflow](.github/workflows/ci.yml) runs tests and build on
 
 ## `06 /` Engineering notes
 
-**Realism validation:** The AKE industrial surface/detail layer is documented in [REALISM_VALIDATION.md](docs/REALISM_VALIDATION.md), including manufacturer-variant limitations, references and device-test criteria. Paint and bare metal now use separate physical maps; dimensional data remains representative until independently verified for a particular serial/model.
+**Realism validation:** The AKE industrial detail layer now includes distinct rigid-metal / textile-curtain closure demonstrations, factory/service surface conditions, physically grounded metal and paint responses, and distance-adaptive microhardware. The viewer settings are shareable; manufacturer-specific geometry and live loading remain unverified. See [REALISM_VALIDATION.md](docs/REALISM_VALIDATION.md) for evidence, cautions and device gates.
 
 | Area | Status in this repository | Evidence / limitations |
 | :--- | :--- | :--- |

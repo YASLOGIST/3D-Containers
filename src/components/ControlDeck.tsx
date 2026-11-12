@@ -101,6 +101,18 @@ function ControlDeckBase({
         </div>
       </Block>
 
+      <Block label="Surface condition">
+        <Segmented<"factory" | "service">
+          value={state.surfaceCondition}
+          onChange={(v) => set({ surfaceCondition: v })}
+          ariaLabel="Surface handling condition"
+          options={[
+            { value: "factory", label: "Factory clean" },
+            { value: "service", label: "In service" },
+          ]}
+        />
+      </Block>
+
       {/* ---- material sliders ---------------------------------------- */}
       <Block label="Material response">
         <Slider
@@ -129,16 +141,33 @@ function ControlDeckBase({
         />
       </Block>
 
+      {state.model === "ake" && (
+        <Block label="AKE closure variant">
+          <Segmented<"rigid" | "fabric">
+            value={state.akeDoor}
+            onChange={(v) => set({ akeDoor: v, door: 0 })}
+            ariaLabel="AKE door construction"
+            options={[
+              { value: "rigid", label: "Rigid metal" },
+              { value: "fabric", label: "Flexible curtain" },
+            ]}
+          />
+          <p className="pt-1 font-mono text-[9px] leading-relaxed text-dim">
+            Representative constructions; not an OEM-approved loading model.
+          </p>
+        </Block>
+      )}
+
       {/* ---- kinematics ---------------------------------------------- */}
       <Block label={spec.palletOption ? "Cargo build" : "Kinematics"}>
         {!spec.palletOption && (
           <Slider
-            label="door swing"
+            label={state.model === "ake" && state.akeDoor === "fabric" ? "curtain lift" : "door swing"}
             value={state.door}
             min={0}
             max={1}
             onChange={(v) => set({ door: v })}
-            display={`${Math.round(state.door * 112)}°`}
+            display={state.model === "ake" && state.akeDoor === "fabric" ? `${Math.round(state.door * 100)}%` : `${Math.round(state.door * 112)}°`}
           />
         )}
         {spec.palletOption && (

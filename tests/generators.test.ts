@@ -8,7 +8,7 @@ import type {
   ViewerContainer,
   ViewerOptions,
 } from "../src/three/primitives.ts";
-import { makeBrushedMetal } from "../src/three/textures.ts";
+import { makeBrushedMetal, makeInServicePatina } from "../src/three/textures.ts";
 
 type FakeCanvas = {
   width: number;
@@ -88,6 +88,7 @@ const options: ViewerOptions = {
   detail: true,
   rivets: true,
   doorOpen: 0,
+  akeDoor: "rigid",
   reefer: true,
   setpoint: -18,
   load: 0.35,
@@ -187,7 +188,14 @@ test("AKE precision detailing is conditional, parented and envelope-safe", () =>
   assert.ok(fullNames.includes("AKE panel joint - raised seam"));
   assert.ok(fullNames.includes("AKE door pressed reinforcement channel"));
   assert.ok(fullNames.includes("AKE blind-end service cover"));
+  assert.ok(fullNames.includes("Roller guide pad - aluminium retainer"));
+  assert.ok(fullNames.includes("Roller guide pad - rubber contact insert"));
+  assert.ok(fullNames.includes("AKE roller pad retaining fasteners"));
   assert.ok(fullNames.includes("AKE skin joint microfasteners"));
+  const tiny = detailed.group.getObjectByName("AKE skin joint microfasteners")!;
+  // Camera-only LOD leaves the original mesh visible for GLB export.
+  assert.equal(tiny.layers.isEnabled(1), true);
+  assert.equal(tiny.visible, true);
   assert.ok(fullNames.includes("AKE door captive screw heads"));
   assert.ok(!lightNames.includes("AKE panel joint - raised seam"));
   assert.ok(!withoutFasteners.includes("AKE skin joint microfasteners"));
@@ -227,4 +235,49 @@ test("painted and bare-metal finishes have distinct physically meaningful maps",
   assert.notEqual(painted.roughnessMap?.image, metal.roughnessMap?.image);
   enamel.dispose();
   bare.dispose();
+});
+
+
+test("AKE flexible textile and metal closures preserve variants and valid motion", () => {
+  const solid = MODELS.ake.build({ ...options, akeDoor: "rigid" });
+  const soft = MODELS.ake.build({ ...options, akeDoor: "fabric" });
+  const get = (m: ViewerContainer, name: string) => m.group.getObjectByName(name);
+  const fabric = get(soft, "AKE tensioned coated textile curtain") as THREE.Mesh;
+  const rigidLeaf = get(solid, "Door leaf") as THREE.Mesh;
+  const hiddenLeaf = get(soft, "Door leaf") as THREE.Mesh;
+  assert.ok(fabric);
+  assert.ok(rigidLeaf);
+  assert.equal(hiddenLeaf?.parent?.visible, false, "rigid door is hidden in fabric mode");
+  assert.ok(soft.stats.triangles > 1000);
+  const mesh = fabric.geometry as THREE.BufferGeometry;
+  const arr = mesh.attributes.position as THREE.BufferAttribute;
+  const yBefore = arr.getY(0);
+  const zBefore = arr.getZ(0);
+  soft.setDoorOpen(0.85);
+  const yAfter = arr.getY(0);
+  const zAfter = arr.getZ(0);
+  assert.ok(yAfter > yBefore + 0.1, "fabric bottom edge lifts");
+  assert.ok(Number.isFinite(zAfter));
+  assert.ok(Math.abs(zAfter - zBefore) < 0.1);
+  const world = bounds(soft).box;
+  assert.ok(world.min.y > -0.04 && world.max.y < 1.65);
+  assert.ok(world.min.z > -0.85 && world.max.z < 0.85);
+  soft.setDoorOpen(1);
+  assert.ok(Number.isFinite(mesh.boundingSphere?.radius));
+  assert.equal(get(soft, "AKE fabric tension strap")?.visible, true);
+  assert.equal(get(solid, "AKE tensioned coated textile curtain"), undefined);
+  solid.dispose();
+  soft.dispose();
+});
+
+
+test("service patina texture is cached by source, but clones remain independently disposable", () => {
+  const first = makeInServicePatina(256);
+  const second = makeInServicePatina(256);
+  assert.notEqual(first, second);
+  assert.equal(first.image, second.image);
+  assert.ok(first.name.startsWith("uld-patina:service:"));
+  assert.equal(first.colorSpace, THREE.SRGBColorSpace);
+  first.dispose();
+  second.dispose();
 });

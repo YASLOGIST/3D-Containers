@@ -26,6 +26,8 @@ export interface AKEPrecisionDetailTargets {
   includeFasteners: boolean;
 }
 
+export const MICRO_DETAIL_LAYER = 1; // camera toggles this only while heads resolve to useful pixels
+
 type FastenerSite = { at: THREE.Vector3; normal: THREE.Vector3 };
 
 /** A single instanced assembly: countersunk heads are a surface detail, not load-bearing hardware. */
@@ -52,6 +54,8 @@ export function addCaptiveFasteners(
   fasteners.instanceMatrix.needsUpdate = true;
   fasteners.castShadow = false;
   fasteners.receiveShadow = true;
+  // Keep visible=true for GLB export; camera layer performs runtime distance LOD.
+  fasteners.layers.set(MICRO_DETAIL_LAYER);
   target.add(fasteners);
 }
 

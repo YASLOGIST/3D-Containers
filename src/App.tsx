@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import akeSource from "./three/akeLD3.ts?raw";
+import fabricDoorSource from "./three/akeFabricDoor.ts?raw";
+import precisionDetailsSource from "./three/akePrecisionDetails.ts?raw";
 import akcSource from "./three/akc.ts?raw";
 import dpeSource from "./three/dpe.ts?raw";
 import dqfSource from "./three/dqf.ts?raw";
@@ -53,6 +55,8 @@ import { cn } from "@/utils/cn";
 
 const SOURCES = {
   "akeLD3.ts": akeSource,
+  "akeFabricDoor.ts": fabricDoorSource,
+  "akePrecisionDetails.ts": precisionDetailsSource,
   "akc.ts": akcSource,
   "dpe.ts": dpeSource,
   "dqf.ts": dqfSource,
@@ -88,6 +92,14 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
       entry: "createAKEContainer()",
       description:
         "Contoured LD-3 generator: one offset polygon drives hull, frames, door and hardware.",
+    },
+    "akeFabricDoor.ts": {
+      entry: "createAKEFabricDoor()",
+      description: "Representative AKE textile door: contoured fabric, woven finish, folding geometry, straps and buckles; not a certified restraint model.",
+    },
+    "akePrecisionDetails.ts": {
+      entry: "addAKEPrecisionDetails()",
+      description: "Close-range sheet joins, instanced fasteners, door reinforcement and service details with screen-space LOD.",
     },
     "akc.ts": {
       entry: "createAKCContainer()",
@@ -658,22 +670,22 @@ export default function App() {
       />
 
       {/* ---------------- top bar ---------------- */}
-      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 p-3 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:p-4">
-        <div className="pointer-events-auto flex items-center gap-3">
+      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
           <Mark />
           <div>
-            <h1 className="font-display text-[19px] font-bold leading-none tracking-[0.02em] text-ink sm:text-[23px]">
+            <h1 className="font-display text-[17px] font-bold leading-none tracking-[0.02em] text-ink sm:text-[23px]">
               {spec.code}
               <span className="text-amber">·</span>
               {spec.name.split("·")[1]?.trim()}
             </h1>
-            <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.22em] text-dim sm:text-[10px]">
+            <p className="mt-1 hidden font-mono text-[9.5px] uppercase tracking-[0.22em] text-dim sm:block sm:text-[10px]">
               procedural uld geometry lab
             </p>
           </div>
         </div>
 
-        <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
+        <div className="pointer-events-auto flex min-w-0 flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-1.5">
           <div className="mr-1 hidden items-center gap-1.5 md:flex">
             <Chip tone="amber">{dimsLabel}</Chip>
             <Chip tone="steel">metallic pbr</Chip>
@@ -681,7 +693,7 @@ export default function App() {
           <div
             role="group"
             aria-label="Select ULD model"
-            className="flex max-w-[72vw] flex-wrap justify-end border border-line bg-panel/90 p-0.5 backdrop-blur-sm"
+            className="flex w-full max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap border border-line bg-panel/90 p-0.5 backdrop-blur-sm sm:w-auto sm:max-w-[72vw] sm:flex-wrap sm:justify-end sm:overflow-visible"
           >
             {(Object.keys(MODELS) as ModelId[]).map((id) => (
               <button
@@ -691,7 +703,7 @@ export default function App() {
                 title={MODELS[id].family}
                 aria-pressed={state.model === id}
                 className={cn(
-                  "px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
+                  "shrink-0 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber/70",
                   state.model === id
                     ? "bg-amber text-void shadow-[0_0_14px_-4px_rgba(255,176,32,0.9)]"
                     : "text-dim hover:bg-raise hover:text-ink",
@@ -701,6 +713,7 @@ export default function App() {
               </button>
             ))}
           </div>
+          <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5 sm:contents">
           <Btn
             onClick={runShowcase}
             disabled={!ready || !!error}
@@ -755,6 +768,7 @@ export default function App() {
           >
             {"</>"} source
           </Btn>
+          </div>
         </div>
       </header>
 
@@ -931,7 +945,7 @@ export default function App() {
                 : undefined
             }
           >
-            {perf.idle ? "idle" : `${perf.fps} fps`} ·{" "}
+            {perf.idle ? "idle" : perf.fps ? `${perf.fps} fps` : "— fps"} ·{" "}
             {(perf.triangles / 1000).toFixed(1)}k tris · {perf.calls} calls
           </span>
           <span className="hidden text-dim sm:inline">
