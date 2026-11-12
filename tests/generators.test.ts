@@ -9,6 +9,7 @@ import type {
   ViewerOptions,
 } from "../src/three/primitives.ts";
 import { makeBrushedMetal, makeInServicePatina } from "../src/three/textures.ts";
+import { addAirCargoOperatorMark } from "../src/three/airServiceBrand.ts";
 
 type FakeCanvas = {
   width: number;
@@ -331,4 +332,86 @@ test("AKE rigid door obeys the same unlocking gate; fabric stays independently l
   fabric.setDoorOpen(0.4);
   assert.ok((cloth.geometry.attributes.position as THREE.BufferAttribute).getY(0) > before);
   fabric.dispose();
+});
+
+
+test("aviation decal attaches cleanly to all 17 ULD families", () => {
+  const previousImage = Object.getOwnPropertyDescriptor(globalThis, "Image");
+  const originalLoad = THREE.TextureLoader.prototype.load;
+  Object.defineProperty(globalThis, "Image", {
+    value: class FakeImage {},
+    configurable: true,
+  });
+  THREE.TextureLoader.prototype.load = function () {
+    return new THREE.Texture();
+  };
+
+  try {
+    for (const id of Object.keys(MODELS) as ModelId[]) {
+      const container = MODELS[id].build(options);
+      assert.equal(
+        addAirCargoOperatorMark(container, "data:image/png;base64,AA=="),
+        true,
+        `${id} did not receive an aviation mark`,
+      );
+      const marks: THREE.Mesh[] = [];
+      container.group.traverse((part) => {
+        if (part.name === "Air Cargo Aviation monogram - transparent applied decal") {
+          marks.push(part as THREE.Mesh);
+        }
+      });
+      assert.equal(marks.length, 1, `${id} must receive exactly one logo`);
+      const mark = marks[0];
+      const material = mark.material as THREE.MeshBasicMaterial;
+      assert.equal(material.transparent, true, `${id} logo must retain alpha`);
+      assert.ok(material.map, `${id} logo texture must be attached`);
+      assert.ok(mark.geometry.parameters.width >= 0.2);
+      assert.ok(mark.geometry.parameters.height >= 0.1);
+
+      const door = container.doorPivot?.getObjectByName("Door leaf") as THREE.Mesh | undefined;
+      if (door?.geometry && container.doorPivot) {
+        assert.equal(mark.parent, container.doorPivot, `${id} logo must follow the hinged leaf`);
+        door.geometry.computeBoundingBox();
+        const box = door.geometry.boundingBox!;
+        assert.ok(mark.position.x > box.min.x && mark.position.x < box.max.x);
+        assert.ok(mark.position.y > box.min.y && mark.position.y < box.max.y);
+      } else {
+        const deck = container.group.getObjectByName("Pallet base plate") as THREE.Mesh | undefined;
+        assert.ok(deck, `${id} needs either a door surface or a pallet deck`);
+        assert.equal(mark.parent, deck);
+        assert.equal(mark.rotation.x, -Math.PI / 2, `${id} pallet decal must lie flat`);
+        deck.geometry.computeBoundingBox();
+        const box = deck.geometry.boundingBox!;
+        assert.ok(mark.position.x > box.min.x && mark.position.x < box.max.x);
+        assert.ok(mark.position.z > box.min.z && mark.position.z < box.max.z);
+      }
+      container.dispose();
+    }
+
+    const fabric = MODELS.ake.build({ ...options, akeDoor: "fabric" });
+    assert.equal(addAirCargoOperatorMark(fabric, "data:image/png;base64,AA=="), true);
+    const mark = fabric.group.getObjectByName(
+      "Air Cargo Aviation monogram - transparent applied decal",
+    );
+    assert.ok(mark);
+    assert.equal(mark.parent, fabric.assemblies.find((a) => a.id === "blind")?.group);
+    fabric.dispose();
+
+    const rigid = MODELS.ake.build(options);
+    assert.equal(addAirCargoOperatorMark(rigid, "data:image/png;base64,AA=="), true);
+    const movingMark = rigid.group.getObjectByName(
+      "Air Cargo Aviation monogram - transparent applied decal",
+    )!;
+    rigid.group.updateMatrixWorld(true);
+    const closed = movingMark.getWorldPosition(new THREE.Vector3()).clone();
+    rigid.setDoorOpen(0.9);
+    rigid.group.updateMatrixWorld(true);
+    const open = movingMark.getWorldPosition(new THREE.Vector3());
+    assert.ok(closed.distanceTo(open) > 0.05, "rigid-door logo must move with the door");
+    rigid.dispose();
+  } finally {
+    THREE.TextureLoader.prototype.load = originalLoad;
+    if (previousImage) Object.defineProperty(globalThis, "Image", previousImage);
+    else delete (globalThis as typeof globalThis & { Image?: unknown }).Image;
+  }
 });

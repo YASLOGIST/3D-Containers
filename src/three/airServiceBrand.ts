@@ -1,19 +1,58 @@
 /**
- * Optional airline-service identity plate for visual inspection.
- * Never replaces operational ULD serial / tare / gross labels or warnings.
- *
- * The two original user supplied marks are retained under assets/branding/air;
- * the optimized artwork is passed in from the web UI, without loading assets
- * in Node-based geometry tests.
+ * Optional aviation-service identity decal.
+ * Leaves the operational ULD serial, weight and warning markings unobscured.
+ * Original supplied logo assets remain untouched.
  */
 import * as THREE from "three";
 import type { ViewerContainer } from "./primitives";
 
+function attachTransparentMark(
+  parent: THREE.Object3D,
+  monogramUrl: string,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  z: number,
+  rotationY = 0,
+): THREE.Mesh {
+  const texture = new THREE.TextureLoader().load(monogramUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  const mark = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      alphaTest: 0.025,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      toneMapped: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    }),
+  );
+  mark.name = "Air Cargo Aviation monogram - transparent applied decal";
+  mark.position.set(x, y, z);
+  mark.rotation.y = rotationY;
+  mark.castShadow = false;
+  mark.renderOrder = 2;
+  parent.add(mark);
+  return mark;
+}
+
+/**
+ * Adds the mark to a clear region of each family's fixed door or blind panel.
+ * Rigid doors carry it through their hinge motion. The flexible AKE curtain
+ * uses the fixed blind end to avoid a rigid, floating-looking badge on fabric.
+ * Flat pallets receive a small decal on the open deck, away from data stencils.
+ */
 export function addAirCargoOperatorMark(
   container: ViewerContainer,
   monogramUrl: string | undefined,
 ): boolean {
   if (!monogramUrl || typeof Image === "undefined") return false;
+
   const visibleInTree = (object: THREE.Object3D | null): boolean => {
     let node = object;
     while (node) {
@@ -22,66 +61,81 @@ export function addAirCargoOperatorMark(
     }
     return true;
   };
+
   const pivot = container.doorPivot ?? null;
   const rigidDoorVisible = !!pivot && visibleInTree(pivot);
   const blind = container.assemblies.find((a) => a.id === "blind")?.group;
-  // For a flexible AKE closure, never attach a rigid placard to the folding
-  // textile or to the intentionally hidden metal-door geometry.
-  const parent = rigidDoorVisible ? pivot : blind;
-  const surface = rigidDoorVisible
+  const door = rigidDoorVisible
     ? pivot!.getObjectByName("Door leaf") as THREE.Mesh | undefined
-    : blind?.getObjectByName("Blind end panel") as THREE.Mesh | undefined;
-  if (!parent || !surface?.geometry) return false;
-  surface.geometry.computeBoundingBox();
-  const box = surface.geometry.boundingBox;
-  if (!box) return false;
-  const spanX = box.max.x - box.min.x;
-  const spanY = box.max.y - box.min.y;
-  if (spanX < 0.3 || spanY < 0.3) return false;
+    : undefined;
 
-  const size = Math.min(0.14, spanX * 0.12, spanY * 0.15);
-  const cx = box.min.x + spanX * (rigidDoorVisible ? 0.35 : 0.78);
-  const cy = box.min.y + spanY * 0.20;
-  const z = rigidDoorVisible ? box.max.z + 0.005 : box.min.z - 0.005;
-  const rotationY = rigidDoorVisible ? 0 : Math.PI;
+  if (door?.geometry) {
+    door.geometry.computeBoundingBox();
+    const box = door.geometry.boundingBox;
+    if (!box) return false;
+    const spanX = box.max.x - box.min.x;
+    const spanY = box.max.y - box.min.y;
+    if (spanX < 0.45 || spanY < 0.55) return false;
 
-  const base = new THREE.Mesh(
-    new THREE.PlaneGeometry(size * 1.24, size * 1.10),
-    new THREE.MeshStandardMaterial({
-      color: "#ecf3f6",
-      metalness: 0.06,
-      roughness: 0.62,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-    }),
-  );
-  base.name = "Air Cargo operator mark - protective placard";
-  base.position.set(cx, cy, z);
-  base.rotation.y = rotationY;
-  base.castShadow = false;
-  parent.add(base);
+    // Clear lower-left panel: above pull hardware, below the data plate, and
+    // inside the perimeter rails. This avoids the central latch hardware.
+    const width = THREE.MathUtils.clamp(spanX * 0.19, 0.20, 0.52);
+    const height = width * (643 / 768);
+    const x = box.min.x + spanX * 0.19;
+    const y = box.min.y + spanY * 0.69;
+    attachTransparentMark(pivot!, monogramUrl, width, height, x, y, box.max.z + 0.004);
+    return true;
+  }
 
-  const map = new THREE.TextureLoader().load(monogramUrl);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  const artwork = new THREE.Mesh(
-    new THREE.PlaneGeometry(size * 1.06, size * 0.91),
-    new THREE.MeshBasicMaterial({
-      map,
-      transparent: true,
-      alphaTest: 0.02,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      toneMapped: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-    }),
-  );
-  artwork.name = "Air Cargo Aviation monogram - user supplied";
-  artwork.position.set(cx, cy, z + (rigidDoorVisible ? 0.0012 : -0.0012));
-  artwork.rotation.y = rotationY;
-  artwork.castShadow = false;
-  parent.add(artwork);
-  return true;
+  // AKE fabric-door mode intentionally hides the metal door. Use its stationary
+  // blind-end skin so the artwork stays crisp and never bends with the curtain.
+  const blindPanel = blind?.getObjectByName("Blind end panel") as THREE.Mesh | undefined;
+  if (blind && blindPanel?.geometry) {
+    blindPanel.geometry.computeBoundingBox();
+    const box = blindPanel.geometry.boundingBox;
+    if (!box) return false;
+    const spanX = box.max.x - box.min.x;
+    const spanY = box.max.y - box.min.y;
+    if (spanX < 0.45 || spanY < 0.55) return false;
+    const width = THREE.MathUtils.clamp(spanX * 0.19, 0.20, 0.52);
+    const height = width * (643 / 768);
+    attachTransparentMark(
+      blind,
+      monogramUrl,
+      width,
+      height,
+      box.min.x + spanX * 0.19,
+      box.min.y + spanY * 0.69,
+      box.min.z - 0.004,
+      Math.PI,
+    );
+    return true;
+  }
+
+  // Pallets have no upright closure. Put the logo on a clean rear-deck field,
+  // well clear of the ID and load-limit stencils and away from the edge rails.
+  const deck = container.group.getObjectByName("Pallet base plate") as THREE.Mesh | undefined;
+  if (deck?.geometry) {
+    deck.geometry.computeBoundingBox();
+    const box = deck.geometry.boundingBox;
+    if (!box) return false;
+    const spanX = box.max.x - box.min.x;
+    const spanZ = box.max.z - box.min.z;
+    const width = THREE.MathUtils.clamp(Math.min(spanX, spanZ) * 0.16, 0.28, 0.38);
+    const height = width * (643 / 768);
+    const x = box.min.x + spanX * 0.62;
+    const z = box.min.z + spanZ * 0.42;
+    const mark = attachTransparentMark(
+      deck,
+      monogramUrl,
+      width,
+      height,
+      x,
+      box.max.y + 0.0015,
+      z,
+    );
+    mark.rotation.x = -Math.PI / 2;
+    return true;
+  }
+  return false;
 }
