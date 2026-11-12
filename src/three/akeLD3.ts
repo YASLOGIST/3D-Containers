@@ -865,7 +865,7 @@ export function createAKEContainer(
       0.34,
       0.18,
       nDoor,
-      new THREE.Vector3(px(X0 + BW / 2 - 0.02), H - 0.34, FACE + 0.003),
+      new THREE.Vector3(px(X0 + BW * 0.40), H - 0.34, FACE + 0.003),
       leafIdMat,
       "Door data plate",
     ),

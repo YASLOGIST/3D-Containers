@@ -4,7 +4,7 @@
  * furniture and the mesh exporters.
  */
 import * as THREE from "three";
-import { addAirCargoOperatorMark } from "./airServiceBrand";
+import { addAirCargoOperatorMark, AIR_MARK_NAME } from "./airServiceBrand";
 import { stepDampedDoor } from "./doorKinematics";
 import { MICRO_DETAIL_LAYER } from "./akePrecisionDetails";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -380,7 +380,7 @@ export class AKEViewer {
       onMeasure?: (m: MeasureInfo) => void;
       onSection?: (s: SectionInfo) => void;
     } = {},
-    private readonly aviationMonogramUrl?: string,
+    private readonly aviationLockupUrl?: string,
   ) {
     this.host = host;
     this.state = { ...state };
@@ -717,7 +717,7 @@ export class AKEViewer {
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
-    addAirCargoOperatorMark(this.container, this.aviationMonogramUrl);
+    addAirCargoOperatorMark(this.container, this.state.model, this.state.finish, this.aviationLockupUrl);
     // Measure overall spans with door latched, pallet load stowed and
     // assemblies home. This is not a contour or certification check.
     this.container.setDoorOpen(0);
@@ -2037,8 +2037,21 @@ export class AKEViewer {
     }
   }
 
+  private detachGeometryExportOverlays() {
+    const restoreCaps = this.detachStencilCaps();
+    const print = this.container?.group.getObjectByName(AIR_MARK_NAME);
+    const panel = print?.parent;
+    // OBJ/STL in this viewer export geometry only. Omit the ink overlay
+    // because its transparent pixels would otherwise become a solid quad.
+    print?.removeFromParent();
+    return () => {
+      if (print && panel) panel.add(print);
+      restoreCaps();
+    };
+  }
+
   exportOBJ(): string {
-    const restore = this.detachStencilCaps();
+    const restore = this.detachGeometryExportOverlays();
     try {
       return new OBJExporter().parse(this.exportRoot());
     } finally {
@@ -2048,7 +2061,7 @@ export class AKEViewer {
   }
 
   exportSTL(): DataView {
-    const restore = this.detachStencilCaps();
+    const restore = this.detachGeometryExportOverlays();
     try {
       return new STLExporter().parse(this.exportRoot(), {
         binary: true,

@@ -1,141 +1,109 @@
-/**
- * Optional aviation-service identity decal.
- * Leaves the operational ULD serial, weight and warning markings unobscured.
- * Original supplied logo assets remain untouched.
- */
 import * as THREE from "three";
-import type { ViewerContainer } from "./primitives";
+import type { ModelId } from "./models";
+import type { FinishId, ViewerContainer } from "./primitives";
 
-function attachTransparentMark(
-  parent: THREE.Object3D,
-  monogramUrl: string,
+export const AIR_MARK_NAME = "YASLOGIST Air Cargo & Aviation - surface print";
+const ARTWORK_ASPECT = 954 / 1024;
+const INK_OFFSET = 0.0005;
+
+type DoorField = {
+  x: number;
+  y: number;
+  width: number;
+};
+
+// Metres in the leaf's local frame. Each field fits the entire lockup,
+// including its lettering, inside one uninterrupted panel bay.
+const DOOR_FIELDS: Partial<Record<ModelId, DoorField>> = {
+  ake: { x: 1.085, y: 1.285, width: 0.37 },
+  akc: { x: 0.707, y: 0.875, width: 0.49 },
+  dpe: { x: 0.515, y: 0.875, width: 0.31 },
+  dqf: { x: 1.473, y: 0.885, width: 0.55 },
+  aqp: { x: 1.128, y: 0.885, width: 0.55 },
+  akh: { x: 0.435, y: 0.73, width: 0.24 },
+  alf: { x: 1.912, y: 0.885, width: 0.56 },
+  alp: { x: 1.497, y: 0.885, width: 0.56 },
+  aap: { x: 1.497, y: 0.885, width: 0.56 },
+  rkn: { x: 0.342, y: 0.97, width: 0.30 },
+  // Between the bezel and the next pressed seam in the insulated skin.
+  rap: { x: 2.632, y: 0.875, width: 0.195 },
+  ama: { x: 1.497, y: 1.39, width: 0.68 },
+  amd: { x: 1.128, y: 1.85, width: 0.65 },
+  aga: { x: 1.128, y: 1.39, width: 0.65 },
+};
+
+function addPrint(
+  surface: THREE.Mesh,
+  url: string,
+  finish: FinishId,
   width: number,
-  height: number,
-  x: number,
-  y: number,
-  z: number,
-  rotationY = 0,
-): THREE.Mesh {
-  const texture = new THREE.TextureLoader().load(monogramUrl);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  const mark = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      alphaTest: 0.025,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      toneMapped: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-    }),
-  );
-  mark.name = "Air Cargo Aviation monogram - transparent applied decal";
-  mark.position.set(x, y, z);
-  mark.rotation.y = rotationY;
-  mark.castShadow = false;
-  mark.renderOrder = 2;
-  parent.add(mark);
-  return mark;
+  position: THREE.Vector3,
+  rotation: THREE.Euler,
+) {
+  const map = new THREE.TextureLoader().load(url);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  const lightInk = finish === "graphite" || finish === "airline";
+  const material = new THREE.MeshStandardMaterial({
+    map,
+    color: lightInk ? "#e9f2fa" : "#0a2742",
+    metalness: 0,
+    roughness: 0.76,
+    transparent: true,
+    alphaTest: 0.025,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  const mark = new THREE.Mesh(new THREE.PlaneGeometry(width, width * ARTWORK_ASPECT), material);
+  mark.name = AIR_MARK_NAME;
+  // Pointer inspection should identify the physical panel under the ink.
+  mark.raycast = () => {};
+  mark.position.copy(position);
+  mark.rotation.copy(rotation);
+  surface.add(mark);
 }
 
-/**
- * Adds the mark to a clear region of each family's fixed door or blind panel.
- * Rigid doors carry it through their hinge motion. The flexible AKE curtain
- * uses the fixed blind end to avoid a rigid, floating-looking badge on fabric.
- * Flat pallets receive a small decal on the open deck, away from data stencils.
- */
 export function addAirCargoOperatorMark(
   container: ViewerContainer,
-  monogramUrl: string | undefined,
+  model: ModelId,
+  finish: FinishId,
+  url: string | undefined,
 ): boolean {
-  if (!monogramUrl || typeof Image === "undefined") return false;
+  if (!url || typeof Image === "undefined") return false;
 
-  const visibleInTree = (object: THREE.Object3D | null): boolean => {
-    let node = object;
-    while (node) {
-      if (!node.visible) return false;
-      node = node.parent;
-    }
-    return true;
-  };
-
-  const pivot = container.doorPivot ?? null;
-  const rigidDoorVisible = !!pivot && visibleInTree(pivot);
-  const blind = container.assemblies.find((a) => a.id === "blind")?.group;
-  const door = rigidDoorVisible
-    ? pivot!.getObjectByName("Door leaf") as THREE.Mesh | undefined
-    : undefined;
-
-  if (door?.geometry) {
-    door.geometry.computeBoundingBox();
-    const box = door.geometry.boundingBox;
-    if (!box) return false;
-    const spanX = box.max.x - box.min.x;
-    const spanY = box.max.y - box.min.y;
-    if (spanX < 0.45 || spanY < 0.55) return false;
-
-    // Clear lower-left panel: above pull hardware, below the data plate, and
-    // inside the perimeter rails. This avoids the central latch hardware.
-    const width = THREE.MathUtils.clamp(spanX * 0.19, 0.20, 0.52);
-    const height = width * (643 / 768);
-    const x = box.min.x + spanX * 0.19;
-    const y = box.min.y + spanY * 0.69;
-    attachTransparentMark(pivot!, monogramUrl, width, height, x, y, box.max.z + 0.004);
+  const field = DOOR_FIELDS[model];
+  const pivot = container.doorPivot;
+  const leaf = pivot?.getObjectByName("Door leaf") as THREE.Mesh | undefined;
+  if (field && leaf && pivot?.visible) {
+    leaf.geometry.computeBoundingBox();
+    const z = leaf.geometry.boundingBox!.max.z + INK_OFFSET;
+    addPrint(leaf, url, finish, field.width, new THREE.Vector3(field.x, field.y, z), new THREE.Euler());
     return true;
   }
 
-  // AKE fabric-door mode intentionally hides the metal door. Use its stationary
-  // blind-end skin so the artwork stays crisp and never bends with the curtain.
-  const blindPanel = blind?.getObjectByName("Blind end panel") as THREE.Mesh | undefined;
-  if (blind && blindPanel?.geometry) {
-    blindPanel.geometry.computeBoundingBox();
-    const box = blindPanel.geometry.boundingBox;
-    if (!box) return false;
-    const spanX = box.max.x - box.min.x;
-    const spanY = box.max.y - box.min.y;
-    if (spanX < 0.45 || spanY < 0.55) return false;
-    const width = THREE.MathUtils.clamp(spanX * 0.19, 0.20, 0.52);
-    const height = width * (643 / 768);
-    attachTransparentMark(
-      blind,
-      monogramUrl,
-      width,
-      height,
-      box.min.x + spanX * 0.19,
-      box.min.y + spanY * 0.69,
-      box.min.z - 0.004,
-      Math.PI,
-    );
+  // With the fabric closure, the fixed rear bay beside the existing livery
+  // has room for the whole print and remains planar while the curtain folds.
+  if (model === "ake") {
+    const panel = container.group.getObjectByName("Blind end panel") as THREE.Mesh | undefined;
+    if (!panel) return false;
+    panel.geometry.computeBoundingBox();
+    const z = panel.geometry.boundingBox!.min.z - INK_OFFSET;
+    addPrint(panel, url, finish, 0.31, new THREE.Vector3(0.557, 1.20, z), new THREE.Euler(0, Math.PI, 0));
     return true;
   }
 
-  // Pallets have no upright closure. Put the logo on a clean rear-deck field,
-  // well clear of the ID and load-limit stencils and away from the edge rails.
   const deck = container.group.getObjectByName("Pallet base plate") as THREE.Mesh | undefined;
-  if (deck?.geometry) {
-    deck.geometry.computeBoundingBox();
-    const box = deck.geometry.boundingBox;
-    if (!box) return false;
-    const spanX = box.max.x - box.min.x;
-    const spanZ = box.max.z - box.min.z;
-    const width = THREE.MathUtils.clamp(Math.min(spanX, spanZ) * 0.16, 0.28, 0.38);
-    const height = width * (643 / 768);
-    const x = box.min.x + spanX * 0.62;
-    const z = box.min.z + spanZ * 0.42;
-    const mark = attachTransparentMark(
-      deck,
-      monogramUrl,
-      width,
-      height,
-      x,
-      box.max.y + 0.0015,
-      z,
-    );
-    mark.rotation.x = -Math.PI / 2;
-    return true;
-  }
-  return false;
+  if (!deck) return false;
+  deck.geometry.computeBoundingBox();
+  const box = deck.geometry.boundingBox!;
+  const width = Math.min(0.66, (box.max.z - box.min.z) * 0.25);
+  // The front half of the deck remains clear of the ID and weight stencils.
+  addPrint(
+    deck, url, finish, width,
+    new THREE.Vector3(0, box.max.y + INK_OFFSET, box.max.z * 0.43),
+    new THREE.Euler(-Math.PI / 2, 0, 0),
+  );
+  return true;
 }

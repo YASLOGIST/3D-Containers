@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import aviationEmblem from "./assets/branding/air-cargo-emblem.png";
-import aviationMonogram from "./assets/branding/air-cargo-monogram.png";
+import aviationLockup from "./assets/branding/air-cargo-lockup.png";
 
 import akeSource from "./three/akeLD3.ts?raw";
 import doorMotionSource from "./three/doorKinematics.ts?raw";
@@ -338,7 +338,7 @@ export default function App() {
             setError(message);
             if (message) setReady(true);
           },
-        }, aviationMonogram);
+        }, aviationLockup);
         viewer.current = v;
       } catch (cause) {
         setError(
@@ -671,19 +671,12 @@ export default function App() {
         and use arrow keys to pan.
       </p>
 
-      {/* ambient overlays: vignette + scanlines */}
+      {/* ambient vignette */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
             "radial-gradient(120% 90% at 50% 42%, rgba(0,0,0,0) 38%, rgba(0,0,0,0.55) 100%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.16] mix-blend-overlay"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, rgba(255,255,255,0.5) 0px, rgba(255,255,255,0.5) 1px, transparent 1px, transparent 3px)",
         }}
       />
 

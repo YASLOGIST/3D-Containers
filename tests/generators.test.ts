@@ -9,7 +9,7 @@ import type {
   ViewerOptions,
 } from "../src/three/primitives.ts";
 import { makeBrushedMetal, makeInServicePatina } from "../src/three/textures.ts";
-import { addAirCargoOperatorMark } from "../src/three/airServiceBrand.ts";
+import { addAirCargoOperatorMark, AIR_MARK_NAME } from "../src/three/airServiceBrand.ts";
 
 type FakeCanvas = {
   width: number;
@@ -335,80 +335,90 @@ test("AKE rigid door obeys the same unlocking gate; fabric stays independently l
 });
 
 
-test("aviation decal attaches cleanly to all 17 ULD families", () => {
+function assertClearPrint(container: ViewerContainer, mark: THREE.Mesh<THREE.PlaneGeometry>, id: string) {
+  container.group.updateMatrixWorld(true);
+  const { width, height } = mark.geometry.parameters;
+  const clearance = 0.012;
+  const halfWidth = width / 2 + clearance;
+  const halfHeight = height / 2 + clearance;
+  const rayDepth = 0.12;
+  const normal = new THREE.Vector3(0, 0, 1).transformDirection(mark.matrixWorld);
+  const direction = normal.clone().negate();
+  const ray = new THREE.Raycaster(undefined, undefined, 0, rayDepth + 0.002);
+  const candidates: THREE.Mesh[] = [];
+  const inverse = mark.matrixWorld.clone().invert();
+  const transform = new THREE.Matrix4();
+  const footprint = new THREE.Box3(
+    new THREE.Vector3(-halfWidth, -halfHeight, -0.002),
+    new THREE.Vector3(halfWidth, halfHeight, rayDepth),
+  );
+  container.group.traverseVisible((part) => {
+    if (!(part instanceof THREE.Mesh) || part === mark) return;
+    const instanceBounds = part instanceof THREE.InstancedMesh;
+    if (instanceBounds) part.computeBoundingBox();
+    part.geometry.computeBoundingBox();
+    const box = (instanceBounds ? part.boundingBox : part.geometry.boundingBox)?.clone();
+    if (box?.applyMatrix4(transform.multiplyMatrices(inverse, part.matrixWorld)).intersectsBox(footprint)) {
+      candidates.push(part);
+    }
+  });
+  const columns = Math.ceil(2 * halfWidth / 0.015);
+  const rows = Math.ceil(2 * halfHeight / 0.015);
+  const origin = new THREE.Vector3();
+  for (let row = 0; row <= rows; row++) {
+    for (let col = 0; col <= columns; col++) {
+      origin.set(
+        THREE.MathUtils.lerp(-halfWidth, halfWidth, col / columns),
+        THREE.MathUtils.lerp(-halfHeight, halfHeight, row / rows),
+        rayDepth,
+      ).applyMatrix4(mark.matrixWorld);
+      ray.set(origin, direction);
+      const hit = ray.intersectObjects(candidates, false)[0];
+      assert.equal(hit?.object.name, mark.parent?.name, `${id} footprint meets ${hit?.object.name ?? "open air"}`);
+      assert.ok(Math.abs(hit.distance - rayDepth - 0.0005) < 1e-5, `${id} must be flush`);
+    }
+  }
+}
+
+test("the whole aviation lockup fits a clear surface on all 17 ULD families", () => {
   const previousImage = Object.getOwnPropertyDescriptor(globalThis, "Image");
   const originalLoad = THREE.TextureLoader.prototype.load;
   Object.defineProperty(globalThis, "Image", {
     value: class FakeImage {},
     configurable: true,
   });
-  THREE.TextureLoader.prototype.load = function () {
-    return new THREE.Texture();
-  };
+  THREE.TextureLoader.prototype.load = () => new THREE.Texture();
 
   try {
-    for (const id of Object.keys(MODELS) as ModelId[]) {
-      const container = MODELS[id].build(options);
-      assert.equal(
-        addAirCargoOperatorMark(container, "data:image/png;base64,AA=="),
-        true,
-        `${id} did not receive an aviation mark`,
-      );
-      const marks: THREE.Mesh[] = [];
-      container.group.traverse((part) => {
-        if (part.name === "Air Cargo Aviation monogram - transparent applied decal") {
-          marks.push(part as THREE.Mesh);
+    const ids = Object.keys(MODELS) as ModelId[];
+    assert.equal(ids.length, 17);
+    for (const variant of [...ids, "ake-fabric"] as const) {
+      const id = variant === "ake-fabric" ? "ake" : variant;
+      const akeDoor = variant === "ake-fabric" ? "fabric" : "rigid";
+      const container = MODELS[id].build({ ...options, akeDoor, load: 0 });
+      try {
+        assert.equal(addAirCargoOperatorMark(container, id, options.finish, "/mark.png"), true);
+        const marks: THREE.Mesh<THREE.PlaneGeometry>[] = [];
+        container.group.traverseVisible((part) => {
+          if (part.name === AIR_MARK_NAME) marks.push(part as THREE.Mesh<THREE.PlaneGeometry>);
+        });
+        assert.equal(marks.length, 1, variant);
+        const [mark] = marks;
+        const material = mark.material as THREE.MeshStandardMaterial;
+        assert.equal(material.transparent, true);
+        assert.ok(material.map);
+        assertClearPrint(container, mark, variant);
+        const closed = mark.getWorldPosition(new THREE.Vector3());
+        if (mark.parent?.name === "Door leaf" || akeDoor === "fabric") {
+          container.setDoorOpen(0.7);
+          const opened = mark.getWorldPosition(new THREE.Vector3());
+          if (akeDoor === "fabric") assert.deepEqual(opened, closed);
+          else assert.ok(opened.distanceTo(closed) > 0.05, variant);
         }
-      });
-      assert.equal(marks.length, 1, `${id} must receive exactly one logo`);
-      const mark = marks[0];
-      const material = mark.material as THREE.MeshBasicMaterial;
-      assert.equal(material.transparent, true, `${id} logo must retain alpha`);
-      assert.ok(material.map, `${id} logo texture must be attached`);
-      assert.ok(mark.geometry.parameters.width >= 0.2);
-      assert.ok(mark.geometry.parameters.height >= 0.1);
-
-      const door = container.doorPivot?.getObjectByName("Door leaf") as THREE.Mesh | undefined;
-      if (door?.geometry && container.doorPivot) {
-        assert.equal(mark.parent, container.doorPivot, `${id} logo must follow the hinged leaf`);
-        door.geometry.computeBoundingBox();
-        const box = door.geometry.boundingBox!;
-        assert.ok(mark.position.x > box.min.x && mark.position.x < box.max.x);
-        assert.ok(mark.position.y > box.min.y && mark.position.y < box.max.y);
-      } else {
-        const deck = container.group.getObjectByName("Pallet base plate") as THREE.Mesh | undefined;
-        assert.ok(deck, `${id} needs either a door surface or a pallet deck`);
-        assert.equal(mark.parent, deck);
-        assert.equal(mark.rotation.x, -Math.PI / 2, `${id} pallet decal must lie flat`);
-        deck.geometry.computeBoundingBox();
-        const box = deck.geometry.boundingBox!;
-        assert.ok(mark.position.x > box.min.x && mark.position.x < box.max.x);
-        assert.ok(mark.position.z > box.min.z && mark.position.z < box.max.z);
+      } finally {
+        container.dispose();
       }
-      container.dispose();
     }
-
-    const fabric = MODELS.ake.build({ ...options, akeDoor: "fabric" });
-    assert.equal(addAirCargoOperatorMark(fabric, "data:image/png;base64,AA=="), true);
-    const mark = fabric.group.getObjectByName(
-      "Air Cargo Aviation monogram - transparent applied decal",
-    );
-    assert.ok(mark);
-    assert.equal(mark.parent, fabric.assemblies.find((a) => a.id === "blind")?.group);
-    fabric.dispose();
-
-    const rigid = MODELS.ake.build(options);
-    assert.equal(addAirCargoOperatorMark(rigid, "data:image/png;base64,AA=="), true);
-    const movingMark = rigid.group.getObjectByName(
-      "Air Cargo Aviation monogram - transparent applied decal",
-    )!;
-    rigid.group.updateMatrixWorld(true);
-    const closed = movingMark.getWorldPosition(new THREE.Vector3()).clone();
-    rigid.setDoorOpen(0.9);
-    rigid.group.updateMatrixWorld(true);
-    const open = movingMark.getWorldPosition(new THREE.Vector3());
-    assert.ok(closed.distanceTo(open) > 0.05, "rigid-door logo must move with the door");
-    rigid.dispose();
   } finally {
     THREE.TextureLoader.prototype.load = originalLoad;
     if (previousImage) Object.defineProperty(globalThis, "Image", previousImage);
