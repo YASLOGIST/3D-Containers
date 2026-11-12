@@ -3,7 +3,7 @@ import type { ModelId } from "./models";
 import type { FinishId, ViewerContainer } from "./primitives";
 
 export const AIR_MARK_NAME = "YASLOGIST Air Cargo & Aviation - surface print";
-const ARTWORK_ASPECT = 954 / 1024;
+const ARTWORK_ASPECT = 1360 / 1536;
 const INK_OFFSET = 0.0005;
 
 type DoorField = {
@@ -42,7 +42,7 @@ function addPrint(
 ) {
   const map = new THREE.TextureLoader().load(url);
   map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
+  map.anisotropy = 16;
   const lightInk = finish === "graphite" || finish === "airline";
   const material = new THREE.MeshStandardMaterial({
     map,

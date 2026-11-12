@@ -380,7 +380,7 @@ export class AKEViewer {
       onMeasure?: (m: MeasureInfo) => void;
       onSection?: (s: SectionInfo) => void;
     } = {},
-    private readonly aviationLockupUrl?: string,
+    private readonly aviationPrintUrl?: string,
   ) {
     this.host = host;
     this.state = { ...state };
@@ -717,7 +717,7 @@ export class AKEViewer {
       load: this.state.load,
     });
     this.modelRoot.add(this.container.group);
-    addAirCargoOperatorMark(this.container, this.state.model, this.state.finish, this.aviationLockupUrl);
+    addAirCargoOperatorMark(this.container, this.state.model, this.state.finish, this.aviationPrintUrl);
     // Measure overall spans with door latched, pallet load stowed and
     // assemblies home. This is not a contour or certification check.
     this.container.setDoorOpen(0);
@@ -1361,20 +1361,32 @@ export class AKEViewer {
     this.scene.add(group);
   }
 
-  /** Current viewport as a PNG (rendered fresh, no drawing-buffer retention). */
+  /** Capture the viewport at up to 2× with a 4K pixel budget. */
   async snapshotPNG(): Promise<Blob> {
-    if (this.shadowDirty) {
-      this.renderer.shadowMap.needsUpdate = true;
-      this.shadowDirty = false;
+    const renderer = this.renderer;
+    const liveRatio = renderer.getPixelRatio();
+    const { x: width, y: height } = renderer.getSize(new THREE.Vector2());
+    const captureRatio = Math.max(liveRatio, Math.min(2, Math.sqrt(8_294_400 / (width * height))));
+    try {
+      if (captureRatio !== liveRatio) renderer.setPixelRatio(captureRatio);
+      if (this.shadowDirty) {
+        renderer.shadowMap.needsUpdate = true;
+        this.shadowDirty = false;
+      }
+      renderer.render(this.scene, this.camera);
+      // toBlob snapshots the drawing buffer before encoding asynchronously.
+      return new Promise((resolve, reject) => {
+        renderer.domElement.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error("snapshot unavailable")),
+          "image/png",
+        );
+      });
+    } finally {
+      if (captureRatio !== liveRatio) {
+        renderer.setPixelRatio(liveRatio);
+        this.wake();
+      }
     }
-    this.renderer.render(this.scene, this.camera);
-    return new Promise((resolve, reject) => {
-      this.renderer.domElement.toBlob(
-        (blob) =>
-          blob ? resolve(blob) : reject(new Error("snapshot unavailable")),
-        "image/png",
-      );
-    });
   }
 
   /* ---------------- state ---------------- */
@@ -2028,7 +2040,7 @@ export class AKEViewer {
       const buf = (await exporter.parseAsync(this.exportRoot(), {
         binary: true,
         onlyVisible: true,
-        maxTextureSize: 1024,
+        maxTextureSize: 1536,
       })) as ArrayBuffer;
       return new Blob([buf], { type: "model/gltf-binary" });
     } finally {

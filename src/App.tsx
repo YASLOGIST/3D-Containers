@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import aviationEmblem from "./assets/branding/air-cargo-emblem.png";
-import aviationLockup from "./assets/branding/air-cargo-lockup.png";
+import aviationPrint from "./assets/branding/yaslogist-air-print.png";
 
 import akeSource from "./three/akeLD3.ts?raw";
 import doorMotionSource from "./three/doorKinematics.ts?raw";
@@ -338,7 +338,7 @@ export default function App() {
             setError(message);
             if (message) setReady(true);
           },
-        }, aviationLockup);
+        }, aviationPrint);
         viewer.current = v;
       } catch (cause) {
         setError(

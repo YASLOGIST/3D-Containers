@@ -17,7 +17,7 @@ function canvas2d(w: number, h: number) {
 function toTexture(c: HTMLCanvasElement, srgb = false) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = 16;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.needsUpdate = true;
   return t;
@@ -242,7 +242,7 @@ export function makeIdPlate(o: PlacardOptions) {
   const key = `id-plate:${JSON.stringify(o)}`;
   return cachedTexture(key, () => {
     const rand = seededRandom(0x1d91a7e);
-    const W = 1024;
+    const W = 1536;
     const H = Math.round((W * o.height) / o.width);
     const { c, ctx } = canvas2d(W, H);
     const s = W / 1024;
@@ -271,26 +271,27 @@ export function makeIdPlate(o: PlacardOptions) {
 
     // rivets
     ctx.fillStyle = "#6d757c";
+    const inset = 30 * s;
     for (const [rx, ry] of [
-      [30, 30],
-      [W - 30, 30],
-      [30, H - 30],
-      [W - 30, H - 30],
+      [inset, inset],
+      [W - inset, inset],
+      [inset, H - inset],
+      [W - inset, H - inset],
     ]) {
       ctx.beginPath();
-      ctx.arc(rx * s, ry * s, 7 * s, 0, Math.PI * 2);
+      ctx.arc(rx, ry, 7 * s, 0, Math.PI * 2);
       ctx.fill();
     }
 
     ctx.fillStyle = "#1b1f23";
     ctx.textBaseline = "top";
     ctx.font = `700 ${74 * s}px "Chakra Petch", sans-serif`;
-    ctx.fillText(o.id, 56 * s, 52 * s);
+    ctx.fillText(o.id, 56 * s, 52 * s, 310 * s);
     ctx.font = `500 ${34 * s}px "IBM Plex Mono", monospace`;
     ctx.fillStyle = "#333a40";
     ctx.fillText(
       o.carrier,
-      56 * s + ctx.measureText(o.id).width * 0 + 330 * s,
+      386 * s,
       74 * s,
     );
 
@@ -311,14 +312,14 @@ export function makeIdPlate(o: PlacardOptions) {
       ctx.fillText(k, x, y);
       ctx.fillStyle = "#14181b";
       ctx.font = `600 ${34 * s}px "IBM Plex Mono", monospace`;
-      ctx.fillText(v, x + 250 * s, y - 2 * s);
+      ctx.fillText(v, x + 250 * s, y - 2 * s, 210 * s);
       ctx.font = `500 ${30 * s}px "IBM Plex Mono", monospace`;
     });
 
     drawBarcode(ctx, 56 * s, H - 132 * s, 560 * s, 86 * s, o.serial);
     ctx.fillStyle = "#22282c";
     ctx.font = `500 ${26 * s}px "IBM Plex Mono", monospace`;
-    ctx.fillText(o.serial, 640 * s, H - 104 * s);
+    ctx.fillText(o.serial, 640 * s, H - 104 * s, 328 * s);
     ctx.fillText("IATA ULD / AS1811", 640 * s, H - 68 * s);
 
     return toTexture(c, true);
