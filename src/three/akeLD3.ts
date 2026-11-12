@@ -30,6 +30,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { addAKEPrecisionDetails } from "./akePrecisionDetails";
 import { makeIdPlate, makeLivery, makeStencil } from "./textures";
 import {
   Assembly,
@@ -833,6 +834,23 @@ export function createAKEContainer(
       "Door data plate",
     ),
   );
+
+  if (o.detail) {
+    addAKEPrecisionDetails({
+      hull: A_HULL.group,
+      blind: A_END.group,
+      doorPivot,
+      profile: nominal,
+      length: BL,
+      height: H,
+      doorFace: FACE,
+      doorHingeX: HINGE_X,
+      blindFaceZ,
+      alloy: mat.alloy,
+      steel: mat.steel,
+      includeFasteners: o.rivets,
+    });
+  }
 
   doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
 

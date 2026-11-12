@@ -168,3 +168,63 @@ test("rebuilding a generator yields stable triangle counts", () => {
   assert.equal(second.stats.triangles, firstTriangles);
   second.dispose();
 });
+
+
+test("AKE precision detailing is conditional, parented and envelope-safe", () => {
+  const detailed = MODELS.ake.build({ ...options, detail: true, rivets: true });
+  const simplified = MODELS.ake.build({ ...options, detail: false, rivets: false });
+  const noFasteners = MODELS.ake.build({ ...options, detail: true, rivets: false });
+
+  const names = (model: ViewerContainer) => {
+    const found: string[] = [];
+    model.group.traverse((o) => found.push(o.name));
+    return found;
+  };
+  const fullNames = names(detailed);
+  const lightNames = names(simplified);
+  const withoutFasteners = names(noFasteners);
+
+  assert.ok(fullNames.includes("AKE panel joint - raised seam"));
+  assert.ok(fullNames.includes("AKE door pressed reinforcement channel"));
+  assert.ok(fullNames.includes("AKE blind-end service cover"));
+  assert.ok(fullNames.includes("AKE skin joint microfasteners"));
+  assert.ok(fullNames.includes("AKE door captive screw heads"));
+  assert.ok(!lightNames.includes("AKE panel joint - raised seam"));
+  assert.ok(!withoutFasteners.includes("AKE skin joint microfasteners"));
+  assert.ok(withoutFasteners.includes("AKE door pressed reinforcement channel"));
+  assert.ok(detailed.stats.triangles > simplified.stats.triangles);
+
+  const bb = bounds(detailed).box;
+  // Precision details must not blow out the reference envelope.
+  assert.ok(bb.min.x >= -1.02 && bb.max.x <= 1.02);
+  assert.ok(bb.min.y >= -0.02 && bb.max.y <= 1.64);
+  assert.ok(bb.min.z >= -0.80 && bb.max.z <= 0.80);
+
+  const face = detailed.group.getObjectByName("AKE door pressed reinforcement channel");
+  assert.ok(face);
+  const before = face.getWorldPosition(new THREE.Vector3());
+  detailed.setDoorOpen(0.5);
+  detailed.group.updateMatrixWorld(true);
+  const after = face.getWorldPosition(new THREE.Vector3());
+  assert.ok(before.distanceTo(after) > 0.005, "detail must follow door rotation");
+
+  detailed.dispose();
+  simplified.dispose();
+  noFasteners.dispose();
+});
+
+test("painted and bare-metal finishes have distinct physically meaningful maps", () => {
+  const enamel = MODELS.ake.build({ ...options, finish: "airline" });
+  const bare = MODELS.ake.build({ ...options, finish: "mill" });
+  const painted = enamel.materials.shell;
+  const metal = bare.materials.shell;
+
+  assert.ok(painted.metalness <= 0.15, "paint is a dielectric, not polished aluminum");
+  assert.ok(metal.metalness >= 0.95, "bare aluminum remains metallic");
+  assert.ok(painted.roughness >= 0.35);
+  assert.ok(metal.roughness >= 0.35);
+  assert.notEqual(painted.normalMap?.image, metal.normalMap?.image);
+  assert.notEqual(painted.roughnessMap?.image, metal.roughnessMap?.image);
+  enamel.dispose();
+  bare.dispose();
+});

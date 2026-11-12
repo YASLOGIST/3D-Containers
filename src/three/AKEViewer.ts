@@ -72,7 +72,7 @@ export const DEFAULT_STATE: ViewerState = {
   door: 0,
   explode: 0,
   metalness: 1,
-  roughness: 0.33,
+  roughness: 0.44,
   envIntensity: 1,
   wireframe: false,
   dimensions: true,
@@ -1314,7 +1314,9 @@ export class AKEViewer {
     const structural =
       (patch.contour !== undefined && patch.contour !== prev.contour) ||
       (patch.detail !== undefined && patch.detail !== prev.detail) ||
-      (patch.rivets !== undefined && patch.rivets !== prev.rivets);
+      (patch.rivets !== undefined && patch.rivets !== prev.rivets) ||
+      // Painted and bare-metal finishes use different physical surface maps.
+      (patch.finish !== undefined && patch.finish !== prev.finish);
     if (structural) {
       this.rebuild();
       this.setSurface(this.state.metalness, this.state.roughness);

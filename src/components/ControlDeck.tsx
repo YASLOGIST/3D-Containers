@@ -331,7 +331,7 @@ function ControlDeckBase({
                   active={state.compare === id}
                   pressed={state.compare === id}
                   onClick={() => set({ compare: id })}
-                  title={`${MODELS[id].name} certified envelope`}
+                  title={`${MODELS[id].name} reference envelope`}
                 >
                   {MODELS[id].code}
                 </Btn>

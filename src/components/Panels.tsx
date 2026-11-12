@@ -313,12 +313,12 @@ function SpecSheetBase({
           <div className="mb-1 flex items-center gap-2">
             <span className="h-1.5 w-1.5 bg-amber" />
             <span className="stencil text-[9.5px] text-dim">
-              certified comparison · {model.code} vs {compareModel.code}
+              reference comparison · {model.code} vs {compareModel.code}
             </span>
           </div>
           {(
             [
-              ["Certified volume", model.ratings.volumeM3, compareModel.ratings.volumeM3, "m³", 2],
+              ["Reference volume", model.ratings.volumeM3, compareModel.ratings.volumeM3, "m³", 2],
               ["Net payload", model.ratings.payloadKg, compareModel.ratings.payloadKg, "kg", 0],
               ["Footprint", model.dims.width * model.dims.depth, compareModel.dims.width * compareModel.dims.depth, "m²", 2],
               ["Height", model.dims.height, compareModel.dims.height, "m", 2],
@@ -333,7 +333,7 @@ function SpecSheetBase({
             />
           ))}
           <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
-            Registry-certified figures for both units; the dashed 3-D envelope
+            Registry reference figures for both units; the dashed 3-D envelope
             shows the same comparison spatially.
           </p>
         </div>
@@ -350,7 +350,7 @@ function SpecSheetBase({
 /* ------------------------------------------------------------------ */
 
 /**
- * Fleet-at-a-glance: every family's certified section silhouette as a
+ * Fleet-at-a-glance: every family's reference section silhouette as a
  * clickable chip, so the whole catalogue can be scanned and jumped
  * between without cycling the header switcher. Silhouettes are
  * normalized per unit for legibility — the hold-fit card above remains

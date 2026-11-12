@@ -45,7 +45,7 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
     const { c, ctx } = canvas2d(size, size);
 
     // base grey (mid roughness)
-    ctx.fillStyle = "#8a8a8a";
+    ctx.fillStyle = "#b9b9b9";
     ctx.fillRect(0, 0, size, size);
 
     // coarse grain
@@ -99,6 +99,68 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
     brushedSources.set(key, pair);
   }
 
+  const roughnessMap = pair.roughnessMap.clone();
+  const normalMap = pair.normalMap.clone();
+  roughnessMap.needsUpdate = true;
+  normalMap.needsUpdate = true;
+  return { roughnessMap, normalMap };
+}
+
+/* ------------------------------------------------------------------ */
+/* Painted sheet / subtle orange-peel microfinish                      */
+/* ------------------------------------------------------------------ */
+
+const coatedSources = new Map<string, {
+  roughnessMap: THREE.Texture;
+  normalMap: THREE.Texture;
+}>();
+
+/**
+ * Painted ULD panels are dielectric coatings, not bare metal.
+ * The repeatable shallow grain gives a diffuse orange-peel response without
+ * loading image assets or adding geometry. The 1024px source is cached.
+ */
+export function makeCoatedPanel(size = 1024) {
+  const key = "coated:" + size;
+  let pair = coatedSources.get(key);
+  if (!pair) {
+    const rand = seededRandom(0xc0a7ed ^ size);
+    const { c, ctx } = canvas2d(size, size);
+    ctx.fillStyle = "#d5d5d5";
+    ctx.fillRect(0, 0, size, size);
+
+    for (let i = 0; i < size * 6; i++) {
+      const x = rand() * size;
+      const y = rand() * size;
+      const dark = rand() < 0.5;
+      ctx.fillStyle = dark
+        ? "rgba(28,28,28,0.10)"
+        : "rgba(255,255,255,0.13)";
+      const d = 0.6 + rand() * 2;
+      ctx.fillRect(x, y, d, d);
+    }
+
+    const src = ctx.getImageData(0, 0, size, size).data;
+    const { c: nc, ctx: nctx } = canvas2d(size, size);
+    const out = nctx.createImageData(size, size);
+    const at = (x: number, y: number) =>
+      src[(((y + size) % size) * size + ((x + size) % size)) * 4] / 255;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (at(x + 1, y) - at(x - 1, y)) * 0.7;
+        const dy = (at(x, y + 1) - at(x, y - 1)) * 0.7;
+        const mag = Math.hypot(dx, dy, 1);
+        const i = (y * size + x) * 4;
+        out.data[i] = ((-dx / mag) * 0.5 + 0.5) * 255;
+        out.data[i + 1] = ((-dy / mag) * 0.5 + 0.5) * 255;
+        out.data[i + 2] = (1 / mag) * 0.5 * 255 + 127;
+        out.data[i + 3] = 255;
+      }
+    }
+    nctx.putImageData(out, 0, 0);
+    pair = { roughnessMap: toTexture(c), normalMap: toTexture(nc) };
+    coatedSources.set(key, pair);
+  }
   const roughnessMap = pair.roughnessMap.clone();
   const normalMap = pair.normalMap.clone();
   roughnessMap.needsUpdate = true;

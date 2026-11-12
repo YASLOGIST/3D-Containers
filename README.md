@@ -159,6 +159,8 @@ The repository's [CI workflow](.github/workflows/ci.yml) runs tests and build on
 
 ## `06 /` Engineering notes
 
+**Realism validation:** The AKE industrial surface/detail layer is documented in [REALISM_VALIDATION.md](docs/REALISM_VALIDATION.md), including manufacturer-variant limitations, references and device-test criteria. Paint and bare metal now use separate physical maps; dimensional data remains representative until independently verified for a particular serial/model.
+
 | Area | Status in this repository | Evidence / limitations |
 | :--- | :--- | :--- |
 | ULD geometry and inspection | Implemented | [Registry](src/three/models.ts), [generators](src/three/), [viewer](src/three/AKEViewer.ts); model details and options differ. |
