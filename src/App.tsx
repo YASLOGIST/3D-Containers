@@ -324,6 +324,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   /* ---------------- boot the viewer ---------------- */
   useEffect(() => {
@@ -731,6 +732,7 @@ export default function App() {
       else if (k === "m") toggleMeasure(!measureOn);
       else if (k === "p") void doSnapshot();
       else if (k === "escape") {
+        setFocusMode(false);
         if (measureOn) toggleMeasure(false);
         else viewer.current?.clearMeasure();
         setSheet(false);
@@ -802,8 +804,33 @@ export default function App() {
         }}
       />
 
+      {/* Presentation mode: uncluttered viewport, no extra renderer or scene. */}
+      {focusMode && (
+        <div className="pointer-events-none absolute inset-0 z-20">
+          <div className="absolute left-4 top-5 max-w-[75vw] border-l-2 border-[#94d7ed]/80 bg-[#0a1822]/75 py-3 pl-4 pr-6 backdrop-blur-sm sm:left-10 sm:top-9 sm:pl-5">
+            <div className="font-mono text-[9px] uppercase tracking-[.23em] text-[#9bd5e9] sm:text-[11px]">
+              YASLOGIST / AIR CARGO &amp; AVIATION
+            </div>
+            <div className="mt-2 font-display text-[26px] font-bold uppercase leading-none tracking-[.045em] text-white sm:text-[44px]">
+              3D CONTAINERS
+            </div>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[.16em] text-[#c5e4ee]">
+              {spec.code} · {spec.family}
+            </div>
+          </div>
+          <button type="button" onClick={() => setFocusMode(false)}
+            className="pointer-events-auto absolute right-3 top-3 min-h-10 border border-[#6aa7be]/75 bg-[#0a1822]/90 px-3 py-2 font-mono text-[10px] uppercase tracking-[.12em] text-white hover:bg-[#244553] focus-visible:outline-[#b3e6f2] sm:right-9 sm:top-9">
+            exit focus · esc
+          </button>
+          <div className="absolute bottom-5 left-5 border-l border-[#8cc7de]/70 pl-3 font-mono text-[9px] uppercase tracking-[.14em] text-[#bfdce7] sm:bottom-9 sm:left-10">
+            Interactive ULD engineering · Drag to orbit · Scroll to inspect
+          </div>
+          <span aria-hidden="true" className="absolute bottom-8 right-9 hidden h-12 w-12 border-b border-r border-[#89d5ea]/60 sm:block" />
+        </div>
+      )}
+
       {/* High-visibility entrance to the working cargo demonstration. */}
-      {!error && (
+      {!error && !focusMode && (
         <CargoMissionDock
           active={cargoItems.length > 0}
           modelCode={spec.code}
@@ -822,7 +849,10 @@ export default function App() {
       )}
 
       {/* ---------------- top bar ---------------- */}
-      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
+      <header className={cn(
+        "anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4",
+        focusMode && "hidden",
+      )}>
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
           <span className="aviation-emblem-frame" aria-hidden="true">
             <img src={aviationEmblem} alt=""
@@ -874,6 +904,19 @@ export default function App() {
             ))}
           </div>
           <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5 sm:contents">
+          <Btn
+            active={focusMode}
+            pressed={focusMode}
+            onClick={() => {
+              setFocusMode(true);
+              setSheet(false);
+              viewer.current?.frameAll();
+            }}
+            title="Presentation focus view with clear canvas; press Escape to exit"
+            className="border-[#5e97b2]/70 text-[#bde0ed]"
+          >
+            ⊞ focus
+          </Btn>
           <Btn
             active={tab === "studio"}
             pressed={tab === "studio"}
@@ -951,7 +994,7 @@ export default function App() {
       </header>
 
       {/* ---------------- left: control deck ---------------- */}
-      <div className="anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden lg:bottom-14 lg:block xl:left-4">
+      <div className={cn("anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden lg:bottom-14 lg:block xl:left-4", focusMode && "lg:!hidden")}>
         <div className="pointer-events-auto max-h-[calc(100dvh-190px)] overflow-y-auto scroll-slim pr-1">
           <ControlDeck
             state={state}
@@ -968,7 +1011,7 @@ export default function App() {
       </div>
 
       {/* ---------------- right: instrument stack ---------------- */}
-      <aside className="anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4">
+      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4", focusMode && "lg:!hidden")}>
         <div className="pointer-events-auto">
           <div
             role="tablist"
@@ -1133,7 +1176,7 @@ export default function App() {
       </aside>
 
       {/* ---------------- bottom status strip ---------------- */}
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
+      <footer className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm", focusMode && "hidden")}>
         <div className="flex items-center gap-3 overflow-hidden px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
           <span
             className={cn(
@@ -1198,7 +1241,7 @@ export default function App() {
       </footer>
 
       {/* ---------------- mobile sheet ---------------- */}
-      <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden">
+      <div className={cn("pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden", focusMode && "!hidden")}>
         <div className="flex items-center justify-start gap-1.5 overflow-x-auto whitespace-nowrap px-3 pb-2 sm:justify-center">
           <Btn
             active={sheet && tab === "spec"}

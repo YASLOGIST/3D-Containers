@@ -416,14 +416,17 @@ export class AKEViewer {
   });
   private cargoCoreWire = new THREE.LineSegments(this.cargoCoreEdges, this.cargoCoreMaterial);
   private cargoBoxGeometry = makeCartonGeometry();
-  private cargoEdgeGeometry = new THREE.EdgesGeometry(this.cargoBoxGeometry);
-  private cargoLineMaterial = new THREE.LineBasicMaterial({ color: 0x533c29, transparent: true, opacity: 0.42 });
   private cargoAtlas = makeCartonAtlas();
-  private cargoMaterials = [0xffffff, 0xf4e4c8, 0xedf0e4, 0xe3d9c8].map(color =>
-    new THREE.MeshStandardMaterial({
-      color, map: this.cargoAtlas, roughness: 0.90, metalness: 0,
-    }),
+  private cargoMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: this.cargoAtlas, roughness: 0.90, metalness: 0,
+  });
+  /** A single instanced draw for all 40 potential cartons. No mesh churn. */
+  private cargoInstances = new THREE.InstancedMesh(
+    this.cargoBoxGeometry, this.cargoMaterial, 40,
   );
+  private cargoMatrixHelper = new THREE.Object3D();
+  private cargoTint = ["#ffffff", "#f4e4c8", "#edf0e4", "#e3d9c8"]
+    .map(color => new THREE.Color(color));
   private fieldPlaneGeometry = new THREE.PlaneGeometry(1, 1);
   private fieldMaterials = [0x246a84, 0x48a2b4, 0xd4a968, 0xee8351].map(color =>
     new THREE.MeshBasicMaterial({
@@ -2197,20 +2200,22 @@ export class AKEViewer {
     this.cargoCoreWire.scale.set(core.widthM, core.heightM, core.depthM);
     this.cargoGroup.visible = true;
     if (showCore) this.cargoGroup.add(this.cargoCoreWire);
-    cartons.slice(0, 40).forEach((carton, index) => {
-      const mesh = new THREE.Mesh(
-        this.cargoBoxGeometry,
-        this.cargoMaterials[index % this.cargoMaterials.length],
-      );
-      mesh.name = `Cargo preview: ${carton.label}`;
-      mesh.position.set(carton.x, carton.y, carton.z);
-      mesh.scale.set(carton.widthM, carton.heightM, carton.depthM);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      const edges = new THREE.LineSegments(this.cargoEdgeGeometry, this.cargoLineMaterial);
-      mesh.add(edges);
-      this.cargoGroup.add(mesh);
+    const visible = cartons.slice(0, 40);
+    this.cargoInstances.count = visible.length;
+    this.cargoInstances.name = "Cargo cartons · instanced preview";
+    this.cargoInstances.castShadow = true;
+    this.cargoInstances.receiveShadow = true;
+    visible.forEach((carton, index) => {
+      this.cargoMatrixHelper.position.set(carton.x, carton.y, carton.z);
+      this.cargoMatrixHelper.scale.set(carton.widthM, carton.heightM, carton.depthM);
+      this.cargoMatrixHelper.updateMatrix();
+      this.cargoInstances.setMatrixAt(index, this.cargoMatrixHelper.matrix);
+      this.cargoInstances.setColorAt(index, this.cargoTint[index % this.cargoTint.length]);
     });
+    this.cargoInstances.instanceMatrix.needsUpdate = true;
+    if (this.cargoInstances.instanceColor) this.cargoInstances.instanceColor.needsUpdate = true;
+    this.cargoInstances.frustumCulled = false;
+    if (visible.length) this.cargoGroup.add(this.cargoInstances);
 
     if (showMassField && signature?.centroid && cartons.length) {
       // 3×3 mass projection, independent of actual structure and restraints.
@@ -2336,13 +2341,12 @@ export class AKEViewer {
     this.container?.dispose();
     this.cargoGroup.clear();
     this.scene.remove(this.cargoGroup);
+    this.cargoInstances.dispose();
     this.cargoBoxGeometry.dispose();
-    this.cargoEdgeGeometry.dispose();
     this.cargoCoreEdges.dispose();
     this.cargoCoreGeometry.dispose();
     this.cargoCoreMaterial.dispose();
-    this.cargoLineMaterial.dispose();
-    this.cargoMaterials.forEach(material => material.dispose());
+    this.cargoMaterial.dispose();
     this.cargoAtlas.dispose();
     this.fieldPlaneGeometry.dispose();
     this.fieldMaterials.forEach(material => material.dispose());

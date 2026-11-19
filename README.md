@@ -138,6 +138,10 @@ The demo cartons now use separate deterministic kraft-fibre textures on their to
 
 The mass field divides the preview core into nine equal plan-view areas and apportions each accepted carton's mass by overlap of its horizontal footprint. It includes stacked cartons in their footprint cells and calculates a mass-weighted centroid from carton positions. The `kg/m²` number is **projected mass per grid area**, not actual physical contact pressure or a safe floor-load threshold. Neither the box models nor this analytical view can certify real ULD hardware clearances, load securing, centre-of-gravity limits, floor strength, vibration, or airworthiness. These tools are designed as engineering explorations; uniqueness is not claimed. See `src/lib/cargoSignature.ts` and the tests for numerical evidence.
 
+### Presentation focus and public sharing
+
+The top-bar **⊞ focus** action switches to a full-canvas presentation HUD for showcasing the 3D scene without stacked control panels. **Escape** or **exit focus** restores the full workbench. It preserves the current unit, camera and cargo overlay. The studio presentation uses static HUD guides and does not add a second renderer or continuous decorative animation. The production domain is `https://containers.yaslogist.com/`, with a 1200 × 630 authentic project screenshot (`public/og-3d-containers.jpg`) used for LinkedIn/Open Graph and Twitter large-image previews. This screenshot is a visualization, not an OEM-certified aircraft loading scene.
+
 ## `05 /` Ignition
 
 **Requirements:** Node.js **20.19 or newer**, npm, and a browser with JavaScript and WebGL available.
