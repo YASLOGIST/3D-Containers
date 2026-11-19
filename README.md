@@ -120,9 +120,27 @@ flowchart LR
 | :--- | :--- | :--- |
 | **Geometry** | Adjust finish and assembly options, animate doors or exploded views, and inspect part groups. | Controls vary by model. |
 | **Inspection** | Perspective or orthographic view, dimensions, point-to-point measurement, section cuts and compare envelope. | Section clipping is view-only; exports remain whole and uncapped. |
-| **Planning** | Estimate payload and volume utilization, dimensional and chargeable weight, and overload status from entered cargo. | Estimates only; aircraft position, restraint, contour and center of gravity are not evaluated. Carrier-specific charging rules and rounding may differ. |
+| **Planning** | Estimate payload and volume utilization, dimensional and chargeable weight, and overload status from entered cargo. | The Studio adds a **cargo-only illustrative mass centroid**, not a certified aircraft centre-of-gravity, floor-strength, restraint or trim calculation. Carrier-specific charging rules and rounding may differ. |
 | **Exchange** | Download binary `.glb`, `.obj`, binary `.stl`, a PNG snapshot or selected TypeScript source. | GLB exports visible objects; OBJ/STL export geometry. Check units and output in the target application. |
 | **Share** | Encode viewer configuration in the URL hash. | Planner inputs are session-only and are not shared. |
+
+### Model-aware 3D cargo placement sandbox (prototype)
+
+The compact **Cargo 3D** bar at the bottom of the scene offers **LOAD 3D** for whichever ULD family is selected. All **17 registry models**, including **PAG / PMC / PGA pallets**, now get their own 27-carton demonstration, a model-specific outline and a cargo inspector. Switching models preserves selection; a demo manifest is recomputed for the new dimensions, whereas manually entered cargo is kept and re-evaluated. The bar is deliberately slim and no longer blocks the middle of the viewer. Use **EDIT** or the **cargo** tab to change carton dimensions and mass, remove boxes, inspect rejected cargo and view utilization metrics. The cargo manifest is session-only.
+
+The preview derives an **inset rectangular core** from each nominal section profile, with additional illustrative margins for refrigeration units. Pallets get a load space above their plate; their alternative translucent load contour is hidden while cartons are present to avoid overlapping presentations. The deterministic first-fit algorithm (`src/lib/cargoPlacement.ts`) prevents carton-to-carton collisions, checks core bounds, requires full single-carton or floor support, and limits accepted mass by the registry payload rating. This does **not** validate contact with interior fittings or cabin restraints, manufacturer-specific clearances, the cargo net, pallet security, strength, centre-of-gravity, or airworthiness. These are **visual estimates only**, not approved operating or loading instructions. GLB/OBJ/STL exports contain the ULD model, not the carton overlays; share links do not preserve the manifest. The regression suite checks all 17 preview cores and the carton packing invariants.
+
+### Engineering Lenses / Mass Signature (experimental)
+
+The **◇ lenses** action and **studio** inspector reveal four one-tap scenes without changing the selected ULD: **HERO OPTICS** (factory-finish studio lighting), **TECH TEARDOWN** (orthographic component explosion), **CUTAWAY** (view-only clipped interior), and **MASS FIELD** (model-aware 3-D cargo with a 3 × 3 projected mass grid and mass-weighted cargo centroid). The in-studio switches allow lighting rig and in-service/factory surface changes, while **FIELD ON/OFF** displays or hides the projected mass overlay. The viewer continues to use adaptive resolution and settled-scene throttling.
+
+The demo cartons now use separate deterministic kraft-fibre textures on their top, labeled front and side faces, with fold seams and crossed closing tape. Cartons reuse one UV-atlas texture and one PBR material per box (rather than multiple draw calls per cardboard face); shadows refresh only when geometry changes. The sandbox exports its measurements as a clearly marked **non-certified CSV**, separate from the existing ULD-only GLB/OBJ/STL exports.
+
+The mass field divides the preview core into nine equal plan-view areas and apportions each accepted carton's mass by overlap of its horizontal footprint. It includes stacked cartons in their footprint cells and calculates a mass-weighted centroid from carton positions. The `kg/m²` number is **projected mass per grid area**, not actual physical contact pressure or a safe floor-load threshold. Neither the box models nor this analytical view can certify real ULD hardware clearances, load securing, centre-of-gravity limits, floor strength, vibration, or airworthiness. These tools are designed as engineering explorations; uniqueness is not claimed. See `src/lib/cargoSignature.ts` and the tests for numerical evidence.
+
+### Presentation focus and public sharing
+
+The top-bar **⊞ focus** action switches to a full-canvas presentation HUD for showcasing the 3D scene without stacked control panels. **Escape** or **exit focus** restores the full workbench. It preserves the current unit, camera and cargo overlay. The studio presentation uses static HUD guides and does not add a second renderer or continuous decorative animation. The production domain is `https://containers.yaslogist.com/`, with a 1200 × 630 authentic project screenshot (`public/og-3d-containers.jpg`) used for LinkedIn/Open Graph and Twitter large-image previews. This screenshot is a visualization, not an OEM-certified aircraft loading scene.
 
 ## `05 /` Ignition
 

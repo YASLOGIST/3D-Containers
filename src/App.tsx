@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import aviationEmblem from "./assets/branding/air-cargo-emblem.png";
 import aviationPrint from "./assets/branding/yaslogist-air-print.png";
 
@@ -44,6 +44,11 @@ import {
 import { decodeShareState, encodeShareState } from "@/lib/state";
 import { formatDistance } from "@/lib/units";
 import type { CargoScenario } from "@/lib/planner";
+import { cargoCoreForModel, demoCargoForModel, planCargoForModel, type CargoItem } from "@/lib/cargoPlacement";
+import { computeCargoSignature, exportCargoSignatureCSV } from "@/lib/cargoSignature";
+import { SignatureStudio, type StudioPreset } from "@/components/SignatureStudio";
+import { CargoMissionDock } from "@/components/CargoMissionDock";
+import { CargoLab } from "@/components/CargoLab";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
 import { ControlDeck } from "@/components/ControlDeck";
@@ -244,8 +249,8 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
 
 const isSourceName = (value: string): value is SourceName => value in SOURCES;
 
-type Tab = "spec" | "parts" | "source";
-const TAB_ORDER: Tab[] = ["spec", "parts", "source"];
+type Tab = "spec" | "cargo" | "studio" | "parts" | "source";
+const TAB_ORDER: Tab[] = ["spec", "cargo", "studio", "parts", "source"];
 
 /** Initial workbench state: defaults overlaid with any shared URL hash. */
 function initialState(): ViewerState {
@@ -279,6 +284,17 @@ export default function App() {
       divisor: "6000",
     };
   });
+  const [cargoItems, setCargoItems] = useState<CargoItem[]>([]);
+  const cargoPlan = useMemo(
+    () => planCargoForModel(state.model, cargoItems, state.contour),
+    [cargoItems, state.model, state.contour],
+  );
+  const cargoSignature = useMemo(
+    () => computeCargoSignature(cargoPlan, cargoCoreForModel(state.model, state.contour)),
+    [cargoPlan, state.model, state.contour],
+  );
+  const [showMassField, setShowMassField] = useState(false);
+  const [studioPreset, setStudioPreset] = useState<StudioPreset | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [measured, setMeasured] = useState<{
@@ -308,6 +324,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   /* ---------------- boot the viewer ---------------- */
   useEffect(() => {
@@ -375,6 +392,106 @@ export default function App() {
     setState((s) => ({ ...s, ...next }));
     viewer.current?.setState(next);
   }, []);
+
+  // Cartons are a separate inspection overlay: they never enter CAD exports
+  // or overwrite the legacy mass/volume-only load planner.
+  useEffect(() => {
+    if (!ready) return;
+    const cargoVisible = studioPreset !== "hero" && studioPreset !== "teardown";
+    viewer.current?.setCargoBoxes(
+      cargoVisible ? cargoPlan.placed : [],
+      cargoVisible && (tab === "cargo" || cargoItems.length > 0),
+      cargoSignature,
+      cargoVisible && showMassField,
+    );
+  }, [ready, state.model, cargoPlan, cargoSignature, tab, cargoItems.length, studioPreset, showMassField]);
+
+  const launchCargoDemo = useCallback(() => {
+    setStudioPreset("field");
+    setShowMassField(true);
+    const model = MODELS[state.model];
+    setCargoItems(demoCargoForModel(state.model, state.contour));
+    setTab("cargo");
+    // Leave model selection unchanged; the scene is built for this ULD.
+    setSheet(false);
+    patch({
+      door: model.palletOption ? 0 : 1,
+      load: 0, section: !model.palletOption, sectionAxis: "z",
+      sectionPos: 0.53, sectionFlip: false, sectionCaps: false,
+      dimensions: false, autoRotate: false, explode: 0, compare: "none",
+    });
+    viewer.current?.frameAll();
+  }, [patch, state.model, state.contour]);
+
+  const openCargoWorkspace = useCallback(() => {
+    setStudioPreset(null);
+    setTab("cargo");
+    setSheet(true);
+  }, []);
+
+  const openStudio = useCallback(() => {
+    setTab("studio");
+    setSheet(true);
+  }, []);
+
+  const applyStudioPreset = useCallback((preset: StudioPreset) => {
+    const spec = MODELS[state.model];
+    setStudioPreset(preset);
+    setTab("studio");
+    setSheet(false);
+    setShowMassField(preset === "field");
+    if (preset === "hero") {
+      patch({
+        mood: "studio", surfaceCondition: "factory",
+        metalness: 0.92, roughness: 0.32, envIntensity: 1.4,
+        section: false, explode: 0, dimensions: false,
+        wireframe: false, autoRotate: false, compare: "none",
+        door: 0, load: 0, projection: "persp",
+      });
+    } else if (preset === "teardown") {
+      patch({
+        mood: "studio", explode: 0.6, projection: "ortho",
+        section: false, dimensions: true, detail: true,
+        rivets: true, wireframe: false, autoRotate: false,
+        compare: "none", door: spec.palletOption ? 0 : 0.18,
+        load: 0,
+      });
+    } else {
+      if (preset === "field" && cargoItems.length === 0) {
+        setCargoItems(demoCargoForModel(state.model, state.contour));
+      }
+      patch({
+        mood: preset === "field" ? "studio" : "hangar",
+        projection: "persp", explode: 0, dimensions: false,
+        section: !spec.palletOption, sectionAxis: "z",
+        sectionPos: 0.53, sectionFlip: false, sectionCaps: false,
+        door: spec.palletOption ? 0 : 1, load: 0,
+        wireframe: false, autoRotate: false, compare: "none",
+      });
+    }
+    viewer.current?.frameAll();
+  }, [patch, state.model, state.contour, cargoItems.length]);
+
+  const changeCargoItems = useCallback((items: CargoItem[]) => {
+    setCargoItems(items);
+    if (items.length) setStudioPreset(current =>
+      current === "hero" || current === "teardown" ? null : current);
+  }, []);
+
+  // Pallet generators also contain an illustrative translucent 'cargo load'
+  // mesh. Hide that alternative representation when actual carton previews
+  // are present to avoid two overlapping cargo visuals.
+  useEffect(() => {
+    if (ready && cargoItems.length > 0 && MODELS[state.model].palletOption && state.load > 0) {
+      patch({ load: 0 });
+    }
+  }, [ready, cargoItems.length, state.model, state.load, patch]);
+
+  const exportSignature = useCallback(() => {
+    if (!cargoPlan.placed.length) return;
+    const csv = exportCargoSignatureCSV(MODELS[state.model].code, cargoPlan, cargoSignature);
+    downloadText(csv, `${state.model}-cargo-signature.csv`, "text/csv;charset=utf-8");
+  }, [cargoPlan, cargoSignature, state.model]);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -445,8 +562,14 @@ export default function App() {
 
   const selectModel = (id: ModelId) => {
     const next = MODELS[id];
+    if (cargoItems.length > 0 && cargoItems.every(item => item.id.includes("-demo-"))) {
+      // Keep the showcase visible when switching between ULD families.
+      setCargoItems(demoCargoForModel(id, state.contour));
+    }
     patch({
-      model: id,
+      model: id, load: cargoItems.length > 0 ? 0 : state.load,
+      door: next.palletOption ? 0 : state.door,
+      section: cargoItems.length > 0 && next.palletOption ? false : state.section,
       setpoint: next.setpointRange?.default ?? state.setpoint,
       compare: state.compare === id ? "none" : state.compare,
     });
@@ -609,6 +732,7 @@ export default function App() {
       else if (k === "m") toggleMeasure(!measureOn);
       else if (k === "p") void doSnapshot();
       else if (k === "escape") {
+        setFocusMode(false);
         if (measureOn) toggleMeasure(false);
         else viewer.current?.clearMeasure();
         setSheet(false);
@@ -680,8 +804,55 @@ export default function App() {
         }}
       />
 
+      {/* Presentation mode: uncluttered viewport, no extra renderer or scene. */}
+      {focusMode && (
+        <div className="pointer-events-none absolute inset-0 z-20">
+          <div className="absolute left-4 top-5 max-w-[75vw] border-l-2 border-[#94d7ed]/80 bg-[#0a1822]/75 py-3 pl-4 pr-6 backdrop-blur-sm sm:left-10 sm:top-9 sm:pl-5">
+            <div className="font-mono text-[9px] uppercase tracking-[.23em] text-[#9bd5e9] sm:text-[11px]">
+              YASLOGIST / AIR CARGO &amp; AVIATION
+            </div>
+            <div className="mt-2 font-display text-[26px] font-bold uppercase leading-none tracking-[.045em] text-white sm:text-[44px]">
+              3D CONTAINERS
+            </div>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[.16em] text-[#c5e4ee]">
+              {spec.code} · {spec.family}
+            </div>
+          </div>
+          <button type="button" onClick={() => setFocusMode(false)}
+            className="pointer-events-auto absolute right-3 top-3 min-h-10 border border-[#6aa7be]/75 bg-[#0a1822]/90 px-3 py-2 font-mono text-[10px] uppercase tracking-[.12em] text-white hover:bg-[#244553] focus-visible:outline-[#b3e6f2] sm:right-9 sm:top-9">
+            exit focus · esc
+          </button>
+          <div className="absolute bottom-5 left-5 border-l border-[#8cc7de]/70 pl-3 font-mono text-[9px] uppercase tracking-[.14em] text-[#bfdce7] sm:bottom-9 sm:left-10">
+            Interactive ULD engineering · Drag to orbit · Scroll to inspect
+          </div>
+          <span aria-hidden="true" className="absolute bottom-8 right-9 hidden h-12 w-12 border-b border-r border-[#89d5ea]/60 sm:block" />
+        </div>
+      )}
+
+      {/* High-visibility entrance to the working cargo demonstration. */}
+      {!error && !focusMode && (
+        <CargoMissionDock
+          active={cargoItems.length > 0}
+          modelCode={spec.code}
+          hidden={sheet}
+          itemCount={cargoItems.length}
+          plan={cargoPlan}
+          onStart={launchCargoDemo}
+          onInspect={openCargoWorkspace}
+          onClear={() => {
+            setCargoItems([]);
+            setShowMassField(false);
+            setStudioPreset(null);
+            patch({ section: false, door: 0 });
+          }}
+        />
+      )}
+
       {/* ---------------- top bar ---------------- */}
-      <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
+      <header className={cn(
+        "anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4",
+        focusMode && "hidden",
+      )}>
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
           <span className="aviation-emblem-frame" aria-hidden="true">
             <img src={aviationEmblem} alt=""
@@ -733,6 +904,37 @@ export default function App() {
             ))}
           </div>
           <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5 sm:contents">
+          <Btn
+            active={focusMode}
+            pressed={focusMode}
+            onClick={() => {
+              setFocusMode(true);
+              setSheet(false);
+              viewer.current?.frameAll();
+            }}
+            title="Presentation focus view with clear canvas; press Escape to exit"
+            className="border-[#5e97b2]/70 text-[#bde0ed]"
+          >
+            ⊞ focus
+          </Btn>
+          <Btn
+            active={tab === "studio"}
+            pressed={tab === "studio"}
+            onClick={openStudio}
+            className="border-[#5fa6c2]/60 bg-[#17303b]/80 text-[#b5d9e8]"
+            title="Engineering lenses: material, teardown, cutaway and cargo mass field"
+          >
+            ◇ lenses
+          </Btn>
+          <Btn
+            active={tab === "cargo"}
+            pressed={tab === "cargo"}
+            onClick={openCargoWorkspace}
+            className="border-[#76bed6]/70 bg-[#173240]/90 text-[#c3ebf9] hover:border-[#b4e6f2] hover:text-white"
+            title="Open the 3D Cargo Loading Laboratory"
+          >
+            ◈ cargo lab
+          </Btn>
           <Btn
             onClick={runShowcase}
             disabled={!ready || !!error}
@@ -792,7 +994,7 @@ export default function App() {
       </header>
 
       {/* ---------------- left: control deck ---------------- */}
-      <div className="anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden lg:bottom-14 lg:block xl:left-4">
+      <div className={cn("anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden lg:bottom-14 lg:block xl:left-4", focusMode && "lg:!hidden")}>
         <div className="pointer-events-auto max-h-[calc(100dvh-190px)] overflow-y-auto scroll-slim pr-1">
           <ControlDeck
             state={state}
@@ -809,7 +1011,7 @@ export default function App() {
       </div>
 
       {/* ---------------- right: instrument stack ---------------- */}
-      <aside className="anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4">
+      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4", focusMode && "lg:!hidden")}>
         <div className="pointer-events-auto">
           <div
             role="tablist"
@@ -875,6 +1077,44 @@ export default function App() {
               </Panel>
             </div>
           )}
+          {tab === "cargo" && (
+            <div role="tabpanel" id="panel-cargo" aria-labelledby="tab-cargo" className="h-full">
+              <Panel title="Cargo placement" code={`${spec.code} sandbox`} className="h-full overflow-y-auto scroll-slim">
+                <CargoLab items={cargoItems} plan={cargoPlan} onChange={changeCargoItems}
+                  model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
+                  onOpenDoor={() => patch({
+                    door: spec.palletOption ? 0 : 1, load: 0,
+                    section: !spec.palletOption, sectionAxis: "z",
+                    sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+                  })} />
+              </Panel>
+            </div>
+          )}
+          {tab === "studio" && (
+            <div role="tabpanel" id="panel-studio" aria-labelledby="tab-studio" className="h-full">
+              <Panel title="Signature studio" code={spec.code} className="h-full overflow-y-auto scroll-slim">
+                <SignatureStudio
+                  model={state.model} state={state} plan={cargoPlan}
+                  signature={cargoSignature} fieldVisible={showMassField}
+                  activePreset={studioPreset}
+                  onPreset={applyStudioPreset}
+                  onExport={exportSignature}
+                  onFieldVisible={(visible) => {
+                    setShowMassField(visible);
+                    setStudioPreset(visible ? "field" : null);
+                    if (visible) patch({
+                      mood: "studio", explode: 0, dimensions: false,
+                      section: !spec.palletOption, sectionAxis: "z",
+                      sectionPos: 0.53, sectionCaps: false,
+                      door: spec.palletOption ? 0 : 1, load: 0,
+                      autoRotate: false,
+                    });
+                  }}
+                  onPatch={(next) => { setStudioPreset(null); patch(next); }}
+                />
+              </Panel>
+            </div>
+          )}
           {tab === "parts" && (
             <div
               role="tabpanel"
@@ -936,7 +1176,7 @@ export default function App() {
       </aside>
 
       {/* ---------------- bottom status strip ---------------- */}
-      <footer className="pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
+      <footer className={cn("pointer-events-none absolute inset-x-0 bottom-0 z-20 border-t border-line-soft bg-deck/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm", focusMode && "hidden")}>
         <div className="flex items-center gap-3 overflow-hidden px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em]">
           <span
             className={cn(
@@ -1001,8 +1241,8 @@ export default function App() {
       </footer>
 
       {/* ---------------- mobile sheet ---------------- */}
-      <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden">
-        <div className="flex items-center justify-center gap-1.5 px-3 pb-2">
+      <div className={cn("pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden", focusMode && "!hidden")}>
+        <div className="flex items-center justify-start gap-1.5 overflow-x-auto whitespace-nowrap px-3 pb-2 sm:justify-center">
           <Btn
             active={sheet && tab === "spec"}
             pressed={sheet && tab === "spec"}
@@ -1012,6 +1252,23 @@ export default function App() {
             }}
           >
             spec
+          </Btn>
+          <Btn
+            active={sheet && tab === "cargo"}
+            pressed={sheet && tab === "cargo"}
+            onClick={() => {
+              setTab("cargo");
+              setSheet(true);
+            }}
+          >
+            cargo
+          </Btn>
+          <Btn
+            active={sheet && tab === "studio"}
+            pressed={sheet && tab === "studio"}
+            onClick={openStudio}
+          >
+            lenses
           </Btn>
           <Btn
             active={sheet && tab === "parts"}
@@ -1045,6 +1302,36 @@ export default function App() {
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
             {tab === "spec" && (
               <SpecSheet cargoScenario={cargoScenario} setCargoScenario={setCargoScenario} stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
+            )}
+            {tab === "cargo" && (
+              <CargoLab items={cargoItems} plan={cargoPlan} onChange={changeCargoItems}
+                model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
+                onOpenDoor={() => patch({
+                  door: spec.palletOption ? 0 : 1, load: 0,
+                  section: !spec.palletOption, sectionAxis: "z",
+                  sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+                })} />
+            )}
+            {tab === "studio" && (
+              <SignatureStudio
+                model={state.model} state={state} plan={cargoPlan}
+                signature={cargoSignature} fieldVisible={showMassField}
+                activePreset={studioPreset}
+                onPreset={applyStudioPreset}
+                onExport={exportSignature}
+                onFieldVisible={(visible) => {
+                  setShowMassField(visible);
+                  setStudioPreset(visible ? "field" : null);
+                  if (visible) patch({
+                    mood: "studio", explode: 0, dimensions: false,
+                    section: !spec.palletOption, sectionAxis: "z",
+                    sectionPos: 0.53, sectionCaps: false,
+                    door: spec.palletOption ? 0 : 1, load: 0,
+                    autoRotate: false,
+                  });
+                }}
+                onPatch={(next) => { setStudioPreset(null); patch(next); }}
+              />
             )}
             {tab === "parts" && (
               <PartsList

@@ -14,11 +14,122 @@ import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 import type { Assembly, ViewerContainer } from "./primitives";
+import { cargoCoreForModel, type CargoPlacement } from "@/lib/cargoPlacement";
+import type { CargoSignature } from "@/lib/cargoSignature";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { formatDistance } from "@/lib/units";
+
+/** Distinct top, front and side textures; deterministic, shared, lightweight. */
+function makeCartonTexture(face: "top" | "front" | "side"): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context is unavailable");
+  const size = 256;
+  ctx.fillStyle = "#d0ae79";
+  ctx.fillRect(0, 0, size, size);
+  // Paper fibres and subtle horizontal corrugation, no extra normal maps.
+  for (let i = 0; i < 420; i++) {
+    const x = (i * 73 + 19) % size, y = (i * 97 + 37) % size;
+    ctx.fillStyle = i % 3 === 0 ? "rgba(65,41,22,.08)" : "rgba(255,247,220,.08)";
+    ctx.fillRect(x, y, 5 + (i % 7) * 2, 1);
+  }
+  ctx.fillStyle = "rgba(108,80,45,.23)";
+  ctx.fillRect(0, 0, 2, size);
+  ctx.fillRect(size - 3, 0, 3, size);
+
+  if (face === "top") {
+    // Interlocking top flaps, crossed paper-reinforced packing tape.
+    ctx.strokeStyle = "rgba(73,51,30,.33)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, size / 2); ctx.lineTo(size, size / 2);
+    ctx.moveTo(size / 2, 0); ctx.lineTo(size / 2, size);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(236,207,156,.92)";
+    ctx.fillRect(108, 0, 40, size);
+    ctx.fillRect(0, 108, size, 40);
+    ctx.strokeStyle = "rgba(112,81,43,.30)";
+    ctx.lineWidth = 1.5;
+    [108, 148].forEach(v => {
+      ctx.beginPath(); ctx.moveTo(v, 0); ctx.lineTo(v, size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, v); ctx.lineTo(size, v); ctx.stroke();
+    });
+  } else {
+    // A small seam and natural packaging shadow on the upright panels.
+    ctx.fillStyle = "rgba(85,56,31,.12)";
+    ctx.fillRect(0, 238, size, 3);
+    if (face === "front") {
+      ctx.fillStyle = "#f1e9d6";
+      ctx.fillRect(21, 126, 186, 102);
+      ctx.strokeStyle = "rgba(74,54,37,.27)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(22, 127, 184, 100);
+      ctx.fillStyle = "#30404b";
+      ctx.font = "700 22px system-ui, sans-serif";
+      ctx.fillText("YASLOGIST", 33, 157);
+      ctx.font = "12px monospace";
+      ctx.fillText("AIR CARGO / DEMO", 33, 177);
+      for (let i = 0; i < 32; i++) {
+        ctx.fillRect(32 + i * 4.6, 186, i % 4 === 0 ? 2.6 : 1.25, 23);
+      }
+    } else {
+      // Handling symbol is an illustration; no fragile/this-side-up claim.
+      ctx.strokeStyle = "rgba(62,52,37,.42)";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(27, 167, 44, 42);
+      ctx.beginPath();
+      ctx.moveTo(49, 199); ctx.lineTo(49, 175);
+      ctx.moveTo(40, 184); ctx.lineTo(49, 175); ctx.lineTo(58, 184);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(54,57,51,.68)";
+      ctx.font = "13px monospace";
+      ctx.fillText("YL / ULD", 85, 191);
+    }
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/** One 1024×256 atlas instead of six materials and six carton draw calls. */
+function makeCartonAtlas(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+  (["side", "top", "front"] as const).forEach((face, index) => {
+    const tmp = makeCartonTexture(face);
+    ctx.drawImage(tmp.image as HTMLCanvasElement, index * 256, 0);
+    tmp.dispose();
+  });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
+
+/** Face UVs select side, top or front within the same atlas. */
+function makeCartonGeometry(): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
+  // BoxGeometry faces: +X, -X, +Y, -Y, +Z, -Z.
+  for (let face = 0; face < 6; face++) {
+    const tile = face === 2 ? 1 : face === 4 ? 2 : 0;
+    for (let v = 0; v < 4; v++) {
+      const i = face * 4 + v;
+      const u0 = uv.getX(i), v0 = uv.getY(i);
+      uv.setXY(i, (tile * 256 + 2 + u0 * 252) / 1024, (2 + v0 * 252) / 256);
+    }
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
 
 const reducedMotionPreferred = () =>
   typeof window !== "undefined" &&
@@ -295,6 +406,45 @@ export class AKEViewer {
   private floorMat!: THREE.MeshStandardMaterial;
 
   private modelRoot = new THREE.Group();
+  /** Carton sandbox is intentionally distinct from ULD geometry and exports. */
+  private cargoGroup = new THREE.Group();
+  private cargoCoreGeometry = new THREE.BoxGeometry(1, 1, 1);
+  private cargoCoreEdges = new THREE.EdgesGeometry(this.cargoCoreGeometry);
+  private cargoCoreMaterial = new THREE.LineDashedMaterial({
+    color: 0x8ad7ed, dashSize: 0.045, gapSize: 0.025,
+    transparent: true, opacity: 0.88, depthTest: true,
+  });
+  private cargoCoreWire = new THREE.LineSegments(this.cargoCoreEdges, this.cargoCoreMaterial);
+  private cargoBoxGeometry = makeCartonGeometry();
+  private cargoAtlas = makeCartonAtlas();
+  private cargoMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: this.cargoAtlas, roughness: 0.90, metalness: 0,
+  });
+  /** A single instanced draw for all 40 potential cartons. No mesh churn. */
+  private cargoInstances = new THREE.InstancedMesh(
+    this.cargoBoxGeometry, this.cargoMaterial, 40,
+  );
+  private cargoMatrixHelper = new THREE.Object3D();
+  private cargoTint = ["#ffffff", "#f4e4c8", "#edf0e4", "#e3d9c8"]
+    .map(color => new THREE.Color(color));
+  private fieldPlaneGeometry = new THREE.PlaneGeometry(1, 1);
+  private fieldMaterials = [0x246a84, 0x48a2b4, 0xd4a968, 0xee8351].map(color =>
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.48,
+      depthWrite: false, side: THREE.DoubleSide,
+    }),
+  );
+  private fieldCentroidGeometry = new THREE.SphereGeometry(0.04, 12, 8);
+  private fieldCentroidMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffdb98, depthTest: false, depthWrite: false,
+  });
+  private fieldLineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0),
+  ]);
+  private fieldLineMaterial = new THREE.LineDashedMaterial({
+    color: 0xffdb98, transparent: true, opacity: 0.9,
+    dashSize: 0.045, gapSize: 0.025, depthTest: false,
+  });
   private container: ViewerContainer | null = null;
   /** door-closed / load-stowed bounding size from the latest rebuild */
   private measuredSize = { x: 0, y: 0, z: 0 };
@@ -445,6 +595,11 @@ export class AKEViewer {
     this.measureGroup.userData.isAnnotation = true;
     this.scene.add(this.measureGroup);
     this.scene.add(this.modelRoot);
+    this.cargoGroup.userData.isAnnotation = true;
+    // The preview outline is re-positioned and scaled for every model.
+    this.cargoCoreWire.computeLineDistances();
+    this.cargoCoreWire.userData.isAnnotation = true;
+    this.scene.add(this.cargoGroup);
     this.rebuild();
     this.applyMood(this.state.mood, true);
     this.applyMaterialState();
@@ -2025,6 +2180,84 @@ export class AKEViewer {
     this.wake();
   };
 
+  /* ---------------- cargo placement sandbox ---------------- */
+
+  setCargoBoxes(
+    cartons: readonly CargoPlacement[],
+    showCore = false,
+    signature?: CargoSignature,
+    showMassField = false,
+  ) {
+    // All carton textures, meshes and field primitives are shared per viewer.
+    // The cargo overlay never becomes part of the exported ULD solid.
+    this.cargoGroup.clear();
+    const core = cargoCoreForModel(this.state.model, this.state.contour);
+    this.cargoCoreWire.position.set(
+      core.minX + core.widthM / 2,
+      core.floorY + core.heightM / 2,
+      core.minZ + core.depthM / 2,
+    );
+    this.cargoCoreWire.scale.set(core.widthM, core.heightM, core.depthM);
+    this.cargoGroup.visible = true;
+    if (showCore) this.cargoGroup.add(this.cargoCoreWire);
+    const visible = cartons.slice(0, 40);
+    this.cargoInstances.count = visible.length;
+    this.cargoInstances.name = "Cargo cartons · instanced preview";
+    this.cargoInstances.castShadow = true;
+    this.cargoInstances.receiveShadow = true;
+    visible.forEach((carton, index) => {
+      this.cargoMatrixHelper.position.set(carton.x, carton.y, carton.z);
+      this.cargoMatrixHelper.scale.set(carton.widthM, carton.heightM, carton.depthM);
+      this.cargoMatrixHelper.updateMatrix();
+      this.cargoInstances.setMatrixAt(index, this.cargoMatrixHelper.matrix);
+      this.cargoInstances.setColorAt(index, this.cargoTint[index % this.cargoTint.length]);
+    });
+    this.cargoInstances.instanceMatrix.needsUpdate = true;
+    if (this.cargoInstances.instanceColor) this.cargoInstances.instanceColor.needsUpdate = true;
+    this.cargoInstances.frustumCulled = false;
+    if (visible.length) this.cargoGroup.add(this.cargoInstances);
+
+    if (showMassField && signature?.centroid && cartons.length) {
+      // 3×3 mass projection, independent of actual structure and restraints.
+      const max = Math.max(1, signature.maxCellKg);
+      const cellX = core.widthM / 3, cellZ = core.depthM / 3;
+      for (const c of signature.cells) {
+        if (c.kg <= 0.000001) continue;
+        const fraction = c.kg / max;
+        const mat = this.fieldMaterials[fraction > 0.78 ? 3 : fraction > 0.52 ? 2 : fraction > 0.27 ? 1 : 0];
+        const plane = new THREE.Mesh(this.fieldPlaneGeometry, mat);
+        plane.name = `Projected cargo density ${c.kg.toFixed(1)} kg`;
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.set(
+          core.minX + (c.column + 0.5) * cellX,
+          core.floorY + 0.006,
+          core.minZ + (c.row + 0.5) * cellZ,
+        );
+        plane.scale.set(cellX * 0.92, cellZ * 0.92, 1);
+        plane.renderOrder = 1;
+        plane.userData.isAnnotation = true;
+        this.cargoGroup.add(plane);
+      }
+      const center = signature.centroid;
+      const marker = new THREE.Mesh(this.fieldCentroidGeometry, this.fieldCentroidMaterial);
+      marker.position.set(center.x, center.y, center.z);
+      marker.name = "Illustrative weighted cargo centroid";
+      marker.userData.isAnnotation = true;
+      marker.renderOrder = 997;
+      this.cargoGroup.add(marker);
+      const stem = new THREE.LineSegments(this.fieldLineGeometry, this.fieldLineMaterial);
+      stem.position.set(center.x, core.floorY + 0.006, center.z);
+      stem.scale.y = Math.max(0.01, center.y - core.floorY);
+      stem.computeLineDistances();
+      stem.renderOrder = 996;
+      stem.userData.isAnnotation = true;
+      this.cargoGroup.add(stem);
+    }
+    // Shadow atlas only re-renders when carton geometry changes; no busy loop.
+    this.markShadowsDirty();
+    this.wake();
+  }
+
   /* ---------------- export ---------------- */
 
   private exportRoot() {
@@ -2106,6 +2339,21 @@ export class AKEViewer {
     this.controls.stopListenToKeyEvents();
     this.controls.dispose();
     this.container?.dispose();
+    this.cargoGroup.clear();
+    this.scene.remove(this.cargoGroup);
+    this.cargoInstances.dispose();
+    this.cargoBoxGeometry.dispose();
+    this.cargoCoreEdges.dispose();
+    this.cargoCoreGeometry.dispose();
+    this.cargoCoreMaterial.dispose();
+    this.cargoMaterial.dispose();
+    this.cargoAtlas.dispose();
+    this.fieldPlaneGeometry.dispose();
+    this.fieldMaterials.forEach(material => material.dispose());
+    this.fieldCentroidGeometry.dispose();
+    this.fieldCentroidMaterial.dispose();
+    this.fieldLineGeometry.dispose();
+    this.fieldLineMaterial.dispose();
     this.disposeAnnotations();
     this.clearMeasurePoints();
     this.state = { ...this.state, compare: "none" };
