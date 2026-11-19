@@ -50,6 +50,18 @@ export const AKE_CARGO_CORE = {
 const EPS = 1e-6;
 const MAX_ITEMS = 40;
 
+/** Visible one-click scene: 30 equal-sized cartons in a stable 3D stack. */
+export function demoAKECargo(): CargoItem[] {
+  return Array.from({ length: 30 }, (_, index) => ({
+    id: `demo-${index + 1}`,
+    label: `Demo ${String(index + 1).padStart(2, "0")}`,
+    widthM: 0.36,
+    depthM: 0.38,
+    heightM: 0.32,
+    massKg: 18,
+  }));
+}
+
 const within = (start: number, span: number, limit: number) =>
   start >= -EPS && span > 0 && start + span <= limit + EPS;
 

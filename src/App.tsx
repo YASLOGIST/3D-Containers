@@ -44,7 +44,8 @@ import {
 import { decodeShareState, encodeShareState } from "@/lib/state";
 import { formatDistance } from "@/lib/units";
 import type { CargoScenario } from "@/lib/planner";
-import { planAKECargo, type CargoItem } from "@/lib/cargoPlacement";
+import { demoAKECargo, planAKECargo, type CargoItem } from "@/lib/cargoPlacement";
+import { CargoMissionDock } from "@/components/CargoMissionDock";
 import { CargoLab } from "@/components/CargoLab";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
@@ -386,8 +387,30 @@ export default function App() {
   // Cartons are a separate inspection overlay: they never enter CAD exports
   // or overwrite the legacy mass/volume-only load planner.
   useEffect(() => {
-    if (ready) viewer.current?.setCargoBoxes(state.model === "ake" ? cargoPlan.placed : []);
-  }, [ready, state.model, cargoPlan]);
+    if (ready) viewer.current?.setCargoBoxes(
+      state.model === "ake" ? cargoPlan.placed : [],
+      state.model === "ake" && (tab === "cargo" || cargoItems.length > 0),
+    );
+  }, [ready, state.model, cargoPlan, tab, cargoItems.length]);
+
+  const launchCargoDemo = useCallback(() => {
+    setCargoItems(demoAKECargo());
+    setTab("cargo");
+    // Show the complete 3D stack rather than covering it with the mobile sheet.
+    setSheet(false);
+    patch({
+      model: "ake", door: 1, section: true, sectionAxis: "z",
+      sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+      dimensions: false, autoRotate: false, explode: 0, compare: "none",
+    });
+    viewer.current?.frameAll();
+  }, [patch]);
+
+  const openCargoWorkspace = useCallback(() => {
+    if (state.model !== "ake") patch({ model: "ake" });
+    setTab("cargo");
+    setSheet(true);
+  }, [patch, state.model]);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -693,6 +716,18 @@ export default function App() {
         }}
       />
 
+      {/* High-visibility entrance to the working cargo demonstration. */}
+      {!error && (
+        <CargoMissionDock
+          active={state.model === "ake" && cargoItems.length > 0}
+          itemCount={cargoItems.length}
+          plan={cargoPlan}
+          onStart={launchCargoDemo}
+          onInspect={openCargoWorkspace}
+          onClear={() => { setCargoItems([]); patch({ section: false, door: 0 }); }}
+        />
+      )}
+
       {/* ---------------- top bar ---------------- */}
       <header className="anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4">
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
@@ -746,6 +781,15 @@ export default function App() {
             ))}
           </div>
           <div className="flex min-w-0 items-center gap-1 overflow-x-auto whitespace-nowrap pb-0.5 sm:contents">
+          <Btn
+            active={tab === "cargo"}
+            pressed={tab === "cargo"}
+            onClick={openCargoWorkspace}
+            className="border-[#76bed6]/70 bg-[#173240]/90 text-[#c3ebf9] hover:border-[#b4e6f2] hover:text-white"
+            title="Open the 3D Cargo Loading Laboratory"
+          >
+            ◈ cargo lab
+          </Btn>
           <Btn
             onClick={runShowcase}
             disabled={!ready || !!error}
@@ -892,7 +936,11 @@ export default function App() {
             <div role="tabpanel" id="panel-cargo" aria-labelledby="tab-cargo" className="h-full">
               <Panel title="Cargo placement" code="AKE sandbox" className="h-full overflow-y-auto scroll-slim">
                 <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
-                  isAKE={state.model === "ake"} onOpenDoor={() => patch({ door: 1 })} />
+                  isAKE={state.model === "ake"} onLoadDemo={launchCargoDemo}
+                  onOpenDoor={() => patch({
+                    door: 1, section: true, sectionAxis: "z",
+                    sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+                  })} />
               </Panel>
             </div>
           )}
@@ -1079,7 +1127,11 @@ export default function App() {
             )}
             {tab === "cargo" && (
               <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
-                isAKE={state.model === "ake"} onOpenDoor={() => patch({ door: 1 })} />
+                isAKE={state.model === "ake"} onLoadDemo={launchCargoDemo}
+                onOpenDoor={() => patch({
+                  door: 1, section: true, sectionAxis: "z",
+                  sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+                })} />
             )}
             {tab === "parts" && (
               <PartsList

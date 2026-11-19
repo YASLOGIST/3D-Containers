@@ -14,12 +14,51 @@ import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 import type { Assembly, ViewerContainer } from "./primitives";
-import type { CargoPlacement } from "@/lib/cargoPlacement";
+import { AKE_CARGO_CORE, type CargoPlacement } from "@/lib/cargoPlacement";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { formatDistance } from "@/lib/units";
+
+/** One deterministic 256² kraft-cardboard texture shared by all cartons. */
+function makeCartonTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context is unavailable");
+  ctx.fillStyle = "#d4b17b";
+  ctx.fillRect(0, 0, 256, 256);
+  // Recycled-paper fibres, repeated deterministically without random state.
+  for (let i = 0; i < 160; i++) {
+    const x = (i * 73 + 19) % 256;
+    const y = (i * 97 + 37) % 256;
+    ctx.fillStyle = i % 3 === 0 ? "rgba(67,45,26,.08)" : "rgba(255,247,220,.10)";
+    ctx.fillRect(x, y, 15 + (i % 7) * 4, 1);
+  }
+  ctx.fillStyle = "rgba(234,209,158,.85)";
+  ctx.fillRect(107, 0, 42, 256);
+  ctx.fillStyle = "rgba(122,88,51,.36)";
+  ctx.fillRect(107, 0, 1.4, 256);
+  ctx.fillRect(148, 0, 1.4, 256);
+  ctx.fillStyle = "#efe5d1";
+  ctx.fillRect(20, 160, 128, 65);
+  ctx.strokeStyle = "rgba(70,54,42,.24)";
+  ctx.strokeRect(20.5, 160.5, 127, 64);
+  ctx.fillStyle = "#273440";
+  ctx.font = "bold 15px system-ui, sans-serif";
+  ctx.fillText("YASLOGIST", 28, 182);
+  ctx.font = "9px monospace";
+  ctx.fillText("AIR CARGO · DEMO", 28, 197);
+  for (let i = 0; i < 26; i++) {
+    const x = 28 + i * 4;
+    ctx.fillRect(x, 206, i % 4 === 0 ? 2.5 : 1.3, 10);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
+}
 
 const reducedMotionPreferred = () =>
   typeof window !== "undefined" &&
@@ -298,11 +337,23 @@ export class AKEViewer {
   private modelRoot = new THREE.Group();
   /** Carton sandbox is intentionally distinct from ULD geometry and exports. */
   private cargoGroup = new THREE.Group();
+  private cargoCoreGeometry = new THREE.BoxGeometry(
+    AKE_CARGO_CORE.widthM, AKE_CARGO_CORE.heightM, AKE_CARGO_CORE.depthM,
+  );
+  private cargoCoreEdges = new THREE.EdgesGeometry(this.cargoCoreGeometry);
+  private cargoCoreMaterial = new THREE.LineDashedMaterial({
+    color: 0x8ad7ed, dashSize: 0.045, gapSize: 0.025,
+    transparent: true, opacity: 0.88, depthTest: true,
+  });
+  private cargoCoreWire = new THREE.LineSegments(this.cargoCoreEdges, this.cargoCoreMaterial);
   private cargoBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
   private cargoEdgeGeometry = new THREE.EdgesGeometry(this.cargoBoxGeometry);
   private cargoLineMaterial = new THREE.LineBasicMaterial({ color: 0x172f43, transparent: true, opacity: 0.82 });
-  private cargoMaterials = [0xd8a35c, 0x8ab9ca, 0x99b687, 0xc98f82].map(
-    color => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.02 }),
+  private cargoTexture = makeCartonTexture();
+  private cargoMaterials = [0xffffff, 0xd9f1fc, 0xf1ead9, 0xf0d5c9].map(
+    color => new THREE.MeshStandardMaterial({
+      color, map: this.cargoTexture, roughness: 0.91, metalness: 0,
+    }),
   );
   private container: ViewerContainer | null = null;
   /** door-closed / load-stowed bounding size from the latest rebuild */
@@ -455,6 +506,13 @@ export class AKEViewer {
     this.scene.add(this.measureGroup);
     this.scene.add(this.modelRoot);
     this.cargoGroup.userData.isAnnotation = true;
+    this.cargoCoreWire.position.set(
+      AKE_CARGO_CORE.minX + AKE_CARGO_CORE.widthM / 2,
+      AKE_CARGO_CORE.floorY + AKE_CARGO_CORE.heightM / 2,
+      AKE_CARGO_CORE.minZ + AKE_CARGO_CORE.depthM / 2,
+    );
+    this.cargoCoreWire.computeLineDistances();
+    this.cargoCoreWire.userData.isAnnotation = true;
     this.scene.add(this.cargoGroup);
     this.rebuild();
     this.applyMood(this.state.mood, true);
@@ -2038,11 +2096,12 @@ export class AKEViewer {
 
   /* ---------------- cargo placement sandbox ---------------- */
 
-  setCargoBoxes(cartons: readonly CargoPlacement[]) {
+  setCargoBoxes(cartons: readonly CargoPlacement[], showCore = false) {
     // Shared primitives keep object creation and GPU churn low (max 40 boxes).
     this.cargoGroup.clear();
     this.cargoGroup.visible = this.state.model === "ake";
     if (this.cargoGroup.visible) {
+      if (showCore) this.cargoGroup.add(this.cargoCoreWire);
       cartons.slice(0, 40).forEach((carton, index) => {
         const mesh = new THREE.Mesh(
           this.cargoBoxGeometry,
@@ -2144,8 +2203,12 @@ export class AKEViewer {
     this.scene.remove(this.cargoGroup);
     this.cargoBoxGeometry.dispose();
     this.cargoEdgeGeometry.dispose();
+    this.cargoCoreEdges.dispose();
+    this.cargoCoreGeometry.dispose();
+    this.cargoCoreMaterial.dispose();
     this.cargoLineMaterial.dispose();
     this.cargoMaterials.forEach(material => material.dispose());
+    this.cargoTexture.dispose();
     this.disposeAnnotations();
     this.clearMeasurePoints();
     this.state = { ...this.state, compare: "none" };

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AKE_CARGO_CORE,
+  demoAKECargo,
   planAKECargo,
   type CargoItem,
 } from "../src/lib/cargoPlacement.ts";
@@ -9,6 +10,17 @@ import {
 const box = (id: string, widthM = 0.4, depthM = 0.4, heightM = 0.4,
   massKg = 20): CargoItem => ({
   id, label: id, widthM, depthM, heightM, massKg,
+});
+
+test("one-click showcase fills the 3D preview without invalid cartons", () => {
+  const demo = demoAKECargo();
+  const plan = planAKECargo(demo);
+  assert.equal(demo.length, 30);
+  assert.equal(plan.placed.length, 30);
+  assert.equal(plan.rejected.length, 0);
+  assert.equal(plan.loadedKg, 540);
+  assert.ok(plan.coreUtilizationPct > 55);
+  assert.ok(plan.coreUtilizationPct < 100);
 });
 
 test("single carton fits the conservative AKE core in world coordinates", () => {

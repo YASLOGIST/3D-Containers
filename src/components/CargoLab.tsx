@@ -20,13 +20,14 @@ const REASONS = {
 } as const;
 
 export function CargoLab({
-  items, plan, onChange, isAKE, onOpenDoor,
+  items, plan, onChange, isAKE, onOpenDoor, onLoadDemo,
 }: {
   items: CargoItem[];
   plan: CargoPlan;
   onChange: (items: CargoItem[]) => void;
   isAKE: boolean;
   onOpenDoor: () => void;
+  onLoadDemo: () => void;
 }) {
   const sequence = useRef(1);
   const [draft, setDraft] = useState({
@@ -108,12 +109,21 @@ export function CargoLab({
           ))}
         </div>
         {validation && <p role="alert" className="text-[10px] text-signal">{validation}</p>}
+        <div className="border border-[#608ba2]/60 bg-[#123040]/70 p-2">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#bfe8f3]">Instant scene / 30 cartons</div>
+          <p className="mb-2 text-[10px] leading-relaxed text-[#afc8d4]">
+            Load a ready-to-inspect 3D example with a cutaway view and live capacity metrics.
+          </p>
+          <Btn onClick={onLoadDemo} className="w-full border-[#8fcde2] bg-[#9ccedd] text-[#09141b] hover:bg-[#c0e6f0]">
+            ▶ launch loaded 3D scene
+          </Btn>
+        </div>
         <div className="flex flex-wrap gap-1.5">
           <Btn tone="amber" onClick={() => add({
             widthM: Number(draft.widthM), depthM: Number(draft.depthM),
             heightM: Number(draft.heightM), massKg: Number(draft.massKg),
           })}>+ add carton</Btn>
-          <Btn onClick={onOpenDoor}>open door to inspect</Btn>
+          <Btn onClick={onOpenDoor}>cutaway inspection view</Btn>
         </div>
         <div className="flex flex-wrap gap-1">
           {PRESETS.map(p => (
