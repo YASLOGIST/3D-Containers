@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import aviationEmblem from "./assets/branding/air-cargo-emblem.png";
 import aviationPrint from "./assets/branding/yaslogist-air-print.png";
 
@@ -44,6 +44,8 @@ import {
 import { decodeShareState, encodeShareState } from "@/lib/state";
 import { formatDistance } from "@/lib/units";
 import type { CargoScenario } from "@/lib/planner";
+import { planAKECargo, type CargoItem } from "@/lib/cargoPlacement";
+import { CargoLab } from "@/components/CargoLab";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
 import { ControlDeck } from "@/components/ControlDeck";
@@ -244,8 +246,8 @@ const SOURCE_META: Record<SourceName, { entry: string; description: string }> =
 
 const isSourceName = (value: string): value is SourceName => value in SOURCES;
 
-type Tab = "spec" | "parts" | "source";
-const TAB_ORDER: Tab[] = ["spec", "parts", "source"];
+type Tab = "spec" | "cargo" | "parts" | "source";
+const TAB_ORDER: Tab[] = ["spec", "cargo", "parts", "source"];
 
 /** Initial workbench state: defaults overlaid with any shared URL hash. */
 function initialState(): ViewerState {
@@ -279,6 +281,11 @@ export default function App() {
       divisor: "6000",
     };
   });
+  const [cargoItems, setCargoItems] = useState<CargoItem[]>([]);
+  const cargoPlan = useMemo(
+    () => planAKECargo(cargoItems, MODELS.ake.ratings.payloadKg),
+    [cargoItems],
+  );
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [measured, setMeasured] = useState<{
@@ -375,6 +382,12 @@ export default function App() {
     setState((s) => ({ ...s, ...next }));
     viewer.current?.setState(next);
   }, []);
+
+  // Cartons are a separate inspection overlay: they never enter CAD exports
+  // or overwrite the legacy mass/volume-only load planner.
+  useEffect(() => {
+    if (ready) viewer.current?.setCargoBoxes(state.model === "ake" ? cargoPlan.placed : []);
+  }, [ready, state.model, cargoPlan]);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -875,6 +888,14 @@ export default function App() {
               </Panel>
             </div>
           )}
+          {tab === "cargo" && (
+            <div role="tabpanel" id="panel-cargo" aria-labelledby="tab-cargo" className="h-full">
+              <Panel title="Cargo placement" code="AKE sandbox" className="h-full overflow-y-auto scroll-slim">
+                <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
+                  isAKE={state.model === "ake"} onOpenDoor={() => patch({ door: 1 })} />
+              </Panel>
+            </div>
+          )}
           {tab === "parts" && (
             <div
               role="tabpanel"
@@ -1014,6 +1035,16 @@ export default function App() {
             spec
           </Btn>
           <Btn
+            active={sheet && tab === "cargo"}
+            pressed={sheet && tab === "cargo"}
+            onClick={() => {
+              setTab("cargo");
+              setSheet(true);
+            }}
+          >
+            cargo
+          </Btn>
+          <Btn
             active={sheet && tab === "parts"}
             pressed={sheet && tab === "parts"}
             onClick={() => {
@@ -1045,6 +1076,10 @@ export default function App() {
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
             {tab === "spec" && (
               <SpecSheet cargoScenario={cargoScenario} setCargoScenario={setCargoScenario} stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
+            )}
+            {tab === "cargo" && (
+              <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
+                isAKE={state.model === "ake"} onOpenDoor={() => patch({ door: 1 })} />
             )}
             {tab === "parts" && (
               <PartsList

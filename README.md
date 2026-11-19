@@ -124,6 +124,12 @@ flowchart LR
 | **Exchange** | Download binary `.glb`, `.obj`, binary `.stl`, a PNG snapshot or selected TypeScript source. | GLB exports visible objects; OBJ/STL export geometry. Check units and output in the target application. |
 | **Share** | Encode viewer configuration in the URL hash. | Planner inputs are session-only and are not shared. |
 
+### AKE cargo placement sandbox (prototype)
+
+Select **AKE** and open the **cargo** inspector tab (also accessible from the mobile sheet). Enter carton width, depth, height in metres and mass in kilograms, or use the three presets; select **open door to inspect** for a clearer 3D view. The manifest is session-only and editable; rejected cartons remain visible in the list with an explicit reason. The preview reports accepted mass and estimated utilization of a deliberately conservative rectangular core, **not** the ULD's advertised 4.3 m³ cargo volume.
+
+The deterministic first-fit algorithm (`src/lib/cargoPlacement.ts`) enforces core boundaries, prevents carton intersections, requires an entire carton footprint to be supported by a single carton or the floor, and rejects loads exceeding the nominal AKE payload. It is **not** a complete packing optimizer or validated cargo-restraint, strength, weight-distribution, centre-of-gravity, contour-clearance or aircraft-loading tool. The viewer renders cartons as a separate overlay: existing GLB/OBJ/STL exports contain only the ULD model; copied viewer links and legacy planner inputs do not preserve the cargo manifest. See `tests/cargoPlacement.test.ts` for regression coverage.
+
 ## `05 /` Ignition
 
 **Requirements:** Node.js **20.19 or newer**, npm, and a browser with JavaScript and WebGL available.

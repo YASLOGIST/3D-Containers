@@ -14,6 +14,7 @@ import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 import type { Assembly, ViewerContainer } from "./primitives";
+import type { CargoPlacement } from "@/lib/cargoPlacement";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
@@ -295,6 +296,14 @@ export class AKEViewer {
   private floorMat!: THREE.MeshStandardMaterial;
 
   private modelRoot = new THREE.Group();
+  /** Carton sandbox is intentionally distinct from ULD geometry and exports. */
+  private cargoGroup = new THREE.Group();
+  private cargoBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
+  private cargoEdgeGeometry = new THREE.EdgesGeometry(this.cargoBoxGeometry);
+  private cargoLineMaterial = new THREE.LineBasicMaterial({ color: 0x172f43, transparent: true, opacity: 0.82 });
+  private cargoMaterials = [0xd8a35c, 0x8ab9ca, 0x99b687, 0xc98f82].map(
+    color => new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0.02 }),
+  );
   private container: ViewerContainer | null = null;
   /** door-closed / load-stowed bounding size from the latest rebuild */
   private measuredSize = { x: 0, y: 0, z: 0 };
@@ -445,6 +454,8 @@ export class AKEViewer {
     this.measureGroup.userData.isAnnotation = true;
     this.scene.add(this.measureGroup);
     this.scene.add(this.modelRoot);
+    this.cargoGroup.userData.isAnnotation = true;
+    this.scene.add(this.cargoGroup);
     this.rebuild();
     this.applyMood(this.state.mood, true);
     this.applyMaterialState();
@@ -2025,6 +2036,29 @@ export class AKEViewer {
     this.wake();
   };
 
+  /* ---------------- cargo placement sandbox ---------------- */
+
+  setCargoBoxes(cartons: readonly CargoPlacement[]) {
+    // Shared primitives keep object creation and GPU churn low (max 40 boxes).
+    this.cargoGroup.clear();
+    this.cargoGroup.visible = this.state.model === "ake";
+    if (this.cargoGroup.visible) {
+      cartons.slice(0, 40).forEach((carton, index) => {
+        const mesh = new THREE.Mesh(
+          this.cargoBoxGeometry,
+          this.cargoMaterials[index % this.cargoMaterials.length],
+        );
+        mesh.name = `Cargo preview: ${carton.label}`;
+        mesh.position.set(carton.x, carton.y, carton.z);
+        mesh.scale.set(carton.widthM, carton.heightM, carton.depthM);
+        const edges = new THREE.LineSegments(this.cargoEdgeGeometry, this.cargoLineMaterial);
+        mesh.add(edges);
+        this.cargoGroup.add(mesh);
+      });
+    }
+    this.wake();
+  }
+
   /* ---------------- export ---------------- */
 
   private exportRoot() {
@@ -2106,6 +2140,12 @@ export class AKEViewer {
     this.controls.stopListenToKeyEvents();
     this.controls.dispose();
     this.container?.dispose();
+    this.cargoGroup.clear();
+    this.scene.remove(this.cargoGroup);
+    this.cargoBoxGeometry.dispose();
+    this.cargoEdgeGeometry.dispose();
+    this.cargoLineMaterial.dispose();
+    this.cargoMaterials.forEach(material => material.dispose());
     this.disposeAnnotations();
     this.clearMeasurePoints();
     this.state = { ...this.state, compare: "none" };
