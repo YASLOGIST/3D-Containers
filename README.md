@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="assets/readme/uld-cinematic-hero.gif" alt="3D-Containers by YASLOGIST: an animated conceptual aviation cargo container in a hangar, with a moving scan and technical signals" width="100%" />
+  <img src="assets/readme/uld-cinematic-hero.gif" alt="ULD360 by YASLOGIST: an animated conceptual aviation cargo container in a hangar, with a moving scan and technical signals" width="100%" />
 </div>
 
 <div align="center">
-  <h1>3D-Containers</h1>
+  <h1>ULD360</h1>
   <p><strong>Procedural aviation ULD geometry, built and explored in the browser.</strong></p>
   <p>A creative engineering project by <a href="https://www.yaslogist.com"><strong>YASLOGIST</strong></a>.</p>
   <p>
@@ -20,7 +20,7 @@
 
 ## `01 /` The system
 
-**3D-Containers** is an interactive laboratory for exploring aviation unit load devices (ULDs). It generates container and pallet geometry in the browser with TypeScript and Three.js rather than loading pre-made 3D models. React provides the workbench controls; procedural Canvas textures supply finishes, placards and simulated controller displays.
+**ULD360** is an interactive laboratory for exploring aviation unit load devices (ULDs). It generates container and pallet geometry in the browser with TypeScript and Three.js rather than loading pre-made 3D models. React provides the workbench controls; procedural Canvas textures supply finishes, placards and simulated controller displays.
 
 | Explore | Inspect | Take away |
 | :--- | :--- | :--- |
@@ -140,7 +140,7 @@ The mass field divides the preview core into nine equal plan-view areas and appo
 
 ### Presentation focus and public sharing
 
-The top-bar **⊞ focus** action switches to a full-canvas presentation HUD for showcasing the 3D scene without stacked control panels. **Escape** or **exit focus** restores the full workbench. It preserves the current unit, camera and cargo overlay. The studio presentation uses static HUD guides and does not add a second renderer or continuous decorative animation. The production domain is `https://containers.yaslogist.com/`, with a 1200 × 630 authentic project screenshot (`public/og-3d-containers.jpg`) used for LinkedIn/Open Graph and Twitter large-image previews. This screenshot is a visualization, not an OEM-certified aircraft loading scene.
+The top-bar **⊞ focus** action switches to a full-canvas presentation HUD for showcasing the 3D scene without stacked control panels. **Escape** or **exit focus** restores the full workbench. It preserves the current unit, camera and cargo overlay. The studio presentation uses static HUD guides and does not add a second renderer or continuous decorative animation. The production domain is `https://containers.yaslogist.com/`, with a 1200 × 630 conceptual promotional cover (`public/og-uld360-v1.jpg`) for LinkedIn/Open Graph and Twitter large-image previews. The cover is illustrative artwork, not a live screenshot or an OEM-certified aircraft loading scene.
 
 ## `05 /` Ignition
 
@@ -212,7 +212,7 @@ The hero uses a locally stored AI-generated conceptual illustration with composi
 ---
 
 <div align="center">
-  <p><strong>3D-CONTAINERS &nbsp; / &nbsp; YASLOGIST</strong></p>
+  <p><strong>ULD360 &nbsp; / &nbsp; YASLOGIST</strong></p>
   <p>Geometry made tangible. Engineering made visible.</p>
   <p><a href="https://www.yaslogist.com">www.yaslogist.com ↗</a></p>
 </div>
