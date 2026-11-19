@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import {
-  AKE_CARGO_CORE,
+  cargoCoreForModel,
   type CargoItem,
   type CargoPlan,
 } from "@/lib/cargoPlacement";
 import { Btn } from "./ui";
+import { MODELS, type ModelId } from "@/three/models";
 
 const PRESETS = [
   { name: "Small", widthM: 0.4, depthM: 0.4, heightM: 0.4, massKg: 20 },
@@ -20,16 +21,19 @@ const REASONS = {
 } as const;
 
 export function CargoLab({
-  items, plan, onChange, isAKE, onOpenDoor, onLoadDemo,
+  items, plan, onChange, model, contour, onOpenDoor, onLoadDemo,
 }: {
   items: CargoItem[];
   plan: CargoPlan;
   onChange: (items: CargoItem[]) => void;
-  isAKE: boolean;
+  model: ModelId;
+  contour: boolean;
   onOpenDoor: () => void;
   onLoadDemo: () => void;
 }) {
   const sequence = useRef(1);
+  const core = cargoCoreForModel(model, contour);
+  const spec = MODELS[model];
   const [draft, setDraft] = useState({
     widthM: "0.40", depthM: "0.40", heightM: "0.40", massKg: "20",
   });
@@ -50,18 +54,11 @@ export function CargoLab({
     onChange([...items, item]);
   };
 
-  if (!isAKE) return (
-    <div className="space-y-3 text-sm text-dim">
-      <p>The carton-placement sandbox currently supports AKE / LD-3 only.</p>
-      <p>Select <strong className="text-ink">AKE</strong> above to inspect your cargo plan. Other ULD models remain unchanged.</p>
-    </div>
-  );
-
   return (
     <div className="space-y-3 font-mono text-[11px]">
       <div className="border border-amber/30 bg-amber/5 p-2 text-[10px] leading-relaxed text-ink/80">
-        <strong className="text-amber">ENGINEERING SANDBOX</strong>
-        <p className="mt-1">Conservative rectangular core only. No certified ULD fit, structural support, restraints, load securing or aircraft centre-of-gravity checks. Estimates are not loading instructions.</p>
+        <strong className="text-amber">{spec.code} · ENGINEERING SANDBOX</strong>
+        <p className="mt-1">Conservative {spec.palletOption ? "pallet load envelope" : "rectangular inner core"} only. Manufacturer-specific hardware, nets, hold compatibility, restraints, structural support and aircraft centre-of-gravity are not validated. Not loading instructions.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -80,7 +77,7 @@ export function CargoLab({
         ))}
       </div>
       <div className="text-[9px] uppercase leading-relaxed tracking-wider text-dim">
-        Core: {AKE_CARGO_CORE.widthM.toFixed(2)} × {AKE_CARGO_CORE.depthM.toFixed(2)} × {AKE_CARGO_CORE.heightM.toFixed(2)} m.
+        Core: {core.widthM.toFixed(2)} × {core.depthM.toFixed(2)} × {core.heightM.toFixed(2)} m.
         It is smaller than the ULD's rated cargo volume.
       </div>
 
@@ -110,7 +107,7 @@ export function CargoLab({
         </div>
         {validation && <p role="alert" className="text-[10px] text-signal">{validation}</p>}
         <div className="border border-[#608ba2]/60 bg-[#123040]/70 p-2">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#bfe8f3]">Instant scene / 30 cartons</div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#bfe8f3]">{spec.code} · Instant scene / 27 cartons</div>
           <p className="mb-2 text-[10px] leading-relaxed text-[#afc8d4]">
             Load a ready-to-inspect 3D example with a cutaway view and live capacity metrics.
           </p>
@@ -123,7 +120,7 @@ export function CargoLab({
             widthM: Number(draft.widthM), depthM: Number(draft.depthM),
             heightM: Number(draft.heightM), massKg: Number(draft.massKg),
           })}>+ add carton</Btn>
-          <Btn onClick={onOpenDoor}>cutaway inspection view</Btn>
+          <Btn onClick={onOpenDoor}>{spec.palletOption ? "inspect pallet loading" : "cutaway inspection view"}</Btn>
         </div>
         <div className="flex flex-wrap gap-1">
           {PRESETS.map(p => (

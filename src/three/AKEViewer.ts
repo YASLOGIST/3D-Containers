@@ -14,7 +14,7 @@ import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 
 import type { Assembly, ViewerContainer } from "./primitives";
-import { AKE_CARGO_CORE, type CargoPlacement } from "@/lib/cargoPlacement";
+import { cargoCoreForModel, type CargoPlacement } from "@/lib/cargoPlacement";
 import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
@@ -337,9 +337,7 @@ export class AKEViewer {
   private modelRoot = new THREE.Group();
   /** Carton sandbox is intentionally distinct from ULD geometry and exports. */
   private cargoGroup = new THREE.Group();
-  private cargoCoreGeometry = new THREE.BoxGeometry(
-    AKE_CARGO_CORE.widthM, AKE_CARGO_CORE.heightM, AKE_CARGO_CORE.depthM,
-  );
+  private cargoCoreGeometry = new THREE.BoxGeometry(1, 1, 1);
   private cargoCoreEdges = new THREE.EdgesGeometry(this.cargoCoreGeometry);
   private cargoCoreMaterial = new THREE.LineDashedMaterial({
     color: 0x8ad7ed, dashSize: 0.045, gapSize: 0.025,
@@ -506,11 +504,7 @@ export class AKEViewer {
     this.scene.add(this.measureGroup);
     this.scene.add(this.modelRoot);
     this.cargoGroup.userData.isAnnotation = true;
-    this.cargoCoreWire.position.set(
-      AKE_CARGO_CORE.minX + AKE_CARGO_CORE.widthM / 2,
-      AKE_CARGO_CORE.floorY + AKE_CARGO_CORE.heightM / 2,
-      AKE_CARGO_CORE.minZ + AKE_CARGO_CORE.depthM / 2,
-    );
+    // The preview outline is re-positioned and scaled for every model.
     this.cargoCoreWire.computeLineDistances();
     this.cargoCoreWire.userData.isAnnotation = true;
     this.scene.add(this.cargoGroup);
@@ -2099,7 +2093,14 @@ export class AKEViewer {
   setCargoBoxes(cartons: readonly CargoPlacement[], showCore = false) {
     // Shared primitives keep object creation and GPU churn low (max 40 boxes).
     this.cargoGroup.clear();
-    this.cargoGroup.visible = this.state.model === "ake";
+    const core = cargoCoreForModel(this.state.model, this.state.contour);
+    this.cargoCoreWire.position.set(
+      core.minX + core.widthM / 2,
+      core.floorY + core.heightM / 2,
+      core.minZ + core.depthM / 2,
+    );
+    this.cargoCoreWire.scale.set(core.widthM, core.heightM, core.depthM);
+    this.cargoGroup.visible = true;
     if (this.cargoGroup.visible) {
       if (showCore) this.cargoGroup.add(this.cargoCoreWire);
       cartons.slice(0, 40).forEach((carton, index) => {

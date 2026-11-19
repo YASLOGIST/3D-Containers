@@ -1,11 +1,10 @@
 /**
- * AKE cargo placement sandbox: conservative axis-aligned core only.
- *
- * Neither the modeled 4.3 m³ rating nor a nominal ULD envelope is a guarantee
- * of available rectangular space. This deliberately smaller core sits inside
- * the nominal AKE profile; wall fittings, restraint and aircraft CG/position
- * are NOT verified. Never use these estimates for operational loading.
+ * Model-aware ULD cargo preview. This is an intentionally conservative
+ * AABB sandbox, NOT a certified fit, structural or restraint calculation.
  */
+import { MODELS, type ModelId } from "../three/models";
+import { contourProfile } from "../three/akeLD3";
+
 export interface CargoItem {
   id: string;
   label: string;
@@ -14,19 +13,15 @@ export interface CargoItem {
   heightM: number;
   massKg: number;
 }
-
 export interface CargoPlacement extends CargoItem {
-  /** World-space centre of the carton, in metres. */
   x: number;
   y: number;
   z: number;
 }
-
 export interface CargoRejection {
   item: CargoItem;
   reason: "invalid" | "oversize" | "overweight" | "no-space";
 }
-
 export interface CargoPlan {
   placed: CargoPlacement[];
   rejected: CargoRejection[];
@@ -36,31 +31,103 @@ export interface CargoPlan {
   coreUtilizationPct: number;
   availableKg: number;
 }
-
-/** A conservative box within the AKE nominal tapered interior, metres. */
-export const AKE_CARGO_CORE = {
-  minX: -0.88,
-  minZ: -0.66,
-  floorY: 0.15,
-  widthM: 1.21,
-  depthM: 1.32,
-  heightM: 1.37,
-} as const;
+export interface CargoCore {
+  minX: number;
+  minZ: number;
+  floorY: number;
+  widthM: number;
+  depthM: number;
+  heightM: number;
+}
 
 const EPS = 1e-6;
 const MAX_ITEMS = 40;
+const finitePositive = (n: number) => Number.isFinite(n) && n > 0;
 
-/** Visible one-click scene: 30 equal-sized cartons in a stable 3D stack. */
-export function demoAKECargo(): CargoItem[] {
-  return Array.from({ length: 30 }, (_, index) => ({
-    id: `demo-${index + 1}`,
-    label: `Demo ${String(index + 1).padStart(2, "0")}`,
-    widthM: 0.36,
-    depthM: 0.38,
-    heightM: 0.32,
-    massKg: 18,
+/** Horizontal segment enclosed by a closed 2D polygon at height y. */
+function profileSegment(profile: readonly { x: number; y: number }[], y: number) {
+  const intersections: number[] = [];
+  for (let i = 0; i < profile.length; i++) {
+    const a = profile[i], b = profile[(i + 1) % profile.length];
+    if (Math.abs(a.y - b.y) <= EPS) continue;
+    // Half-open crossing rule avoids double counting at shared vertices.
+    if (y >= Math.min(a.y, b.y) && y < Math.max(a.y, b.y)) {
+      intersections.push(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
+    }
+  }
+  intersections.sort((a, b) => a - b);
+  return intersections.length >= 2
+    ? { left: intersections[0], right: intersections[intersections.length - 1] }
+    : null;
+}
+
+/**
+ * A fixed inner rectangular preview core derived from each model's 2D outline.
+ * Uses inward margins larger for reefer units and pallets; these do not certify
+ * clearance from interior hardware, structure, nets or particular cargo types.
+ */
+export function cargoCoreForModel(model: ModelId, contour = true): CargoCore {
+  const spec = MODELS[model];
+  const reefer = spec.reeferOption;
+  const profile = model === "ake" ? contourProfile(contour) : spec.sectionProfile();
+  if (spec.palletOption) {
+    const minX = Math.min(...profile.map(p => p.x));
+    const maxX = Math.max(...profile.map(p => p.x));
+    const padX = 0.14, padZ = 0.14;
+    // Plate top is nominal thickness plus the 16 mm skid in pallet engine.
+    const floorY = spec.dims.height + 0.021;
+    return {
+      minX: minX + padX,
+      minZ: -spec.dims.depth / 2 + padZ,
+      floorY,
+      widthM: maxX - minX - padX * 2,
+      depthM: spec.dims.depth - padZ * 2,
+      heightM: Math.max(0.1, (spec.dims.contourHeight ?? 1.5) - 0.17),
+    };
+  }
+  const low = Math.min(...profile.map(p => p.y));
+  const high = Math.max(...profile.map(p => p.y));
+  const floorY = low + (reefer ? 0.16 : 0.07);
+  const ceilingY = high - (reefer ? 0.20 : 0.10);
+  const marginX = reefer ? 0.20 : 0.13;
+  const marginZ = reefer ? 0.24 : 0.12;
+  const sampled = Array.from({ length: 9 }, (_, i) =>
+    profileSegment(profile, floorY + (ceilingY - floorY) * (i / 8)),
+  ).filter((p): p is { left: number; right: number } => !!p);
+  if (!sampled.length) throw new Error(`No reference cargo section for ${model}`);
+  const minX = Math.max(...sampled.map(s => s.left)) + marginX;
+  const maxX = Math.min(...sampled.map(s => s.right)) - marginX;
+  const widthM = maxX - minX;
+  const depthM = spec.dims.depth - marginZ * 2;
+  const heightM = ceilingY - floorY;
+  if (![widthM, depthM, heightM].every(finitePositive)) {
+    throw new Error(`Cargo preview core is not feasible for ${model}`);
+  }
+  return { minX, minZ: -spec.dims.depth / 2 + marginZ,
+    floorY, widthM, depthM, heightM };
+}
+
+/** Adaptive sample with 3 × 3 × 3 stowed boxes, rather than forcing LD-3
+ * dimensions into aircraft containers and onto main-deck pallets. */
+export function demoCargoForModel(model: ModelId, contour = true): CargoItem[] {
+  const core = cargoCoreForModel(model, contour);
+  const count = 27;
+  const size = {
+    widthM: Number((core.widthM / 3 * 0.89).toFixed(4)),
+    depthM: Number((core.depthM / 3 * 0.89).toFixed(4)),
+    heightM: Number((core.heightM / 3 * 0.89).toFixed(4)),
+  };
+  const massKg = Number(Math.min(25, MODELS[model].ratings.payloadKg / 40).toFixed(2));
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${model}-demo-${i + 1}`,
+    label: `Demo ${String(i + 1).padStart(2, "0")}`,
+    ...size, massKg,
   }));
 }
+
+/** Kept as a compatibility alias for legacy LD-3 callers. */
+export const AKE_CARGO_CORE = cargoCoreForModel("ake");
+export const demoAKECargo = () => demoCargoForModel("ake");
 
 const within = (start: number, span: number, limit: number) =>
   start >= -EPS && span > 0 && start + span <= limit + EPS;
@@ -74,46 +141,43 @@ function overlaps(a: { x: number; y: number; z: number; widthM: number; depthM: 
     a.z < b.z + b.depthM - EPS &&
     a.z + a.depthM > b.z + EPS;
 }
-
 function supported(
   box: { x: number; y: number; z: number; widthM: number; depthM: number },
   placed: Array<CargoItem & { x: number; y: number; z: number }>,
 ) {
   if (box.y <= EPS) return true;
-  // Full footprint on one carton: conservative, no unsupported bridges.
   return placed.some(p =>
     Math.abs(p.y + p.heightM - box.y) <= EPS &&
     box.x >= p.x - EPS && box.x + box.widthM <= p.x + p.widthM + EPS &&
-    box.z >= p.z - EPS && box.z + box.depthM <= p.z + p.depthM + EPS
+    box.z >= p.z - EPS && box.z + box.depthM <= p.z + p.depthM + EPS,
   );
 }
-
 function candidates(values: number[]) {
   return [...new Set(values.map(v => Math.round(v * 1e6) / 1e6))]
     .sort((a, b) => a - b);
 }
-
 function valid(item: CargoItem) {
-  return [item.widthM, item.depthM, item.heightM, item.massKg].every(Number.isFinite) &&
-    item.widthM > 0 && item.depthM > 0 && item.heightM > 0 && item.massKg > 0;
+  return [item.widthM, item.depthM, item.heightM, item.massKg].every(finitePositive);
 }
 
-/** Greedy, deterministic first-fit placement; order is significant. */
-export function planAKECargo(items: readonly CargoItem[], payloadKg = 1496): CargoPlan {
-  const core = AKE_CARGO_CORE;
+/** Deterministic, supported first-fit. Not a bin-packing optimizer. */
+export function planCargoForModel(
+  model: ModelId, items: readonly CargoItem[], contour = true,
+  payloadOverride?: number,
+): CargoPlan {
+  const core = cargoCoreForModel(model, contour);
+  const payloadKg = payloadOverride ?? MODELS[model].ratings.payloadKg;
   const coreM3 = core.widthM * core.depthM * core.heightM;
   const local: Array<CargoItem & { x: number; y: number; z: number }> = [];
   const rejected: CargoRejection[] = [];
-  let loadedKg = 0;
-  let usedM3 = 0;
-
+  let loadedKg = 0, usedM3 = 0;
   for (const item of items.slice(0, MAX_ITEMS)) {
     if (!valid(item)) {
       rejected.push({ item, reason: "invalid" });
       continue;
     }
     if (item.widthM > core.widthM + EPS ||
-        item.depthM > core.depthM + EPS || item.heightM > core.heightM + EPS) {
+      item.depthM > core.depthM + EPS || item.heightM > core.heightM + EPS) {
       rejected.push({ item, reason: "oversize" });
       continue;
     }
@@ -121,7 +185,6 @@ export function planAKECargo(items: readonly CargoItem[], payloadKg = 1496): Car
       rejected.push({ item, reason: "overweight" });
       continue;
     }
-
     const ys = candidates([0, ...local.map(p => p.y + p.heightM)]);
     const zs = candidates([0, ...local.map(p => p.z + p.depthM)]);
     const xs = candidates([0, ...local.map(p => p.x + p.widthM)]);
@@ -145,10 +208,7 @@ export function planAKECargo(items: readonly CargoItem[], payloadKg = 1496): Car
     loadedKg += item.massKg;
     usedM3 += item.widthM * item.depthM * item.heightM;
   }
-  // Never silently omit items beyond the safe preview cap.
-  for (const item of items.slice(MAX_ITEMS)) {
-    rejected.push({ item, reason: "no-space" });
-  }
+  for (const item of items.slice(MAX_ITEMS)) rejected.push({ item, reason: "no-space" });
   return {
     placed: local.map(p => ({
       ...p,
@@ -156,11 +216,13 @@ export function planAKECargo(items: readonly CargoItem[], payloadKg = 1496): Car
       y: core.floorY + p.y + p.heightM / 2,
       z: core.minZ + p.z + p.depthM / 2,
     })),
-    rejected,
-    loadedKg,
-    usedM3,
-    coreM3,
+    rejected, loadedKg, usedM3, coreM3,
     coreUtilizationPct: (usedM3 / coreM3) * 100,
     availableKg: Math.max(0, payloadKg - loadedKg),
   };
+}
+
+/** Compatibility with earlier AKE-only callers. */
+export function planAKECargo(items: readonly CargoItem[], payloadKg = 1496): CargoPlan {
+  return planCargoForModel("ake", items, true, payloadKg);
 }

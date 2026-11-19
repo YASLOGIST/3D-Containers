@@ -44,7 +44,7 @@ import {
 import { decodeShareState, encodeShareState } from "@/lib/state";
 import { formatDistance } from "@/lib/units";
 import type { CargoScenario } from "@/lib/planner";
-import { demoAKECargo, planAKECargo, type CargoItem } from "@/lib/cargoPlacement";
+import { demoCargoForModel, planCargoForModel, type CargoItem } from "@/lib/cargoPlacement";
 import { CargoMissionDock } from "@/components/CargoMissionDock";
 import { CargoLab } from "@/components/CargoLab";
 import { MODELS, type ModelId } from "@/three/models";
@@ -284,8 +284,8 @@ export default function App() {
   });
   const [cargoItems, setCargoItems] = useState<CargoItem[]>([]);
   const cargoPlan = useMemo(
-    () => planAKECargo(cargoItems, MODELS.ake.ratings.payloadKg),
-    [cargoItems],
+    () => planCargoForModel(state.model, cargoItems, state.contour),
+    [cargoItems, state.model, state.contour],
   );
   const [stats, setStats] = useState<Stats | null>(null);
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
@@ -388,29 +388,39 @@ export default function App() {
   // or overwrite the legacy mass/volume-only load planner.
   useEffect(() => {
     if (ready) viewer.current?.setCargoBoxes(
-      state.model === "ake" ? cargoPlan.placed : [],
-      state.model === "ake" && (tab === "cargo" || cargoItems.length > 0),
+      cargoPlan.placed,
+      tab === "cargo" || cargoItems.length > 0,
     );
   }, [ready, state.model, cargoPlan, tab, cargoItems.length]);
 
   const launchCargoDemo = useCallback(() => {
-    setCargoItems(demoAKECargo());
+    const model = MODELS[state.model];
+    setCargoItems(demoCargoForModel(state.model, state.contour));
     setTab("cargo");
-    // Show the complete 3D stack rather than covering it with the mobile sheet.
+    // Leave model selection unchanged; the scene is built for this ULD.
     setSheet(false);
     patch({
-      model: "ake", door: 1, section: true, sectionAxis: "z",
-      sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
+      door: model.palletOption ? 0 : 1,
+      load: 0, section: !model.palletOption, sectionAxis: "z",
+      sectionPos: 0.53, sectionFlip: false, sectionCaps: false,
       dimensions: false, autoRotate: false, explode: 0, compare: "none",
     });
     viewer.current?.frameAll();
-  }, [patch]);
+  }, [patch, state.model, state.contour]);
 
   const openCargoWorkspace = useCallback(() => {
-    if (state.model !== "ake") patch({ model: "ake" });
     setTab("cargo");
     setSheet(true);
-  }, [patch, state.model]);
+  }, []);
+
+  // Pallet generators also contain an illustrative translucent 'cargo load'
+  // mesh. Hide that alternative representation when actual carton previews
+  // are present to avoid two overlapping cargo visuals.
+  useEffect(() => {
+    if (ready && cargoItems.length > 0 && MODELS[state.model].palletOption && state.load > 0) {
+      patch({ load: 0 });
+    }
+  }, [ready, cargoItems.length, state.model, state.load, patch]);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -481,8 +491,14 @@ export default function App() {
 
   const selectModel = (id: ModelId) => {
     const next = MODELS[id];
+    if (cargoItems.length > 0 && cargoItems.every(item => item.id.includes("-demo-"))) {
+      // Keep the showcase visible when switching between ULD families.
+      setCargoItems(demoCargoForModel(id, state.contour));
+    }
     patch({
-      model: id,
+      model: id, load: cargoItems.length > 0 ? 0 : state.load,
+      door: next.palletOption ? 0 : state.door,
+      section: cargoItems.length > 0 && next.palletOption ? false : state.section,
       setpoint: next.setpointRange?.default ?? state.setpoint,
       compare: state.compare === id ? "none" : state.compare,
     });
@@ -719,7 +735,9 @@ export default function App() {
       {/* High-visibility entrance to the working cargo demonstration. */}
       {!error && (
         <CargoMissionDock
-          active={state.model === "ake" && cargoItems.length > 0}
+          active={cargoItems.length > 0}
+          modelCode={spec.code}
+          hidden={sheet}
           itemCount={cargoItems.length}
           plan={cargoPlan}
           onStart={launchCargoDemo}
@@ -934,11 +952,12 @@ export default function App() {
           )}
           {tab === "cargo" && (
             <div role="tabpanel" id="panel-cargo" aria-labelledby="tab-cargo" className="h-full">
-              <Panel title="Cargo placement" code="AKE sandbox" className="h-full overflow-y-auto scroll-slim">
+              <Panel title="Cargo placement" code={`${spec.code} sandbox`} className="h-full overflow-y-auto scroll-slim">
                 <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
-                  isAKE={state.model === "ake"} onLoadDemo={launchCargoDemo}
+                  model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
                   onOpenDoor={() => patch({
-                    door: 1, section: true, sectionAxis: "z",
+                    door: spec.palletOption ? 0 : 1, load: 0,
+                    section: !spec.palletOption, sectionAxis: "z",
                     sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
                   })} />
               </Panel>
@@ -1127,9 +1146,10 @@ export default function App() {
             )}
             {tab === "cargo" && (
               <CargoLab items={cargoItems} plan={cargoPlan} onChange={setCargoItems}
-                isAKE={state.model === "ake"} onLoadDemo={launchCargoDemo}
+                model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
                 onOpenDoor={() => patch({
-                  door: 1, section: true, sectionAxis: "z",
+                  door: spec.palletOption ? 0 : 1, load: 0,
+                  section: !spec.palletOption, sectionAxis: "z",
                   sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
                 })} />
             )}
