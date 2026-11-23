@@ -185,6 +185,12 @@ export interface ViewerState {
   compare: ModelId | "none";
 }
 
+/** A restrained three-quarter pose prioritizing the mechanical door (+Z), with tapered hull (+X) still visible.
+ * Does not alter measurement geometry, model orientation, or exported meshes. */
+export function homeViewDirection(): THREE.Vector3 {
+  return new THREE.Vector3(0.57, 0.32, 0.84).normalize();
+}
+
 export const DEFAULT_STATE: ViewerState = {
   model: "ake",
   finish: "mill",
@@ -199,8 +205,10 @@ export const DEFAULT_STATE: ViewerState = {
   roughness: 0.49,
   envIntensity: 1,
   wireframe: false,
-  dimensions: true,
-  autoRotate: !reducedMotionPreferred() && !touchFirstPreferred(),
+  dimensions: false,
+  // Stationary by default for inspectability and low idle GPU demand.
+  // Operators can enable rotation and engineering labels explicitly.
+  autoRotate: false,
   mood: "hangar",
   reefer: true,
   setpoint: -18,
@@ -1775,14 +1783,14 @@ export class AKEViewer {
     const dir = this.camera.position.clone().sub(this.controls.target);
     return dir.lengthSq() > 1e-8
       ? dir.normalize()
-      : new THREE.Vector3(0.62, 0.42, 0.78).normalize();
+      : homeViewDirection();
   }
 
   /** Recompute the home pose whenever the generated envelope changes. */
   private updateHomePose() {
     const box = this.modelBox();
     const target = box.getCenter(new THREE.Vector3());
-    const dir = new THREE.Vector3(0.62, 0.42, 0.78).normalize();
+    const dir = homeViewDirection();
     this.homeTarget.copy(target);
     this.homeCamera
       .copy(target)

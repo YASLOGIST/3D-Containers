@@ -140,6 +140,8 @@ The mass field divides the preview core into nine equal plan-view areas and appo
 
 ### Presentation focus and public sharing
 
+The initial scene now uses a fixed three-quarter camera view prioritizing the mechanical door with the contoured side still visible. Dimension callouts and automatic orbit start **off** to keep the silhouette readable and allow the existing settled-scene GPU throttle to engage; both remain available as explicit controls and are retained by shared-viewer URLs.
+
 The top-bar **⊞ focus** action switches to a full-canvas presentation HUD for showcasing the 3D scene without stacked control panels. **Escape** or **exit focus** restores the full workbench. It preserves the current unit, camera and cargo overlay. The studio presentation uses static HUD guides and does not add a second renderer or continuous decorative animation. The production domain is `https://containers.yaslogist.com/`, with a 1200 × 630 conceptual promotional cover (`public/og-uld360-v1.jpg`) for LinkedIn/Open Graph and Twitter large-image previews. The cover is illustrative artwork, not a live screenshot or an OEM-certified aircraft loading scene.
 
 ## `05 /` Ignition
