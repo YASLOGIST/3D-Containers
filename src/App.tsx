@@ -472,6 +472,14 @@ export default function App() {
     viewer.current?.frameAll();
   }, [patch, state.model, state.contour, cargoItems.length]);
 
+  // Make the mass field discoverable from the loading bar, including on mobile.
+  // applyStudioPreset closes the sheet for the canvas view; re-open it so the
+  // numerical analysis is actually visible on smaller screens.
+  const openMassAnalysis = useCallback(() => {
+    applyStudioPreset("field");
+    setSheet(true);
+  }, [applyStudioPreset]);
+
   const changeCargoItems = useCallback((items: CargoItem[]) => {
     setCargoItems(items);
     if (items.length) setStudioPreset(current =>
@@ -833,11 +841,13 @@ export default function App() {
       {!error && !focusMode && (
         <CargoMissionDock
           active={cargoItems.length > 0}
+          ready={ready}
           modelCode={spec.code}
           hidden={sheet}
           itemCount={cargoItems.length}
           plan={cargoPlan}
           onStart={launchCargoDemo}
+          onAnalyze={openMassAnalysis}
           onInspect={openCargoWorkspace}
           onClear={() => {
             setCargoItems([]);
@@ -862,7 +872,7 @@ export default function App() {
           </span>
           <div>
             <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.19em] text-[#90bfdf] sm:text-[9px]">
-              YASLOGIST / AIR CARGO &amp; AVIATION
+              YASLOGIST / ULD360 / AIR CARGO
             </div>
             <h1 className="font-display text-[17px] font-bold leading-none tracking-[0.02em] text-ink sm:text-[23px]">
               {spec.code}
