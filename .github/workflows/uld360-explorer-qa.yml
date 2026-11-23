@@ -70,14 +70,18 @@ jobs:
               assert.ok(clip.includes('RKN')&&clip.includes('NOT an OEM-approved'),'Reference brief includes source and disclaimer');
               await dialog.getByRole('button',{name:'All',exact:true}).click();
               await box.fill('');
+              await dialog.locator('h3').getByText('RKN',{exact:false}).waitFor();
+              assert.equal(await dialog.getByText('Reference brief copied').count(),0,'No stale copy message after a new query');
               if(config.id!=='desktop'){
                 await dialog.screenshot({path:'qa-evidence/explorer-'+config.id+'.png',animations:'disabled',timeout:30000});
               }
               await p.keyboard.press('Escape');
               assert.equal(await dialog.isVisible(),false,'Escape dismisses explorer');
               assert.ok((await p.getByRole('button',{name:'Browse 17 ULD models and technical references'}).getAttribute('aria-expanded'))==='false');
-              await p.getByRole('button',{name:'Browse 17 ULD models and technical references'}).click();
+              if(config.id==='desktop')await p.keyboard.press('/');
+              else await p.getByRole('button',{name:'Browse 17 ULD models and technical references'}).click();
               const again=p.getByRole('dialog',{name:'Model Explorer'});
+              await again.waitFor({state:'visible'});
               await again.getByRole('searchbox').fill('RKN');
               await again.getByRole('button',{name:'Open model in 3D'}).click();
               assert.equal(await p.getByRole('dialog').count(),0,'Inspect closes dialog');
