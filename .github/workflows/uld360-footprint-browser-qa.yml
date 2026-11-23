@@ -1,0 +1,81 @@
+name: Temporary ULD360 Projected Footprint Browser QA
+
+on:
+  push:
+    branches: [feat/uld360-footprint-intelligence-20261123]
+    paths: [.github/workflows/uld360-footprint-browser-qa.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install project and Chromium
+        run: |
+          npm ci
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Start preview web app
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/uld360-vite.log 2>&1 &
+          for i in {1..45}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break || sleep 1; done
+          curl -fsS http://127.0.0.1:4173/ >/dev/null
+      - name: Inspect selected carton footprint and disclosure on three viewports
+        run: |
+          cat > qa-footprint.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          const profiles=[
+            {name:'phone',viewport:{width:390,height:844},dpr:3,mobile:true},
+            {name:'tablet',viewport:{width:1024,height:1366},dpr:2,mobile:true},
+            {name:'desktop',viewport:{width:1440,height:900},dpr:2,mobile:false},
+          ];
+          try{
+            for(const device of profiles){
+              const ctx=await browser.newContext({
+                viewport:device.viewport,deviceScaleFactor:device.dpr,isMobile:device.mobile,hasTouch:device.mobile,reducedMotion:'reduce'
+              });
+              const p=await ctx.newPage();
+              p.setDefaultTimeout(28000);
+              const errors=[];p.on('pageerror',e=>errors.push(e.message));
+              try{
+                const r=await p.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:30000});
+                assert.equal(r?.status(),200);
+                await p.locator('canvas').first().waitFor();
+                await p.getByRole('button',{name:'Load 3D cargo preview'}).click();
+                await p.getByRole('button',{name:'Edit the cargo manifest'}).click();
+                await p.getByRole('button',{name:'Highlight Demo 01 in 3D'}).click();
+                const badge=p.getByTestId('selected-cargo-indicator');
+                await badge.waitFor({state:'visible'});
+                const text=await badge.innerText();
+                assert.match(text,/kg\/m² index/);
+                assert.match(text,/m² plan view/);
+                assert.match(text,/NOT floor pressure/);
+                assert.match(text,/Base at preview floor/);
+                await p.getByRole('button',{name:'Clear highlighted carton'}).click();
+                await badge.waitFor({state:'hidden'});
+                await p.getByRole('button',{name:'Edit the cargo manifest'}).click();
+                const card=p.locator('article:visible').filter({hasText:'Demo 01'}).first();
+                await card.locator('summary').click();
+                const detail=await card.innerText();
+                assert.match(detail,/Plan-view load index/);
+                assert.match(detail,/Horizontal projection/);
+                assert.match(detail,/Carton mass ÷ area/);
+                assert.match(detail,/not verified contact area or transferred floor loading/);
+                const overflow=await p.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2);
+                assert.equal(overflow,false,device.name+' horizontal overflow');
+                assert.deepEqual(errors,[],device.name+' Javascript errors');
+                console.log('PASS',device.name,'preview load, projected index, warning, inspection, clear, no overflow');
+              } finally {await ctx.close();}
+            }
+          }finally{await browser.close();}
+          JS
+          node qa-footprint.mjs
