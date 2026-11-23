@@ -84,6 +84,14 @@ export function ModelExplorer({ activeModel, onInspect, onCompare, onClose }: Pr
   const selected = selectedId ? MODELS[selectedId] : null;
   const active = MODELS[activeModel];
 
+  // Keep the last searched model selected after clearing a query or filter,
+  // instead of snapping back to the initial ULD unexpectedly.
+  useEffect(() => {
+    if (matches.length > 0 && !matches.includes(previewId)) {
+      setPreviewId(matches[0]);
+    }
+  }, [matches, previewId]);
+
   useEffect(() => {
     focusBefore.current = document.activeElement instanceof HTMLElement
       ? document.activeElement : null;
@@ -158,7 +166,7 @@ export function ModelExplorer({ activeModel, onInspect, onCompare, onClose }: Pr
             <div className="shrink-0 space-y-3 p-3 sm:p-4">
               <label className="block">
                 <span className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-[#9bd3e7]">Search models</span>
-                <input ref={inputRef} type="search" value={query} onChange={e => setQuery(e.target.value)}
+                <input ref={inputRef} type="search" value={query} onChange={e => { setQuery(e.target.value); setCopyStatus(""); }}
                   aria-label="Search ULD models by code, family, or aircraft"
                   placeholder="AKE, LD-3, A320, Boeing..."
                   className="h-11 w-full min-w-0 border border-[#517c90] bg-[#06131d] px-3 text-[13px] text-white outline-none placeholder:text-[#6d8b9a] focus:border-[#a6e8f8]" />
