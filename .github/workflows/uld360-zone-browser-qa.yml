@@ -76,8 +76,12 @@ jobs:
                 await badge.waitFor({state:'hidden'});
                 await page.getByRole('button',{name:/lenses/i}).first().click();
                 const refreshed=page.getByRole('group',{name:'Inspect nine projected mass zones'});
-                await refreshed.getByRole('button',{name:/Inspect zone row 1 column 1,/i}).click();
-                await page.getByRole('button',{name:'Close selected mass zone'}).click();
+                const reopened=page.getByRole('region',{name:'Selected mass zone breakdown'});
+                // Desktop keeps the studio mounted, while the mobile sheet unmounts.
+                if (await reopened.count() === 0) {
+                  await refreshed.getByRole('button',{name:/Inspect zone row 1 column 1,/i}).click();
+                }
+                await reopened.getByRole('button',{name:'Close selected mass zone'}).click();
                 await page.getByRole('region',{name:'Selected mass zone breakdown'}).waitFor({state:'hidden'});
                 const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2);
                 assert.equal(overflow,false,'Unexpected horizontal overflow on '+device.name);
