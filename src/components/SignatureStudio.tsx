@@ -97,7 +97,7 @@ export const SignatureStudio = memo(function SignatureStudio({
         <div className="mt-3 grid grid-cols-2 gap-2">
           {[
             ["ACCEPTED MASS", `${signature.totalKg.toFixed(1)} kg`],
-            ["PEAK FOOTPRINT", `${signature.peakKgPerM2.toFixed(1)} kg/m²`],
+            ["PEAK MAP INDEX", `${signature.peakKgPerM2.toFixed(1)} kg/m²`],
             ["LATERAL OFFSET", formatOffset(signature.lateralOffsetPct)],
             ["FORE/AFT OFFSET", formatOffset(signature.longitudinalOffsetPct)],
           ].map(([label, value]) => (
@@ -109,7 +109,7 @@ export const SignatureStudio = memo(function SignatureStudio({
         </div>
 
         <div className="mt-3 flex items-start gap-3">
-          <div className="grid aspect-square w-[45%] shrink-0 grid-cols-3 gap-1 rounded-sm border border-[#355364] bg-[#06131b] p-1" role="group"
+          <div className="grid w-[45%] min-h-[148px] shrink-0 grid-cols-3 gap-1 rounded-sm border border-[#355364] bg-[#06131b] p-1" role="group"
             aria-label="Inspect nine projected mass zones">
             {signature.cells.map(c => {
               const ratio = c.kg / max;
