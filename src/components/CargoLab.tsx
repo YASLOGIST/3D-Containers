@@ -241,8 +241,32 @@ export function CargoLab({
                     <p>
                       Carton volume: {row.volumeM3?.toFixed(4) ?? "unavailable"} m³ ·
                       illustrative density: {row.densityKgM3?.toFixed(1) ?? "unavailable"} kg/m³.
-                      These values are not floor pressure or stack-strength limits.
                     </p>
+                    {row.projection && (
+                      <div className="border border-[#496c80]/70 bg-[#0c2834]/65 p-2"
+                        aria-label="Illustrative carton footprint metrics">
+                        <p className="font-semibold text-[#b8e8f4]">Plan-view load index · NOT floor pressure</p>
+                        <div className="mt-1.5 grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="block text-[9px] text-[#9dbdcd]">Horizontal projection</span>
+                            <strong>{row.projection.planAreaM2?.toFixed(3) ?? "N/A"} m²</strong>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] text-[#9dbdcd]">Carton mass ÷ area</span>
+                            <strong>{row.projection.arealMassIndexKgM2?.toFixed(1) ?? "N/A"} kg/m²</strong>
+                          </div>
+                        </div>
+                        <p className="mt-1.5">
+                          {row.projection.layer === "preview-floor" ? "Base at preview floor" :
+                            row.projection.layer === "above-preview-floor"
+                              ? `Base ${row.projection.baseAboveFloorM?.toFixed(3)} m above preview floor`
+                              : "Vertical layer unavailable"}.
+                          Projected rectangle only, not verified contact area or transferred floor loading.
+                        </p>
+                      </div>
+                    )}
+                    <p>Neither density nor plan-view mass index establishes floor pressure,
+                      support strength, restraint adequacy, or aircraft approval.</p>
                   </div>
                 </details>
               </article>

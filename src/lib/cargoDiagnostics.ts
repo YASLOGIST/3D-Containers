@@ -1,5 +1,6 @@
 import { cargoCoreForModel, type CargoItem, type CargoPlan } from "./cargoPlacement";
 import { MODELS, type ModelId } from "../three/models";
+import { projectedCartonMetrics, type ProjectedCartonMetrics } from "./cargoProjection";
 
 export type CartonStatus = "placed" | "rejected";
 export type CartonDiagnosticReason =
@@ -19,6 +20,8 @@ export interface CartonDiagnostic {
   densityKgM3: number | null;
   /** Preview-core-relative centre, not aircraft station coordinates. */
   centreM: { x: number; y: number; z: number } | null;
+  /** Plan-view mass index and vertical layer; never certified floor pressure. */
+  projection: ProjectedCartonMetrics | null;
 }
 
 export interface CartonDiagnostics {
@@ -74,6 +77,7 @@ export function diagnoseCartons(
         title: "Position found in preview",
         explanation: "The first-fit preview found a non-overlapping, heuristically supported position within its conservative core.",
         nextStep: "Inspect the model and mass field. This does not verify the real load, supports, restraints or stacking strength.",
+        projection: projectedCartonMetrics(placed, core.floorY),
         centreM: {
           x: placed.x - core.minX,
           y: placed.y - core.floorY,
@@ -91,6 +95,7 @@ export function diagnoseCartons(
         explanation: "The demo planner did not attempt placement because this item exceeds its 40-carton preview limit.",
         nextStep: "Remove earlier items before retrying. This is a software preview limit, not a ULD capacity rating.",
         centreM: null,
+        projection: null,
       };
     }
     if (rejected === "invalid") {
@@ -104,6 +109,7 @@ export function diagnoseCartons(
         explanation: "Invalid or non-positive: " + (invalidFields.join(", ") || "carton input") + ". All dimensions and mass must be positive finite numbers.",
         nextStep: "Correct the listed values and add the carton again.",
         centreM: null,
+        projection: null,
       };
     }
     if (rejected === "oversize") {
@@ -116,6 +122,7 @@ export function diagnoseCartons(
         explanation: "Exceeded: " + (exceeded.join("; ") || "one or more conservative dimensions") + ".",
         nextStep: "Reduce the relevant dimension or choose another ULD. Carton rotation and real interior clearances are not validated.",
         centreM: null,
+        projection: null,
       };
     }
     if (rejected === "overweight") {
@@ -127,6 +134,7 @@ export function diagnoseCartons(
           " kg nominal reference remainder at this step (previously placed: " + measurement(priorPlacedMass) + " kg).",
         nextStep: "Reduce requested mass or revise the manifest. Real ULD/aircraft loading approval is not evaluated.",
         centreM: null,
+        projection: null,
       };
     }
     if (rejected === "no-space") {
@@ -136,6 +144,7 @@ export function diagnoseCartons(
         explanation: "No non-overlapping, heuristically supported location was found using this item order and unrotated cartons.",
         nextStep: "Try a smaller carton or revise the insertion order. This result does not prove that no valid loading arrangement exists.",
         centreM: null,
+        projection: null,
       };
     }
     // A conservative fallback if the supplied plan is stale or incomplete.
@@ -145,6 +154,7 @@ export function diagnoseCartons(
       explanation: "The manifest and preview result do not match. No load position is claimed.",
       nextStep: "Re-run the preview and review the manifest before interpreting the result.",
       centreM: null,
+        projection: null,
     };
   });
   return {
@@ -165,7 +175,10 @@ export function exportCartonDiagnosticsCSV(report: CartonDiagnostics): string {
   const header = [
     "ULD","Item","ID","Label","Preview status","Reason","Mass kg",
     "Carton volume m3","Carton density kg/m3","Centre X m (preview core)",
-    "Centre Y m (preview core)","Centre Z m (preview core)","Explanation","Next step",
+    "Centre Y m (preview core)","Centre Z m (preview core)",
+    "Carton plan area m2 (not contact area)",
+    "Plan-view areal mass index kg/m2 (NOT floor pressure)",
+    "Vertical layer in sandbox","Base above preview floor m","Explanation","Next step",
   ];
   const num = (value: number | null, dp = 3) => value != null && Number.isFinite(value)
     ? value.toFixed(dp) : "";
@@ -174,6 +187,9 @@ export function exportCartonDiagnosticsCSV(report: CartonDiagnostics): string {
     row.status, row.reason, num(row.massKg), num(row.volumeM3, 4),
     num(row.densityKgM3, 2), num(row.centreM?.x ?? null),
     num(row.centreM?.y ?? null), num(row.centreM?.z ?? null),
+    num(row.projection?.planAreaM2 ?? null, 4),
+    num(row.projection?.arealMassIndexKgM2 ?? null, 2),
+    row.projection?.layer ?? "", num(row.projection?.baseAboveFloorM ?? null, 4),
     row.explanation, row.nextStep,
   ].map(cell).join(","));
   return [
@@ -181,6 +197,7 @@ export function exportCartonDiagnosticsCSV(report: CartonDiagnostics): string {
     ...rows,
     "",
     cell("LIMITATION") + "," + cell("ILLUSTRATIVE 3D FIRST-FIT PREVIEW — NOT CERTIFIED FOR ULD OR AIRCRAFT LOADING"),
-    cell("NOT CHECKED") + "," + cell("Floor strength, restraint loads, aircraft approval, stacking strength, and dynamic cargo forces"),
+    cell("NOT CHECKED") + "," + cell("Floor strength, actual floor contact pressure, restraint loads, aircraft approval, stacking strength, and dynamic cargo forces"),
+    cell("METHOD") + "," + cell("Plan-view index = nominal carton mass / horizontal carton rectangle area, including elevated cartons. NOT a measured floor contact patch or transferred load."),
   ].join("\r\n") + "\r\n";
 }
