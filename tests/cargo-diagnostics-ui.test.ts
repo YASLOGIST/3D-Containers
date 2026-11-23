@@ -14,6 +14,7 @@ test("cargo panel exposes per-carton explanations, filters and CSV export", () =
     items: examples, plan: planCargoForModel("ake", examples),
     onChange: () => {}, model: "ake", contour: true,
     onLoadDemo: () => {}, onOpenDoor: () => {},
+    selectedCartonId: null, onSelectCarton: () => {},
   }));
   assert.match(html, /Carton diagnostics/);
   assert.match(html, /Not placed \(1\)/);
@@ -23,4 +24,19 @@ test("cargo panel exposes per-carton explanations, filters and CSV export", () =
   assert.match(html, /Outside conservative preview core/);
   assert.match(html, /Not aircraft station coordinates/);
   assert.match(html, /No OEM or aircraft loading approval/);
+  assert.match(html, /Highlight Placed carton in 3D/);
+  assert.doesNotMatch(html, /Highlight Too wide in 3D/);
+});
+
+test("focused placed carton is clearly selectable and the selection can be cleared", () => {
+  const html = renderToStaticMarkup(createElement(CargoLab, {
+    items: examples, plan: planCargoForModel("ake", examples),
+    onChange: () => {}, model: "ake", contour: true,
+    onLoadDemo: () => {}, onOpenDoor: () => {},
+    selectedCartonId: "placed", onSelectCarton: () => {},
+  }));
+  assert.match(html, /Clear focus/);
+  assert.match(html, /aria-pressed="true"/);
+  assert.ok(html.includes("border-[#76ddf1]"));
+  assert.doesNotMatch(html, /Highlight Too wide in 3D/);
 });

@@ -19,6 +19,7 @@ const PRESETS = [
 
 export function CargoLab({
   items, plan, onChange, model, contour, onOpenDoor, onLoadDemo,
+  selectedCartonId, onSelectCarton,
 }: {
   items: CargoItem[];
   plan: CargoPlan;
@@ -27,6 +28,8 @@ export function CargoLab({
   contour: boolean;
   onOpenDoor: () => void;
   onLoadDemo: () => void;
+  selectedCartonId: string | null;
+  onSelectCarton: (id: string | null) => void;
 }) {
   const sequence = useRef(1);
   const core = cargoCoreForModel(model, contour);
@@ -189,7 +192,8 @@ export function CargoLab({
             const item = items[row.index - 1];
             const rejected = row.status === "rejected";
             return (
-              <article key={row.id} className="border border-line-soft bg-void/45 p-2">
+              <article key={row.id} className={`border p-2 ${selectedCartonId === row.id
+                ? "border-[#76ddf1] bg-[#123d50]/75" : "border-line-soft bg-void/45"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="break-words font-semibold text-ink">
@@ -207,8 +211,18 @@ export function CargoLab({
                       </p>
                     )}
                   </div>
-                  <Btn tone="ghost" title={`Remove ${item.label}`}
-                    onClick={() => onChange(items.filter(i => i.id !== item.id))}>remove</Btn>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    {!rejected && (
+                      <button type="button" aria-pressed={selectedCartonId === row.id}
+                        aria-label={`Highlight ${item.label} in 3D`}
+                        onClick={() => onSelectCarton(selectedCartonId === row.id ? null : row.id)}
+                        className="min-h-10 border border-[#79bdd6] bg-[#163747] px-2 font-mono text-[9px] font-semibold text-[#caf3fc] hover:bg-[#285369] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                        {selectedCartonId === row.id ? "Clear focus" : "Highlight 3D"}
+                      </button>
+                    )}
+                    <Btn tone="ghost" title={`Remove ${item.label}`}
+                      onClick={() => onChange(items.filter(i => i.id !== item.id))}>remove</Btn>
+                  </div>
                 </div>
                 <details className="mt-1">
                   <summary className="min-h-9 cursor-pointer select-none py-2 font-mono text-[10px] text-[#9dd3e6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">

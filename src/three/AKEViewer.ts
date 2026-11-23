@@ -421,6 +421,16 @@ export class AKEViewer {
     transparent: true, opacity: 0.88, depthTest: true,
   });
   private cargoCoreWire = new THREE.LineSegments(this.cargoCoreEdges, this.cargoCoreMaterial);
+  /** One reusable selection outline, independent from the 40 instanced cartons. */
+  private cargoSelectionBox = new THREE.LineSegments(
+    this.cargoCoreEdges,
+    new THREE.LineBasicMaterial({
+      color: 0x51e1f5, transparent: true, opacity: 1,
+      depthTest: false, depthWrite: false,
+    }),
+  );
+  private cargoSelectionId: string | null = null;
+  private cargoVisibleById = new Map<string, CargoPlacement>();
   private cargoBoxGeometry = makeCartonGeometry();
   private cargoAtlas = makeCartonAtlas();
   private cargoMaterial = new THREE.MeshStandardMaterial({
@@ -608,6 +618,9 @@ export class AKEViewer {
     // The preview outline is re-positioned and scaled for every model.
     this.cargoCoreWire.computeLineDistances();
     this.cargoCoreWire.userData.isAnnotation = true;
+    this.cargoSelectionBox.userData.isAnnotation = true;
+    this.cargoSelectionBox.visible = false;
+    this.cargoSelectionBox.renderOrder = 999;
     this.scene.add(this.cargoGroup);
     this.rebuild();
     this.applyMood(this.state.mood, true);
@@ -2186,6 +2199,28 @@ export class AKEViewer {
 
   /* ---------------- cargo placement sandbox ---------------- */
 
+  /** Select a placed carton without changing its geometry or re-instancing. */
+  setCargoSelection(id: string | null) {
+    this.cargoSelectionId = id;
+    this.syncCargoSelectionOutline();
+    this.wake();
+  }
+
+  private syncCargoSelectionOutline() {
+    const carton = this.cargoSelectionId
+      ? this.cargoVisibleById.get(this.cargoSelectionId)
+      : undefined;
+    if (!carton) {
+      this.cargoSelectionBox.visible = false;
+      return;
+    }
+    this.cargoSelectionBox.visible = true;
+    this.cargoSelectionBox.position.set(carton.x, carton.y, carton.z);
+    this.cargoSelectionBox.scale.set(
+      carton.widthM + 0.022, carton.heightM + 0.022, carton.depthM + 0.022,
+    );
+  }
+
   setCargoBoxes(
     cartons: readonly CargoPlacement[],
     showCore = false,
@@ -2220,6 +2255,9 @@ export class AKEViewer {
     if (this.cargoInstances.instanceColor) this.cargoInstances.instanceColor.needsUpdate = true;
     this.cargoInstances.frustumCulled = false;
     if (visible.length) this.cargoGroup.add(this.cargoInstances);
+    this.cargoVisibleById = new Map(visible.map(item => [item.id, item]));
+    this.cargoGroup.add(this.cargoSelectionBox);
+    this.syncCargoSelectionOutline();
 
     if (showMassField && signature?.centroid && cartons.length) {
       // 3×3 mass projection, independent of actual structure and restraints.
@@ -2350,6 +2388,8 @@ export class AKEViewer {
     this.cargoCoreEdges.dispose();
     this.cargoCoreGeometry.dispose();
     this.cargoCoreMaterial.dispose();
+    (this.cargoSelectionBox.material as THREE.Material).dispose();
+    this.cargoVisibleById.clear();
     this.cargoMaterial.dispose();
     this.cargoAtlas.dispose();
     this.fieldPlaneGeometry.dispose();

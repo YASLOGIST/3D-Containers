@@ -286,6 +286,7 @@ export default function App() {
     };
   });
   const [cargoItems, setCargoItems] = useState<CargoItem[]>([]);
+  const [selectedCargoId, setSelectedCargoId] = useState<string | null>(null);
   const cargoPlan = useMemo(
     () => planCargoForModel(state.model, cargoItems, state.contour),
     [cargoItems, state.model, state.contour],
@@ -293,6 +294,10 @@ export default function App() {
   const cargoSignature = useMemo(
     () => computeCargoSignature(cargoPlan, cargoCoreForModel(state.model, state.contour)),
     [cargoPlan, state.model, state.contour],
+  );
+  const focusedCarton = useMemo(
+    () => cargoPlan.placed.find(item => item.id === selectedCargoId) ?? null,
+    [cargoPlan, selectedCargoId],
   );
   const [showMassField, setShowMassField] = useState(false);
   const [studioPreset, setStudioPreset] = useState<StudioPreset | null>(null);
@@ -409,7 +414,12 @@ export default function App() {
     );
   }, [ready, state.model, cargoPlan, cargoSignature, tab, cargoItems.length, studioPreset, showMassField]);
 
+  useEffect(() => {
+    if (ready) viewer.current?.setCargoSelection(focusedCarton?.id ?? null);
+  }, [ready, focusedCarton]);
+
   const launchCargoDemo = useCallback(() => {
+    setSelectedCargoId(null);
     setStudioPreset("field");
     setShowMassField(true);
     const model = MODELS[state.model];
@@ -487,10 +497,24 @@ export default function App() {
   }, [applyStudioPreset]);
 
   const changeCargoItems = useCallback((items: CargoItem[]) => {
+    setSelectedCargoId(prev => prev && items.some(item => item.id === prev) ? prev : null);
     setCargoItems(items);
     if (items.length) setStudioPreset(current =>
       current === "hero" || current === "teardown" ? null : current);
   }, []);
+
+  const selectCartonForInspection = useCallback((id: string | null) => {
+    setSelectedCargoId(id);
+    if (!id) return;
+    setStudioPreset(current => current === "hero" || current === "teardown" ? null : current);
+    setSheet(false); // Reveal the selected carton immediately on small screens.
+    const pallet = MODELS[state.model].palletOption;
+    patch({
+      door: pallet ? 0 : 1, load: 0, section: !pallet,
+      sectionAxis: "z", sectionPos: 0.53, sectionFlip: false,
+      sectionCaps: false, autoRotate: false,
+    });
+  }, [patch, state.model]);
 
   // Pallet generators also contain an illustrative translucent 'cargo load'
   // mesh. Hide that alternative representation when actual carton previews
@@ -590,6 +614,7 @@ export default function App() {
     if (isSourceName(next.sourceFile)) setSource(next.sourceFile);
     setHighlight(null);
     setHover(null);
+    setSelectedCargoId(null);
   };
 
   /* ---------------- exports ---------------- */
@@ -849,6 +874,22 @@ export default function App() {
             Interactive ULD engineering · Drag to orbit · Scroll to inspect
           </div>
           <span aria-hidden="true" className="absolute bottom-8 right-9 hidden h-12 w-12 border-b border-r border-[#89d5ea]/60 sm:block" />
+        </div>
+      )}
+
+      {focusedCarton && (
+        <div data-testid="selected-cargo-indicator" role="status" aria-live="polite"
+          className="pointer-events-none absolute left-1/2 top-[122px] z-30 w-[min(92vw,400px)] -translate-x-1/2 sm:top-[102px]">
+          <div className="pointer-events-auto flex items-center gap-2 border border-[#6bd5ef] bg-[#071e2c]/95 px-3 py-2 shadow-[0_5px_25px_rgba(0,0,0,.40)] backdrop-blur">
+            <span aria-hidden="true" className="text-[#6bdcf3]">◇</span>
+            <div className="min-w-0 flex-1 font-mono">
+              <div className="text-[9px] font-semibold uppercase tracking-[.11em] text-[#8de2f3]">Highlighted · cargo preview</div>
+              <div className="truncate text-[11px] text-white">{focusedCarton.label} · {focusedCarton.massKg.toFixed(1)} kg</div>
+            </div>
+            <button type="button" onClick={() => setSelectedCargoId(null)}
+              aria-label="Clear highlighted carton"
+              className="min-h-10 min-w-10 border border-[#436b7e] text-lg text-white hover:bg-[#295268] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">×</button>
+          </div>
         </div>
       )}
 
@@ -1143,6 +1184,8 @@ export default function App() {
               <Panel title="Cargo placement" code={`${spec.code} sandbox`} className="h-full overflow-y-auto scroll-slim">
                 <CargoLab items={cargoItems} plan={cargoPlan} onChange={changeCargoItems}
                   model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
+                  selectedCartonId={focusedCarton?.id ?? null}
+                  onSelectCarton={selectCartonForInspection}
                   onOpenDoor={() => patch({
                     door: spec.palletOption ? 0 : 1, load: 0,
                     section: !spec.palletOption, sectionAxis: "z",
@@ -1395,6 +1438,8 @@ export default function App() {
             {!mobileDeckOpen && tab === "cargo" && (
               <CargoLab items={cargoItems} plan={cargoPlan} onChange={changeCargoItems}
                 model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
+                  selectedCartonId={focusedCarton?.id ?? null}
+                  onSelectCarton={selectCartonForInspection}
                 onOpenDoor={() => patch({
                   door: spec.palletOption ? 0 : 1, load: 0,
                   section: !spec.palletOption, sectionAxis: "z",
