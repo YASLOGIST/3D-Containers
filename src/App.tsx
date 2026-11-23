@@ -62,6 +62,7 @@ import {
 } from "@/components/Panels";
 import { Btn, Chip, Panel } from "@/components/ui";
 import { downloadBlob, downloadText } from "@/lib/io";
+import { inspectorTopOffset } from "@/lib/inspectorLayout";
 import { cn } from "@/utils/cn";
 
 const SOURCES = {
@@ -273,6 +274,26 @@ function initialState(): ViewerState {
 
 export default function App() {
   const host = useRef<HTMLDivElement>(null);
+  const workspace = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const parent = workspace.current;
+    const bar = header.current;
+    if (!parent || !bar) return;
+    const align = () => parent.style.setProperty(
+      "--uld-inspector-top",
+      String(inspectorTopOffset(bar.getBoundingClientRect().bottom, parent.getBoundingClientRect().top)) + "px",
+    );
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(align) : null;
+    observer?.observe(bar);
+    window.addEventListener("resize", align);
+    align();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", align);
+      parent.style.removeProperty("--uld-inspector-top");
+    };
+  }, []);
   const viewer = useRef<AKEViewer | null>(null);
   const [bootState] = useState<ViewerState>(initialState);
 
@@ -837,7 +858,7 @@ export default function App() {
     : `${Math.round(state.sectionPos * 100)}%`;
 
   return (
-    <div className="air-service-theme relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
+    <div ref={workspace} className="air-service-theme relative h-[100dvh] w-screen overflow-hidden bg-void text-ink">
       {/* ---------------- 3-D viewport ---------------- */}
       <div
         ref={host}
@@ -933,7 +954,7 @@ export default function App() {
       )}
 
       {/* ---------------- top bar ---------------- */}
-      <header className={cn(
+      <header ref={header} className={cn(
         "anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4",
         focusMode && "hidden",
       )}>
@@ -1131,7 +1152,7 @@ export default function App() {
       </div>
 
       {/* ---------------- right: instrument stack ---------------- */}
-      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 xl:flex xl:right-4", focusMode && "xl:!hidden")}>
+      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[var(--uld-inspector-top,160px)] z-20 hidden w-[336px] flex-col gap-2 xl:flex xl:right-4", focusMode && "xl:!hidden")}>
         <div className="pointer-events-auto">
           <div
             role="tablist"

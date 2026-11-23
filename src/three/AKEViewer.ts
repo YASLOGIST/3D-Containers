@@ -12,6 +12,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { geometryOnlyExportScene } from "./geometryExport";
 
 import type { Assembly, ViewerContainer } from "./primitives";
 import { cargoCoreForModel, type CargoPlacement } from "@/lib/cargoPlacement";
@@ -2348,7 +2349,7 @@ export class AKEViewer {
   exportOBJ(): string {
     const restore = this.detachGeometryExportOverlays();
     try {
-      return new OBJExporter().parse(this.exportRoot());
+      return new OBJExporter().parse(geometryOnlyExportScene(this.exportRoot()));
     } finally {
       restore();
       this.wake();
@@ -2358,7 +2359,7 @@ export class AKEViewer {
   exportSTL(): DataView {
     const restore = this.detachGeometryExportOverlays();
     try {
-      return new STLExporter().parse(this.exportRoot(), {
+      return new STLExporter().parse(geometryOnlyExportScene(this.exportRoot()), {
         binary: true,
       }) as DataView;
     } finally {
