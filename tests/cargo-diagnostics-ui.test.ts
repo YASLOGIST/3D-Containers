@@ -23,6 +23,9 @@ test("cargo panel exposes per-carton explanations, filters and CSV export", () =
   assert.match(html, /Why not placed/);
   assert.match(html, /Outside conservative preview core/);
   assert.match(html, /Not aircraft station coordinates/);
+  assert.match(html, /Plan-view load index/);
+  assert.match(html, /Horizontal projection/);
+  assert.match(html, /NOT floor pressure/);
   assert.match(html, /No OEM or aircraft loading approval/);
   assert.match(html, /Highlight Placed carton in 3D/);
   assert.doesNotMatch(html, /Highlight Too wide in 3D/);

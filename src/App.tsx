@@ -46,6 +46,7 @@ import { formatDistance } from "@/lib/units";
 import type { CargoScenario } from "@/lib/planner";
 import { cargoCoreForModel, demoCargoForModel, planCargoForModel, type CargoItem } from "@/lib/cargoPlacement";
 import { computeCargoSignature, exportCargoSignatureCSV } from "@/lib/cargoSignature";
+import { projectedCartonMetrics } from "@/lib/cargoProjection";
 import { SignatureStudio, type StudioPreset } from "@/components/SignatureStudio";
 import { CargoMissionDock } from "@/components/CargoMissionDock";
 import { ModelExplorer } from "@/components/ModelExplorer";
@@ -298,6 +299,12 @@ export default function App() {
   const focusedCarton = useMemo(
     () => cargoPlan.placed.find(item => item.id === selectedCargoId) ?? null,
     [cargoPlan, selectedCargoId],
+  );
+  const selectedProjection = useMemo(
+    () => focusedCarton
+      ? projectedCartonMetrics(focusedCarton, cargoCoreForModel(state.model, state.contour).floorY)
+      : null,
+    [focusedCarton, state.model, state.contour],
   );
   const [showMassField, setShowMassField] = useState(false);
   const [studioPreset, setStudioPreset] = useState<StudioPreset | null>(null);
@@ -885,6 +892,17 @@ export default function App() {
             <div className="min-w-0 flex-1 font-mono">
               <div className="text-[9px] font-semibold uppercase tracking-[.11em] text-[#8de2f3]">Highlighted · cargo preview</div>
               <div className="truncate text-[11px] text-white">{focusedCarton.label} · {focusedCarton.massKg.toFixed(1)} kg</div>
+              {selectedProjection?.arealMassIndexKgM2 != null && (
+                <div className="mt-1 text-[10px] text-[#bce4ef]">
+                  {selectedProjection.planAreaM2?.toFixed(3)} m² plan view ·
+                  {" "}{selectedProjection.arealMassIndexKgM2.toFixed(1)} kg/m² index
+                </div>
+              )}
+              <div className="mt-0.5 text-[9px] text-[#e3c699]">
+                {selectedProjection?.layer === "preview-floor" ? "Base at preview floor" :
+                  selectedProjection?.layer === "above-preview-floor" ? "Elevated in preview" :
+                    "Layer unknown"} · NOT floor pressure
+              </div>
             </div>
             <button type="button" onClick={() => setSelectedCargoId(null)}
               aria-label="Clear highlighted carton"

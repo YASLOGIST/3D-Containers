@@ -84,3 +84,29 @@ test("empty manifest produces an empty descriptive report, not load approval", (
   assert.equal(report.operationallyApproved,false);
   assert.equal(report.rows.length,0);
 });
+
+test("projection metrics report at-preview-floor vs elevated cartons without load approval", () => {
+  const demo=demoCargoForModel("ake");
+  const plan=planCargoForModel("ake",demo);
+  const report=diagnoseCartons("ake",demo,plan);
+  const layers=new Set(report.rows.map(r=>r.projection?.layer));
+  assert.ok(layers.has("preview-floor"));
+  assert.ok(layers.has("above-preview-floor"));
+  for(const row of report.rows){
+    assert.ok(row.projection);
+    assert.ok((row.projection?.planAreaM2 ?? 0)>0);
+    assert.ok((row.projection?.arealMassIndexKgM2 ?? 0)>0);
+  }
+  assert.equal(report.operationallyApproved,false);
+});
+
+test("unplaced cartons never claim a measured footprint loading or vertical layer", () => {
+  const boxes=[item("valid",0.4,20),item("too-wide",40,20)];
+  const report=diagnoseCartons("ake",boxes,planCargoForModel("ake",boxes));
+  assert.equal(report.rows[0].status,"placed");
+  assert.equal(report.rows[1].status,"rejected");
+  assert.equal(report.rows[1].projection,null);
+  const csv=exportCartonDiagnosticsCSV(report);
+  assert.match(csv,/Plan-view areal mass index kg\/m2 \(NOT floor pressure\)/);
+  assert.match(csv,/NOT a measured floor contact patch or transferred load/);
+});
