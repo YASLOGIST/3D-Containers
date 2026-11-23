@@ -100,3 +100,20 @@ Brand architecture is documented in [assets/branding/BRAND_ARCHITECTURE.md](../a
 - Browser: Chromium with SwiftShader, macOS WebKit and emulated iPhone 13 rendered the scene without captured JavaScript errors. Playwright verified `UNLATCH 61%` at 0.11, `OPEN 78°` at 0.70, and 3D handle click triggered full opening.
 - A GLB browser export of the branded AKH was parsed independently as glTF 2.0: 114 nodes, 103 mesh definitions, 16 materials, 10 embedded textures and identified cam groups, keepers and the branding placard. This validates a syntactically sound output and structural presence, **not** an external CAD/geometry/physics certification.
 - Retain this feature branch as a **draft PR** until real-device FPS/GPU-memory tests, independent OBJ/STL scale and geometry review, model-specific manufacturer reference comparison, and acceptance of the branding rights/safety-label positioning are completed.
+
+## Inspection-first camera and idle-render gate (23 Nov 2026)
+
+- On macOS Safari, the prior AKE first view emphasized a low-contrast frontal panel and stacked dimensional callouts. The revised lower-elevation home direction favors the hardware-rich door with the +X side visible while retaining the nominal envelope and all camera inspection tools.
+- New visitor defaults: dimensions OFF, auto-orbit OFF. Both still work through controls and explicit shared-link settings. This allows settled-scene throttling instead of perpetual auto-orbit-driven rendering.
+- Pure regression tests cover the direction, default state and backwards-compatible share-state override. Visual acceptance must inspect AKE and pallets in real Safari/WebGL; no GPU or frame-rate improvement is claimed from unit tests alone.
+
+### Execution evidence (23 Nov 2026)
+
+- Local npm run verify: **104/104 tests**, TypeScript check and Vite production build passed on the development Mac.
+- Isolated Playwright WebKit contexts: AKE (1440×900), RKN and PMC model selection, and an emulated 390×844 mobile viewport all initialized a live WebGL context without page exceptions; the mobile document did not overflow horizontally.
+- An isolated Chromium / SwiftShader context also initialized AKE with WebGL and no page exceptions.
+- WebKit operator controls were exercised in both directions: dimension labels and automatic orbit enabled, then disabled; aria-pressed reflected the interactions. A fresh view produced dim=0&rot=0 in the shared URL, and preexisting explicit settings still decode.
+- After 7.2 s without interaction, the WebKit preview's own status displayed **IDLE**, confirming the existing settled-scene render throttle was reachable in that test context. This is not a measurement of power consumption or a physical-device FPS benchmark.
+- Baseline and revised AKE snapshots were inspected side by side. A too-side-heavy first camera candidate was **rejected**; the final pose emphasizes visible latch detail rather than a blank hull panel. WebKit desktop and mobile screenshots were held only in temporary QA storage, not the repository.
+
+**Open gates:** independent photographic comparison against one exact manufacturer variant; independent geometry/scale export inspection; real-device GPU power/frame-time profiling. This pass changes no loading algorithms, manufacturer specs, structural clearances or airworthiness claims.

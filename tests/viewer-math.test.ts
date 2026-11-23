@@ -7,6 +7,8 @@ import {
   projectedFeaturePixels,
   projectedOrthoFeaturePixels,
   isDoorInteractionTarget,
+  homeViewDirection,
+  DEFAULT_STATE,
   orthoFitSizeFor,
   sectionPlaneFor,
 } from "../src/three/AKEViewer.ts";
@@ -119,4 +121,17 @@ test("only deliberate closure parts, not the entire hull or brand plate, are dir
   for (const part of ["Door leaf", "Hull — contour tube", "ULD identification plate", "Air Cargo Aviation monogram - user supplied"]) {
     assert.equal(isDoorInteractionTarget(part), false);
   }
+});
+
+test("inspection-first home pose reveals door and contoured side", () => {
+  const direction = homeViewDirection();
+  assert.ok(Math.abs(direction.length() - 1) < 1e-12);
+  assert.ok(direction.z > direction.x, "mechanical +Z door should be the focal plane");
+  assert.ok(direction.x > 0.3, "contoured +X wall must remain visible");
+  assert.ok(direction.y > 0.2 && direction.y < 0.5, "eye level keeps roof and chassis readable");
+});
+
+test("fresh inspections do not spend GPU cycles on autonomous orbit or labels", () => {
+  assert.equal(DEFAULT_STATE.autoRotate, false);
+  assert.equal(DEFAULT_STATE.dimensions, false);
 });

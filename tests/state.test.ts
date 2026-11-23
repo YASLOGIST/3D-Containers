@@ -76,3 +76,12 @@ test("surface patina condition is shared safely", () => {
   assert.equal(decodeShareState("#condition=factory").surfaceCondition, "factory");
   assert.equal(decodeShareState("#condition=unknown").surfaceCondition, undefined);
 });
+
+test("shared inspection links retain explicitly enabled orbit and dimensions", () => {
+  const decoded = decodeShareState("#m=ake&dim=1&rot=1");
+  assert.equal(decoded.dimensions, true);
+  assert.equal(decoded.autoRotate, true);
+  const state = { ...DEFAULT_STATE, ...decoded };
+  assert.equal(state.dimensions, true);
+  assert.equal(state.autoRotate, true);
+});
