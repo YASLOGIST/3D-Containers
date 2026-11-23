@@ -37,6 +37,6 @@ test("focused placed carton is clearly selectable and the selection can be clear
   }));
   assert.match(html, /Clear focus/);
   assert.match(html, /aria-pressed="true"/);
-  assert.match(html, /border-\\\[#76ddf1\\\]/);
+  assert.ok(html.includes("border-[#76ddf1]"));
   assert.doesNotMatch(html, /Highlight Too wide in 3D/);
 });
