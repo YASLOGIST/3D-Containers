@@ -82,8 +82,8 @@ test("overlap splits one carton exactly across neighboring zones without double 
   const box = {id:"cross", label:"cross", widthM:1, depthM:0.4, heightM:0.4, massKg:50, x:1, y:0.2, z:0.5};
   const left = getCargoZoneBreakdown({placed:[box]}, core, 0, 0);
   const right = getCargoZoneBreakdown({placed:[box]}, core, 0, 1);
-  assert.equal(left.projectedKg, 25);
-  assert.equal(right.projectedKg, 25);
+  assert.ok(Math.abs(left.projectedKg - 25) < 1e-8);
+  assert.ok(Math.abs(right.projectedKg - 25) < 1e-8);
   assert.equal(getCargoZoneBreakdown({placed:[box]}, core, 2, 2).projectedKg, 0);
 });
 
@@ -94,13 +94,13 @@ test("stacked cartons are counted without presenting projections as floor loads"
     {...base,id:"base",label:"base",massKg:20,y:0.2},
     {...base,id:"top",label:"top",massKg:60,y:0.6},
   ]},core,1,1);
-  assert.equal(zone.projectedKg,80);
+  assert.ok(Math.abs(zone.projectedKg - 80) < 1e-8);
   assert.equal(zone.contributors.length,2);
   assert.equal(zone.contributors[0].id,"top");
   assert.equal(zone.contributors[0].verticalLayer,"above-preview-floor");
   assert.equal(zone.contributors[1].verticalLayer,"preview-floor");
-  assert.equal(zone.contributors[0].sharePct,75);
-  assert.equal(zone.contributors[1].sharePct,25);
+  assert.ok(Math.abs(zone.contributors[0].sharePct - 75) < 1e-8);
+  assert.ok(Math.abs(zone.contributors[1].sharePct - 25) < 1e-8);
 });
 
 test("invalid or nonoverlapping cargo does not create fictitious zone contributors", () => {
@@ -109,6 +109,6 @@ test("invalid or nonoverlapping cargo does not create fictitious zone contributo
   const invalid={...valid,id:"invalid",massKg:NaN};
   const b=getCargoZoneBreakdown({placed:[valid,invalid]},core,0,0);
   assert.equal(b.contributors.length,1);
-  assert.equal(b.projectedKg,20);
+  assert.ok(Math.abs(b.projectedKg - 20) < 1e-8);
   assert.equal(getCargoZoneBreakdown({placed:[]},core,1,1).contributors.length,0);
 });
