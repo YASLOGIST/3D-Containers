@@ -1,0 +1,99 @@
+name: Temporary ULD360 Browser Render QA
+
+on:
+  push:
+    branches: [perf/uld360-adaptive-pixel-budget-20261123]
+    paths: [.github/workflows/uld360-browser-smoke.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  webgl-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser and dependencies
+        run: |
+          npm ci
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run local Vite server
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/uld360-vite.log 2>&1 &
+          for i in {1..40}; do curl -fsS http://127.0.0.1:4173/ > /dev/null && break || sleep 1; done
+          curl -fsS http://127.0.0.1:4173/ > /dev/null
+      - name: Mobile/tablet/desktop rendering smoke and pixel count
+        run: |
+          cat > qa-mobile.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          const cases=[
+            {id:'phone',width:390,height:844,dpr:3,touch:true,budget:1500000},
+            {id:'tablet',width:1024,height:1366,dpr:2,touch:true,budget:1500000},
+            {id:'desktop',width:1440,height:900,dpr:2,touch:false,budget:3200000},
+          ];
+          try{
+            for(const cfg of cases){
+              const ctx=await browser.newContext({
+                viewport:{width:cfg.width,height:cfg.height},
+                deviceScaleFactor:cfg.dpr,
+                isMobile:cfg.touch,
+                hasTouch:cfg.touch,
+                reducedMotion:'reduce'
+              });
+              const p=await ctx.newPage();
+              const errs=[];
+              p.on('pageerror',e=>errs.push(e.message));
+              const response=await p.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:30000});
+              assert.equal(response?.status(),200);
+              await p.locator('canvas').first().waitFor({timeout:30000});
+              await p.waitForTimeout(2200);
+              const measured=await p.evaluate(()=>{
+                const c=document.querySelector('canvas');
+                if(!c)throw Error('Canvas missing');
+                const r=c.getBoundingClientRect();
+                return {
+                  cssWidth:r.width,
+                  cssHeight:r.height,
+                  bufferWidth:c.width,
+                  bufferHeight:c.height,
+                  pointerCoarse:matchMedia('(pointer: coarse)').matches,
+                  horizontalOverflow:document.documentElement.scrollWidth>innerWidth+2
+                };
+              });
+              const px=measured.bufferWidth*measured.bufferHeight;
+              console.log(cfg.id,JSON.stringify({...measured,px,fps:'not asserted in software GL'}));
+              assert.equal(measured.pointerCoarse,cfg.touch,'Pointer mode should match the case');
+              assert.ok(px<=cfg.budget*1.02,
+                cfg.id+' rendered '+px+' GPU pixels, budget '+cfg.budget);
+              assert.equal(measured.horizontalOverflow,false, 'No horizontal overflow');
+              assert.deepEqual(errs,[],'No JS exceptions before action');
+              if(cfg.id==='phone'){
+                await p.getByRole('button',{name:'Load 3D cargo preview'}).click({timeout:10000});
+                await p.getByRole('button',{name:'Inspect cargo mass distribution'}).click({timeout:10000});
+                const signature=p.getByText('Cargo Mass Signature');
+                assert.ok(await signature.count()>0,'Signature control exists');
+                assert.ok(await signature.last().isVisible(),'Mobile analysis sheet is visible');
+                assert.ok((await p.locator('body').innerText()).includes('675.0 kg'),'Cargo analysis data visible');
+              }
+              assert.deepEqual(errs,[],'No JS exceptions after interactions');
+              await p.screenshot({path:'qa-'+cfg.id+'.png',animations:'disabled'});
+              await ctx.close();
+            }
+          } finally{await browser.close()}
+          JS
+          node qa-mobile.mjs
+      - name: Upload QA visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ULD360-Renderer-Smoke-Screenshots
+          path: qa-*.png
+          if-no-files-found: warn
+          retention-days: 3
