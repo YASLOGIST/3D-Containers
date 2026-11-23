@@ -81,9 +81,14 @@ jobs:
                 assert.ok(await signature.count()>0,'Signature control exists');
                 assert.ok(await signature.last().isVisible(),'Mobile analysis sheet is visible');
                 assert.ok((await p.locator('body').innerText()).includes('675.0 kg'),'Cargo analysis data visible');
+                await p.screenshot({path:'qa-phone-analysis.png',animations:'disabled',timeout:30000});
+                await p.getByRole('button',{name:'model',exact:true}).click({timeout:10000});
+                assert.ok(await p.getByText('CONTROL DECK').last().isVisible(),'Mobile model controls are reachable');
               }
               assert.deepEqual(errs,[],'No JS exceptions after interactions');
-              await p.screenshot({path:'qa-'+cfg.id+'.png',animations:'disabled'});
+              // Software WebGL on CI may time out while capturing a 2x Retina desktop.
+              // The pixel-buffer assertion above still runs on all three viewports.
+              if(cfg.id==='tablet') await p.screenshot({path:'qa-tablet.png',animations:'disabled',timeout:30000});
               await ctx.close();
             }
           } finally{await browser.close()}
