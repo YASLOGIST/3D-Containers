@@ -324,6 +324,7 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [mobileDeckOpen, setMobileDeckOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
   /* ---------------- boot the viewer ---------------- */
@@ -426,11 +427,13 @@ export default function App() {
   const openCargoWorkspace = useCallback(() => {
     setStudioPreset(null);
     setTab("cargo");
+    setMobileDeckOpen(false);
     setSheet(true);
   }, []);
 
   const openStudio = useCallback(() => {
     setTab("studio");
+    setMobileDeckOpen(false);
     setSheet(true);
   }, []);
 
@@ -477,6 +480,7 @@ export default function App() {
   // numerical analysis is actually visible on smaller screens.
   const openMassAnalysis = useCallback(() => {
     applyStudioPreset("field");
+    setMobileDeckOpen(false);
     setSheet(true);
   }, [applyStudioPreset]);
 
@@ -1004,7 +1008,7 @@ export default function App() {
       </header>
 
       {/* ---------------- left: control deck ---------------- */}
-      <div className={cn("anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden lg:bottom-14 lg:block xl:left-4", focusMode && "lg:!hidden")}>
+      <div className={cn("anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden xl:bottom-14 xl:block xl:left-4", focusMode && "xl:!hidden")}>
         <div className="pointer-events-auto max-h-[calc(100dvh-190px)] overflow-y-auto scroll-slim pr-1">
           <ControlDeck
             state={state}
@@ -1021,7 +1025,7 @@ export default function App() {
       </div>
 
       {/* ---------------- right: instrument stack ---------------- */}
-      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 lg:flex xl:right-4", focusMode && "lg:!hidden")}>
+      <aside className={cn("anim-rise pointer-events-none absolute bottom-16 right-3 top-[86px] z-20 hidden w-[336px] flex-col gap-2 xl:flex xl:right-4", focusMode && "xl:!hidden")}>
         <div className="pointer-events-auto">
           <div
             role="tablist"
@@ -1221,7 +1225,7 @@ export default function App() {
             meshes {stats?.meshes ?? "—"} · vol{" "}
             {stats?.volumeM3.toFixed(2) ?? "—"} m³
           </span>
-          <span className="hidden text-dim lg:inline">{spec.name}</span>
+          <span className="hidden text-dim xl:inline">{spec.name}</span>
           <span className="ml-auto hidden max-w-[38%] truncate text-amber md:inline">
             {measureOn
               ? (measureLabel ?? "measure · click two surface points")
@@ -1251,13 +1255,14 @@ export default function App() {
       </footer>
 
       {/* ---------------- mobile sheet ---------------- */}
-      <div className={cn("pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 lg:hidden", focusMode && "!hidden")}>
+      <div className={cn("pointer-events-auto absolute inset-x-0 bottom-[calc(38px+env(safe-area-inset-bottom))] z-30 xl:hidden", focusMode && "!hidden")}>
         <div className="flex items-center justify-start gap-1.5 overflow-x-auto whitespace-nowrap px-3 pb-2 sm:justify-center">
           <Btn
             active={sheet && tab === "spec"}
             pressed={sheet && tab === "spec"}
             onClick={() => {
               setTab("spec");
+              setMobileDeckOpen(false);
               setSheet(true);
             }}
           >
@@ -1268,6 +1273,7 @@ export default function App() {
             pressed={sheet && tab === "cargo"}
             onClick={() => {
               setTab("cargo");
+              setMobileDeckOpen(false);
               setSheet(true);
             }}
           >
@@ -1285,6 +1291,7 @@ export default function App() {
             pressed={sheet && tab === "parts"}
             onClick={() => {
               setTab("parts");
+              setMobileDeckOpen(false);
               setSheet(true);
             }}
           >
@@ -1295,25 +1302,50 @@ export default function App() {
             pressed={sheet && tab === "source"}
             onClick={() => {
               setTab("source");
+              setMobileDeckOpen(false);
               setSheet(true);
             }}
           >
             source
           </Btn>
           <Btn
+            active={sheet && mobileDeckOpen}
+            pressed={sheet && mobileDeckOpen}
+            onClick={() => {
+              setMobileDeckOpen(true);
+              setSheet(true);
+            }}
+            title="Open ULD material, dimensions and camera controls"
+          >
+            model
+          </Btn>
+          <Btn
             active={sheet}
             pressed={sheet}
             onClick={() => setSheet((open) => !open)}
           >
-            {sheet ? "hide" : "controls"}
+            {sheet ? "hide" : "show"}
           </Btn>
         </div>
         {sheet && (
           <div className="max-h-[58dvh] overflow-y-auto scroll-slim border-t border-line bg-deck/95 p-3 backdrop-blur">
-            {tab === "spec" && (
+            {mobileDeckOpen && (
+              <ControlDeck
+                state={state}
+                set={patch}
+                onView={onViewCb}
+                onFrame={onFrameCb}
+                measureOn={measureOn}
+                onMeasureToggle={toggleMeasure}
+                onMeasureClear={onMeasureClearCb}
+                measureLabel={measureLabel}
+                sectionLabel={sectionReadout}
+              />
+            )}
+            {!mobileDeckOpen && tab === "spec" && (
               <SpecSheet cargoScenario={cargoScenario} setCargoScenario={setCargoScenario} stats={stats} measured={measured} model={spec} compareModel={state.compare !== "none" ? MODELS[state.compare] : null} onSelectModel={selectModel} />
             )}
-            {tab === "cargo" && (
+            {!mobileDeckOpen && tab === "cargo" && (
               <CargoLab items={cargoItems} plan={cargoPlan} onChange={changeCargoItems}
                 model={state.model} contour={state.contour} onLoadDemo={launchCargoDemo}
                 onOpenDoor={() => patch({
@@ -1322,7 +1354,7 @@ export default function App() {
                   sectionPos: 0.52, sectionFlip: false, sectionCaps: false,
                 })} />
             )}
-            {tab === "studio" && (
+            {!mobileDeckOpen && tab === "studio" && (
               <SignatureStudio
                 model={state.model} state={state} plan={cargoPlan}
                 signature={cargoSignature} fieldVisible={showMassField}
@@ -1343,7 +1375,7 @@ export default function App() {
                 onPatch={(next) => { setStudioPreset(null); patch(next); }}
               />
             )}
-            {tab === "parts" && (
+            {!mobileDeckOpen && tab === "parts" && (
               <PartsList
                 assemblies={assemblies}
                 hovered={highlight}
@@ -1351,7 +1383,7 @@ export default function App() {
                 onFocus={onFocusCb}
               />
             )}
-            {tab === "source" && (
+            {!mobileDeckOpen && tab === "source" && (
               <div className="h-[46dvh]">
                 <SourcePanel
                   source={SOURCES[source]}
