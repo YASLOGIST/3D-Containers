@@ -19,7 +19,7 @@ export function CargoMissionDock({
   onStart, onAnalyze, onInspect, onClear,
 }: Props) {
   return (
-    <div className={`pointer-events-none absolute inset-x-2 bottom-[100px] z-20 mx-auto max-w-[440px] sm:bottom-[93px] lg:bottom-[56px] lg:max-w-[420px] xl:bottom-[65px] xl:max-w-[470px] ${hidden ? "hidden lg:block" : ""}`}>
+    <div className={`pointer-events-none absolute inset-x-2 bottom-[100px] z-20 mx-auto max-w-[440px] sm:bottom-[93px] xl:bottom-[56px] xl:max-w-[420px] xl:bottom-[65px] xl:max-w-[470px] ${hidden ? "hidden xl:block" : ""}`}>
       <div className="pointer-events-auto border border-[#5b8fa5]/60 bg-[#09131c]/92 px-2.5 py-2 shadow-[0_10px_30px_rgba(0,0,0,.40)] backdrop-blur-md sm:px-3">
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
           <div className="min-w-0 flex-1 basis-[140px]">

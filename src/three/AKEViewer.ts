@@ -21,6 +21,7 @@ import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { formatDistance } from "@/lib/units";
+import { pixelRatioForViewport, stepAdaptiveResolution } from "@/lib/renderQuality";
 
 /** Distinct top, front and side textures; deterministic, shared, lightweight. */
 function makeCartonTexture(face: "top" | "front" | "side"): THREE.CanvasTexture {
@@ -131,6 +132,11 @@ function makeCartonGeometry(): THREE.BoxGeometry {
   return geo;
 }
 
+const touchFirstPreferred = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(pointer: coarse)").matches;
+
 const reducedMotionPreferred = () =>
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
@@ -194,7 +200,7 @@ export const DEFAULT_STATE: ViewerState = {
   envIntensity: 1,
   wireframe: false,
   dimensions: true,
-  autoRotate: !reducedMotionPreferred(),
+  autoRotate: !reducedMotionPreferred() && !touchFirstPreferred(),
   mood: "hangar",
   reefer: true,
   setpoint: -18,
@@ -536,7 +542,10 @@ export class AKEViewer {
     this.state = { ...state };
     this.displayedDoor = state.door;
     this.reducedMotion = reducedMotionPreferred();
-    this.baseDpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.baseDpr = pixelRatioForViewport(
+      host.clientWidth || 800, host.clientHeight || 600,
+      window.devicePixelRatio || 1, touchFirstPreferred(),
+    );
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -754,10 +763,7 @@ export class AKEViewer {
     this.key.castShadow = true;
     // Touch-first small screens get a quarter-cost shadow map; the contact
     // shadow under a 3 m ULD reads identically at phone sizes.
-    const coarseSmall =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(pointer: coarse)").matches &&
+    const coarseSmall = touchFirstPreferred() &&
       Math.min(window.innerWidth, window.innerHeight) <= 820;
     const shadowSize = coarseSmall ? 1024 : 2048;
     this.key.shadow.mapSize.set(shadowSize, shadowSize);
@@ -790,7 +796,9 @@ export class AKEViewer {
   }
 
   private buildFloor() {
-    const tex = makeApronTexture(1024);
+    // The apron is decorative; quarter its texture memory on touch-first devices.
+    // ULD meshes, cargo cartons and engineering outputs are unchanged.
+    const tex = makeApronTexture(touchFirstPreferred() ? 512 : 1024);
     tex.repeat.set(5, 5);
     this.floorMat = new THREE.MeshStandardMaterial({
       map: tex,
@@ -2142,27 +2150,19 @@ export class AKEViewer {
 
   /** Deliberately hysteretic DPR control: stable quality, no visible hunting. */
   private adaptResolution(fps: number, sampleSeconds: number) {
-    if (document.hidden || this.baseDpr <= 1) return;
-    if (fps < 42) {
-      this.lowFpsTime += sampleSeconds;
-      this.recoveredTime = 0;
-    } else if (fps > 55) {
-      this.recoveredTime += sampleSeconds;
-      this.lowFpsTime = 0;
-    } else {
-      this.lowFpsTime = 0;
-      this.recoveredTime = 0;
-    }
-
-    if (this.lowFpsTime > 1.5 && this.dprScale > 0.65) {
-      this.dprScale = Math.max(0.65, this.dprScale - 0.15);
-      this.lowFpsTime = 0;
-      this.resize();
-    } else if (this.recoveredTime > 8 && this.dprScale < 1) {
-      this.dprScale = Math.min(1, this.dprScale + 0.1);
-      this.recoveredTime = 0;
-      this.resize();
-    }
+    if (document.hidden) return;
+    // Even DPR=1 desktops and large CSS viewports can be GPU-bound.
+    // Lower the internal buffer only; 3D geometry and cargo maths stay exact.
+    const next = stepAdaptiveResolution({
+      scale: this.dprScale,
+      lowFpsSeconds: this.lowFpsTime,
+      recoveredSeconds: this.recoveredTime,
+    }, fps, sampleSeconds);
+    const changed = next.scale !== this.dprScale;
+    this.dprScale = next.scale;
+    this.lowFpsTime = next.lowFpsSeconds;
+    this.recoveredTime = next.recoveredSeconds;
+    if (changed) this.resize();
   }
 
   private resize = () => {
@@ -2172,6 +2172,10 @@ export class AKEViewer {
     this.persp.aspect = w / h;
     this.persp.updateProjectionMatrix();
     this.updateOrthoFrustum();
+    // Orientation, viewport size and zoom can all change the pixel budget.
+    this.baseDpr = pixelRatioForViewport(
+      w, h, window.devicePixelRatio || 1, touchFirstPreferred(),
+    );
     this.renderer.setPixelRatio(this.baseDpr * this.dprScale);
     this.renderer.setSize(w, h, false);
     // Fit distances depend on aspect (portrait phones especially); refresh
