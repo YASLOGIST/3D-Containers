@@ -1221,6 +1221,7 @@ export default function App() {
                   activePreset={studioPreset}
                   onPreset={applyStudioPreset}
                   onExport={exportSignature}
+                  onInspectCarton={selectCartonForInspection}
                   onFieldVisible={(visible) => {
                     setShowMassField(visible);
                     setStudioPreset(visible ? "field" : null);
@@ -1471,6 +1472,7 @@ export default function App() {
                 activePreset={studioPreset}
                 onPreset={applyStudioPreset}
                 onExport={exportSignature}
+                onInspectCarton={selectCartonForInspection}
                 onFieldVisible={(visible) => {
                   setShowMassField(visible);
                   setStudioPreset(visible ? "field" : null);

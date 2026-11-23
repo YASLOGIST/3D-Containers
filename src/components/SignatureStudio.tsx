@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { MODELS, type ModelId } from "@/three/models";
-import type { CargoSignature } from "@/lib/cargoSignature";
+import { getCargoZoneBreakdown, type CargoSignature } from "@/lib/cargoSignature";
+import { cargoCoreForModel } from "@/lib/cargoPlacement";
 import type { CargoPlan } from "@/lib/cargoPlacement";
 import type { MoodId, ViewerState } from "@/three/AKEViewer";
 import { cn } from "@/utils/cn";
@@ -18,7 +19,7 @@ const formatOffset = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 
 export const SignatureStudio = memo(function SignatureStudio({
   model, state, plan, signature, fieldVisible, activePreset,
-  onPreset, onFieldVisible, onPatch, onExport,
+  onPreset, onFieldVisible, onPatch, onExport, onInspectCarton,
 }: {
   model: ModelId;
   state: ViewerState;
@@ -30,8 +31,18 @@ export const SignatureStudio = memo(function SignatureStudio({
   onFieldVisible: (visible: boolean) => void;
   onPatch: (patch: Partial<ViewerState>) => void;
   onExport: () => void;
+  onInspectCarton: (id: string) => void;
 }) {
   const max = Math.max(1, signature.maxCellKg);
+  const [selectedZone, setSelectedZone] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const selectedBreakdown = useMemo(() => {
+    if (selectedZone === null || selectedZone < 0 || selectedZone >= 9) return null;
+    return getCargoZoneBreakdown(
+      plan, cargoCoreForModel(model, state.contour),
+      Math.floor(selectedZone / 3), selectedZone % 3,
+    );
+  }, [model, plan, selectedZone, state.contour]);
   return (
     <div className="space-y-3 font-mono text-[10px]">
       <div className="relative overflow-hidden border border-[#4a8aa6]/60 bg-[radial-gradient(ellipse_at_top_right,rgba(64,147,174,.24),transparent_70%),#0b1c29] p-3">
@@ -86,7 +97,7 @@ export const SignatureStudio = memo(function SignatureStudio({
         <div className="mt-3 grid grid-cols-2 gap-2">
           {[
             ["ACCEPTED MASS", `${signature.totalKg.toFixed(1)} kg`],
-            ["PEAK FOOTPRINT", `${signature.peakKgPerM2.toFixed(1)} kg/m²`],
+            ["PEAK MAP INDEX", `${signature.peakKgPerM2.toFixed(1)} kg/m²`],
             ["LATERAL OFFSET", formatOffset(signature.lateralOffsetPct)],
             ["FORE/AFT OFFSET", formatOffset(signature.longitudinalOffsetPct)],
           ].map(([label, value]) => (
@@ -98,28 +109,96 @@ export const SignatureStudio = memo(function SignatureStudio({
         </div>
 
         <div className="mt-3 flex items-start gap-3">
-          <div className="grid aspect-square w-[45%] shrink-0 grid-cols-3 gap-1 rounded-sm border border-[#355364] bg-[#06131b] p-1" role="img"
-            aria-label="Nine-cell mass distribution projected onto the cargo floor, not a structural strength map">
+          <div className="grid w-[45%] min-h-[148px] shrink-0 grid-cols-3 gap-1 rounded-sm border border-[#355364] bg-[#06131b] p-1" role="group"
+            aria-label="Inspect nine projected mass zones">
             {signature.cells.map(c => {
               const ratio = c.kg / max;
+              const index = c.row * 3 + c.column;
+              const selected = selectedZone === index;
               return (
-                <div key={`${c.row}-${c.column}`}
-                  className="flex min-h-[34px] items-center justify-center border border-white/10 font-mono text-[9px] font-semibold text-white"
+                <button key={`${c.row}-${c.column}`} type="button"
+                  aria-label={`Inspect zone row ${c.row + 1} column ${c.column + 1}, ${c.kg.toFixed(1)} kg projected`}
+                  aria-pressed={selected} disabled={!c.kg}
+                  onClick={() => {
+                    setSelectedZone(current => current === index ? null : index);
+                    setShowAll(false);
+                  }}
+                  className={cn(
+                    "flex min-h-11 items-center justify-center border font-mono text-[9px] font-semibold text-white",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b5efff]",
+                    selected ? "border-[#d9f8ff] ring-2 ring-[#86e7f6]" : "border-white/10",
+                    !c.kg ? "cursor-default" : "hover:border-[#b7e7f6]",
+                  )}
                   style={{ background: c.kg
                     ? `rgba(${Math.round(39 + ratio * 171)}, ${Math.round(111 + ratio * 24)}, ${Math.round(147 - ratio * 78)}, ${(0.22 + ratio * .65).toFixed(2)})`
                     : "rgba(20,37,48,.55)" }}>
                   {c.kg ? c.kg.toFixed(0) : "·"}
-                </div>
+                </button>
               );
             })}
           </div>
           <div className="flex-1 space-y-1.5 text-[9px] leading-relaxed text-[#a7c0cc]">
             <div className="text-[10px] font-bold uppercase text-[#d6ecf4]">Where mass sits</div>
-            <p>Cells show projected kg including stacked cartons. Brighter means more mass in that area.</p>
-            <p className="text-[#d6b37c]">Centroid and density are estimates, not aircraft trim or floor-load approvals.</p>
+            <p>Tap a numbered zone to inspect the contributing cartons. Values include stacked cartons.</p>
+            <p className="text-[#d6b37c]">This is a plan-view projection, not floor pressure or certified loading.</p>
             {!plan.placed.length && <p>Add or load cartons to activate.</p>}
           </div>
         </div>
+        {selectedBreakdown && (
+          <section aria-label="Selected mass zone breakdown"
+            className="mt-2 border border-[#5594ae]/70 bg-[#102936]/85 p-2.5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-mono text-[11px] font-bold text-white">
+                  Zone R{selectedBreakdown.row + 1} / C{selectedBreakdown.column + 1}
+                </h3>
+                <p className="mt-1 text-[10px] text-[#c8e6ee]">
+                  {selectedBreakdown.projectedKg.toFixed(2)} kg projected ·
+                  {" "}{selectedBreakdown.projectedKgPerM2.toFixed(1)} kg/m² index
+                </p>
+              </div>
+              <button type="button" aria-label="Close selected mass zone"
+                onClick={() => setSelectedZone(null)}
+                className="min-h-9 min-w-9 border border-[#52788a] text-[#d2edf4] hover:bg-[#245062]">×</button>
+            </div>
+            <div className="mt-2 flex items-center justify-between font-mono text-[9px] text-[#a8c7d7]">
+              <span>{selectedBreakdown.contributors.length} contributing cartons</span>
+              <span>share of projected zone mass</span>
+            </div>
+            <div className="mt-1.5 space-y-1.5">
+              {(showAll ? selectedBreakdown.contributors : selectedBreakdown.contributors.slice(0, 4))
+                .map(carton => (
+                  <div key={carton.id}
+                    className="flex flex-wrap items-center justify-between gap-2 border border-[#345c71] bg-[#0b1b27]/80 px-2 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[10px] font-semibold text-[#edfaff]">{carton.label}</div>
+                      <div className="mt-1 text-[9px] text-[#b5d2de]">
+                        {carton.projectedKg.toFixed(2)} kg · {carton.sharePct.toFixed(1)}% of zone
+                        {" · "}{carton.verticalLayer === "above-preview-floor" ? "elevated" :
+                          carton.verticalLayer === "preview-floor" ? "floor level" : "unknown level"}
+                      </div>
+                    </div>
+                    <button type="button"
+                      aria-label={`Highlight ${carton.label} contributing to zone in 3D`}
+                      onClick={() => onInspectCarton(carton.id)}
+                      className="min-h-10 border border-[#5d9cb5] px-2 text-[9px] font-bold text-[#b9e7f6] hover:bg-[#22475a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                      Inspect 3D
+                    </button>
+                  </div>
+                ))}
+            </div>
+            {!showAll && selectedBreakdown.contributors.length > 4 && (
+              <button type="button" onClick={() => setShowAll(true)}
+                className="mt-2 min-h-10 w-full border border-[#466f83] text-[10px] text-[#d2e9ef] hover:bg-[#254858]">
+                Show all {selectedBreakdown.contributors.length} contributors
+              </button>
+            )}
+            <p className="mt-2 text-[9px] leading-relaxed text-[#e4c58d]">
+              Shares use horizontal overlap, even for elevated cartons.
+              Not a contact-force, restraint, structural or aircraft trim assessment.
+            </p>
+          </section>
+        )}
       </div>
 
       <button type="button" onClick={onExport} disabled={!plan.placed.length}
