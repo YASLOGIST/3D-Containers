@@ -6,6 +6,8 @@ import {
 } from "@/lib/cargoPlacement";
 import { Btn } from "./ui";
 import { MODELS, type ModelId } from "@/three/models";
+import { assessCargoEvidence } from "@/lib/cargoEvidence";
+import { CargoEvidencePanel } from "@/components/CargoEvidencePanel";
 
 const PRESETS = [
   { name: "Small", widthM: 0.4, depthM: 0.4, heightM: 0.4, massKg: 20 },
@@ -34,6 +36,7 @@ export function CargoLab({
   const sequence = useRef(1);
   const core = cargoCoreForModel(model, contour);
   const spec = MODELS[model];
+  const evidence = assessCargoEvidence(model, items, plan);
   const [draft, setDraft] = useState({
     widthM: "0.40", depthM: "0.40", heightM: "0.40", massKg: "20",
   });
@@ -61,12 +64,14 @@ export function CargoLab({
         <p className="mt-1">Conservative {spec.palletOption ? "pallet load envelope" : "rectangular inner core"} only. Manufacturer-specific hardware, nets, hold compatibility, restraints, structural support and aircraft centre-of-gravity are not validated. Not loading instructions.</p>
       </div>
 
+      <CargoEvidencePanel report={evidence} />
+
       <div className="grid grid-cols-2 gap-2">
         {[
           ["Placed cartons", `${plan.placed.length} / ${items.length}`],
-          ["Accepted mass", `${plan.loadedKg.toFixed(1)} kg`],
+          ["Placed preview mass", `${plan.loadedKg.toFixed(1)} kg`],
           ["Core utilization", `${plan.coreUtilizationPct.toFixed(1)}%`],
-          ["Free payload", `${plan.availableKg.toFixed(1)} kg`],
+          ["Remaining nominal payload*", `${plan.availableKg.toFixed(1)} kg`],
           ["Cargo volume", `${plan.usedM3.toFixed(3)} m³`],
           ["Preview core", `${plan.coreM3.toFixed(2)} m³`],
         ].map(([label, value]) => (
@@ -137,7 +142,7 @@ export function CargoLab({
           </Btn>
         </div>
         {items.length === 0 && (
-          <p className="py-3 text-[10px] text-dim">Add a carton to visualize its position inside the AKE.</p>
+          <p className="py-3 text-[10px] text-dim">Add a carton to visualize its position inside the selected ULD.</p>
         )}
         {items.map(item => {
           const problem = plan.rejected.find(r => r.item.id === item.id);
