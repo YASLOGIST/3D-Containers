@@ -68,10 +68,10 @@ jobs:
                 await page.getByRole('button',{name:'Highlight Demo 01 in 3D'}).click();
                 await badge.waitFor({state:'visible'});
                 await page.getByRole('button',{name:'Edit the cargo manifest'}).click();
-                const article=page.locator('article').filter({hasText:'Demo 01'}).first();
-                console.log('DEBUG',device.name,'matching articles',await article.count(),
-                  'remove controls',await page.locator('button[title="Remove Demo 01"]').count());
-                await article.locator('button[title="Remove Demo 01"]').click();
+                // Both responsive panels exist in DOM; click the *visible* control.
+                const removeVisible=page.locator('button[title="Remove Demo 01"]:visible');
+                assert.equal(await removeVisible.count(),1,'One remove control must be visible');
+                await removeVisible.click();
                 await badge.waitFor({state:'hidden'});
                 const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2);
                 assert.equal(overflow,false,'No horizontal overflow');
