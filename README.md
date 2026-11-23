@@ -184,7 +184,7 @@ The repository's [CI workflow](.github/workflows/ci.yml) runs tests and build on
 | ULD geometry and inspection | Implemented | [Registry](src/three/models.ts), [generators](src/three/), [viewer](src/three/AKEViewer.ts); model details and options differ. |
 | Planner and sharing | Implemented | [Planner](src/lib/planner.ts) is an estimate; [state codec](src/lib/state.ts) handles viewer settings only. |
 | Automated checks | Implemented | [Tests](tests/) cover generator and geometry invariants, planning, state, UI-related logic and viewer math; they are not a substitute for an operational or browser certification. |
-| Live deployment | Unverified | A [previously documented Vercel preview](https://containers-ahmedyas9966-2532s-projects.vercel.app) may exist, but its current availability has not been verified. Run locally using the commands above. |
+| Live deployment | Verified on 2026-11-23 | [Production](https://containers.yaslogist.com/) returned HTTP 200 and the matching Vercel deployment was READY at commit bf6073a5; future availability is not guaranteed. LinkedIn's cached share preview requires a separate Post Inspector check. |
 
 <details>
 <summary><strong>Repository map</strong></summary>
