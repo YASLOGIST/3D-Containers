@@ -61,11 +61,11 @@ jobs:
               assert.equal(await dialog.getByRole('button',{name:/^Preview /}).count(),17,'All 17 registry models visible');
               const box=dialog.getByRole('searchbox',{name:'Search ULD models by code, family, or aircraft'});
               await box.fill('RKN');
-              assert.ok(await dialog.getByText('1 of 17 registry models').isVisible(),'Search filters to RKN');
+              await dialog.getByText('1 of 17 registry models').waitFor({state:'visible'});
               await dialog.getByRole('button',{name:'Refrigerated',exact:true}).click();
-              assert.ok(await dialog.getByText('1 of 17 registry models').isVisible(),'Reefer filter is functional');
+              await dialog.getByText('1 of 17 registry models').waitFor({state:'visible'});
               await dialog.getByRole('button',{name:'Copy specs'}).click();
-              assert.ok(await dialog.getByText('Reference brief copied').isVisible(),'Copy technical reference works');
+              await dialog.getByText('Reference brief copied',{exact:true}).waitFor({state:'visible',timeout:6000});
               const clip=await p.evaluate(()=>navigator.clipboard.readText());
               assert.ok(clip.includes('RKN')&&clip.includes('NOT an OEM-approved'),'Reference brief includes source and disclaimer');
               await dialog.getByRole('button',{name:'All',exact:true}).click();
