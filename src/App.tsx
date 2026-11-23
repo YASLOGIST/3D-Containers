@@ -736,6 +736,7 @@ export default function App() {
       const k = e.key.toLowerCase();
       const keyIndex = "1234567890qertyug".indexOf(k); // w stays the wireframe toggle
       if (keyIndex >= 0 && keyIndex < ids.length) selectModel(ids[keyIndex]);
+      else if (k === "/") setModelExplorerOpen(true);
       else if (k === "f") viewer.current?.frameAll();
       else if (k === "i") viewer.current?.setView("iso");
       else if (k === "o")
@@ -909,7 +910,8 @@ export default function App() {
             aria-haspopup="dialog"
             aria-expanded={modelExplorerOpen}
             aria-label="Browse 17 ULD models and technical references"
-            title="Search, inspect and compare ULD reference specifications"
+            title="Search and compare ULD reference specifications · press /"
+            aria-keyshortcuts="/"
             onClick={() => setModelExplorerOpen(true)}
             className="flex min-h-10 shrink-0 items-center gap-2 border border-[#8ad6ee] bg-[#184457] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.09em] text-white hover:bg-[#28617a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
