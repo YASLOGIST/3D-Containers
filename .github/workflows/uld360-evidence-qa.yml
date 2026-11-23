@@ -1,0 +1,76 @@
+name: Temporary ULD360 Cargo Evidence Browser QA
+
+on:
+  push:
+    branches: [feat/uld360-constraint-evidence-20261123]
+    paths: [.github/workflows/uld360-evidence-qa.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-evidence-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser dependencies
+        run: |
+          npm ci
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Start local ULD360 site
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/uld360-dev.log 2>&1 &
+          for i in {1..40}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break || sleep 1; done
+          curl -fsS http://127.0.0.1:4173/ >/dev/null
+      - name: Verify cargo evidence on phone and desktop
+        run: |
+          cat > qa-evidence.mjs <<'JS'
+          import assert from 'node:assert/strict';
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+          const cases=[
+            {id:'phone',width:390,height:844,dpr:3,touch:true},
+            {id:'desktop',width:1440,height:900,dpr:1,touch:false},
+          ];
+          try{
+            for(const config of cases){
+              const ctx=await browser.newContext({
+                viewport:{width:config.width,height:config.height},
+                deviceScaleFactor:config.dpr,
+                isMobile:config.touch,hasTouch:config.touch,
+                reducedMotion:'reduce',
+              });
+              const p=await ctx.newPage(), errors=[];
+              p.on('pageerror',e=>errors.push(e.message));
+              const response=await p.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:30000});
+              assert.equal(response?.status(),200);
+              await p.waitForSelector('canvas',{timeout:30000});
+              await p.getByRole('button',{name:'Edit the cargo manifest'}).click({timeout:30000});
+              const panel=p.getByRole('region',{name:'Cargo validation boundaries'});
+              await panel.waitFor({state:'visible',timeout:15000});
+              assert.ok(await panel.getByText('NOT CERTIFIED').isVisible());
+              assert.ok((await panel.innerText()).includes('4 operational checks remain NOT VERIFIED'));
+              await panel.locator('summary').click();
+              assert.ok(await panel.getByText('NOT VERIFIED',{exact:true}).count()>=4);
+              await p.getByRole('button',{name:/launch loaded 3D scene/i}).click();
+              await p.getByRole('button',{name:'Edit the cargo manifest'}).click({timeout:30000});
+              const loaded=p.getByRole('region',{name:'Cargo validation boundaries'});
+              await loaded.waitFor({state:'visible',timeout:15000});
+              const content=await loaded.innerText();
+              assert.ok(content.includes('27 / 27'),content);
+              assert.ok(content.includes('675.0 kg requested'),content);
+              assert.ok(content.includes('NOT CERTIFIED'),content);
+              assert.ok(content.includes('4 operational checks remain NOT VERIFIED'),content);
+              assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2),false);
+              assert.deepEqual(errors,[]);
+              console.log('PASS',config.id,'evidence before/after 27-box demo','not certified','no overflow or JS errors');
+              await ctx.close();
+            }
+          } finally{await browser.close()}
+          JS
+          node qa-evidence.mjs
