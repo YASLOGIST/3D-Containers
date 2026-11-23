@@ -32,9 +32,11 @@ instancing via the glTF EXT_mesh_gpu_instancing extension.
 
 The geometry-only helper at src/three/geometryExport.ts now makes a temporary,
 non-mutating copy for OBJ/STL. Visible GPU instances become ordinary meshes
-with their original local transforms. Hidden descendants are omitted. The live
-viewer and GLB exporter are unchanged. Automated tests verify two translated
-instances, hidden subtrees, real OBJ/STL coordinates, and source non-mutation.
+with their original local transforms. Hidden descendants are omitted.
+The live viewer is unchanged. This describes the 23 November export fix;
+the GLB exporter received a subsequent compatibility change on 24 November
+as documented below. Automated tests verify two translated instances,
+hidden subtrees, real OBJ/STL coordinates, and source non-mutation.
 
 ## Responsive UI
 
@@ -65,3 +67,30 @@ still separate open validation gates.
 
 Test outputs were held in system temporary storage only, not committed to
 the project; the testing workstation was a MacBook Pro M1 Pro.
+
+
+## 24 November topology and GLB interoperability follow-up
+
+A full independently imported topology audit later found only 10 of 17
+binary STL demo assemblies were edge-closed in their tested poses.
+Repairs to the AKE hinge straps and the omission of printed/ink-only
+decals from geometry-only OBJ/STL increased this to 14 of 17.
+AKH, RKN and RAP retain documented open/nonmanifold subassemblies.
+These must not be automatically filled or certified.
+
+For GLB interoperability, GPU-instanced hardware is now expanded to
+standard mesh nodes during export only; this removes reliance on the
+optional EXT_mesh_gpu_instancing extension in third-party readers.
+The live WebGL viewer still uses hardware instancing.
+
+GLB retains textured branding/printed decals; OBJ and STL omit those
+visual-only meshes. The cross-format validator therefore skips explicitly
+marked visualOnlyDecal nodes when measuring structural GLB bounds.
+Visual whole-scene GLB dimensions may legitimately include decorative
+details that are not in a geometry-only export. The maximum compared
+structural-axis discrepancy is 0.8 mm across all 17 models.
+
+Apple Model I/O successfully imported 34 OBJ/STL specimens and Trimesh
+loaded all 17 GLB scenes, in addition to the structural parser tests.
+For specific topology counts and the real-device benchmark, consult
+MESH_QUALITY_AUDIT_20261124.md.

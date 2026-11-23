@@ -2,6 +2,8 @@
 
 Usage: python3 scripts/verify_export_meshes.py DIRECTORY [MODEL ...]
 Requires model.glb, model.obj, model.stl for each model.
+Compares physical mesh envelopes: printed/ink-only GLB decorations carrying
+visualOnlyDecal=true are intentionally ignored, as they do not occur in OBJ/STL.
 Does not prove manifold quality, physical safety or manufacturer accuracy.
 """
 import json, struct, math, pathlib, sys
@@ -89,6 +91,11 @@ def glb(path):
  def visit(index,parent):
   nonlocal countNodes,instanced
   node=nodes[index]
+  # GLB deliberately retains textured/printed visual decals. OBJ/STL are
+  # geometry-only, so exclude marked ink/labels from its comparison envelope.
+  # This ignores no physical shell or structural parts.
+  if node.get("extras", {}).get("visualOnlyDecal") is True:
+   return
   model=mult(parent,matrix(node))
   if "mesh" in node:
    countNodes+=1

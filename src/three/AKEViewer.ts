@@ -2321,7 +2321,13 @@ export class AKEViewer {
     const restore = this.detachStencilCaps();
     try {
       const exporter = new GLTFExporter();
-      const buf = (await exporter.parseAsync(this.exportRoot(), {
+      // Standard glTF mesh primitives import more reliably than the optional
+      // EXT_mesh_gpu_instancing path in independent/legacy GLB readers.
+      // Expand on an isolated copy; preserve visual decals for this format.
+      const compatibleRoot = geometryOnlyExportScene(this.exportRoot(), {
+        keepVisualDecals: true,
+      });
+      const buf = (await exporter.parseAsync(compatibleRoot, {
         binary: true,
         onlyVisible: true,
         maxTextureSize: 1536,

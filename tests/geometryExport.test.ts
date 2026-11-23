@@ -98,3 +98,18 @@ test("actual OBJ and binary STL agree on both translated instance positions", ()
   geo.dispose();
   material.dispose();
 });
+
+test("geometry-only exports exclude ink labels, while GLB preview retains them", () => {
+  const { root, geo, material } = synthetic();
+  const visual = new THREE.Mesh(geo, material);
+  visual.name = "Printed decal";
+  visual.userData.visualOnlyDecal = true;
+  root.add(visual);
+
+  assert.equal(geometryOnlyExportScene(root).getObjectByName("Printed decal"), undefined);
+  const rich = geometryOnlyExportScene(root, { keepVisualDecals: true });
+  assert.ok(rich.getObjectByName("Printed decal"));
+  assert.ok(root.getObjectByName("Printed decal"), "live scene never mutated");
+  geo.dispose();
+  material.dispose();
+});

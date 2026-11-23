@@ -1,14 +1,17 @@
 import * as THREE from "three";
 
 /**
- * OBJ/STL exporters only walk ordinary Mesh geometry and do not expand
- * InstancedMesh per-instance transforms. Build a non-mutating scene copy and
- * materialize those instances for these geometry-only exchange formats.
+ * Some exchange-format readers do not expand InstancedMesh correctly.
+ * Create a non-mutating scene copy with one regular Mesh per original instance.
+ * Used by GLB (keep textured visual decals) and OBJ/STL (omit printed labels).
  *
  * The cloned subtree shares geometries/materials read-only with the viewer.
  * Do not dispose the clones' shared resources.
  */
-export function geometryOnlyExportScene(source: THREE.Group): THREE.Group {
+export function geometryOnlyExportScene(
+  source: THREE.Group,
+  options: { keepVisualDecals?: boolean } = {},
+): THREE.Group {
   const output = source.clone(true);
   output.updateMatrixWorld(true);
 
@@ -16,7 +19,7 @@ export function geometryOnlyExportScene(source: THREE.Group): THREE.Group {
     for (const child of [...parent.children]) {
       // OBJ and STL do not honor Object3D.visible or ancestors' visibility.
       // GLB already uses onlyVisible; match that contract for active variants.
-      if (!child.visible) {
+      if (!child.visible || (!options.keepVisualDecals && child.userData.visualOnlyDecal === true)) {
         parent.remove(child);
         continue;
       }

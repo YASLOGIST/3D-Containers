@@ -670,7 +670,7 @@ export default function App() {
           data.byteOffset + data.byteLength,
         ) as ArrayBuffer;
         downloadBlob(new Blob([buffer], { type: "model/stl" }), `${stamp}.stl`);
-        notify(`STL written · ${(data.byteLength / 1024).toFixed(0)} KB`);
+        notify(`STL mesh · not print-certified · ${(data.byteLength / 1024).toFixed(0)} KB`);
       }
     } catch (cause) {
       notify(
@@ -1079,7 +1079,7 @@ export default function App() {
           <Btn
             onClick={() => doExport("stl")}
             disabled={!ready || !!error || exporting}
-            title="Binary STL · units are metres (scale ×1000 for mm slicers)"
+            title="Binary STL · metre coordinates · preview geometry only; not verified manifold or print-ready"
             className="hidden sm:inline-flex"
           >
             <DlIcon /> stl

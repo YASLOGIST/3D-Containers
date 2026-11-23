@@ -354,6 +354,9 @@ export function decal(
   );
   m.castShadow = false;
   m.receiveShadow = false;
+  // Printed ink/stencils are visual detail, not manufactured solid volume.
+  // Keep them for GLB preview; omit from geometry-only OBJ/STL meshes.
+  m.userData.visualOnlyDecal = true;
   return m;
 }
 

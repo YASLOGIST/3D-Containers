@@ -836,7 +836,10 @@ export function createAKEContainer(
     leafArm.position.set(px(HINGE_X + 0.048), hy, FACE + 0.008);
     doorPivot.add(leafArm);
     const frameArm = box(mat.steel, 0.09, 0.1, 0.014, "Hinge strap", 0.005);
-    frameArm.position.set(HINGE_X + 0.048, hy, BL / 2 - 0.014);
+    // Separate the moving and fixed hinge leaves by 5 mm along the
+    // hinge's depth without altering the nominal X envelope. Previously
+    // their broad faces touched exactly, causing duplicate STL edge valence.
+    frameArm.position.set(HINGE_X + 0.048, hy, BL / 2 - 0.009);
     A_DOOR.group.add(frameArm);
   }
 
