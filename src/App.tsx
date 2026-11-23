@@ -48,6 +48,7 @@ import { cargoCoreForModel, demoCargoForModel, planCargoForModel, type CargoItem
 import { computeCargoSignature, exportCargoSignatureCSV } from "@/lib/cargoSignature";
 import { SignatureStudio, type StudioPreset } from "@/components/SignatureStudio";
 import { CargoMissionDock } from "@/components/CargoMissionDock";
+import { ModelExplorer } from "@/components/ModelExplorer";
 import { CargoLab } from "@/components/CargoLab";
 import { MODELS, type ModelId } from "@/three/models";
 import type { Assembly } from "@/three/primitives";
@@ -326,6 +327,7 @@ export default function App() {
   const [sheet, setSheet] = useState(false);
   const [mobileDeckOpen, setMobileDeckOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [modelExplorerOpen, setModelExplorerOpen] = useState(false);
 
   /* ---------------- boot the viewer ---------------- */
   useEffect(() => {
@@ -718,6 +720,14 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Do not let scene shortcuts change a ULD while the catalogue is open.
+      if (modelExplorerOpen) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setModelExplorerOpen(false);
+        }
+        return;
+      }
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -894,10 +904,22 @@ export default function App() {
             <Chip tone="amber">{dimsLabel}</Chip>
             <Chip tone="steel">metallic pbr</Chip>
           </div>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={modelExplorerOpen}
+            aria-label="Browse 17 ULD models and technical references"
+            title="Search, inspect and compare ULD reference specifications"
+            onClick={() => setModelExplorerOpen(true)}
+            className="flex min-h-10 shrink-0 items-center gap-2 border border-[#8ad6ee] bg-[#184457] px-3 font-mono text-[10px] font-semibold uppercase tracking-[0.09em] text-white hover:bg-[#28617a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            <span>⌕ Models</span>
+            <span className="border border-[#9ed1df]/50 px-1.5 py-0.5 text-[#bce9f5]">{Object.keys(MODELS).length}</span>
+          </button>
           <div
             role="group"
-            aria-label="Select ULD model"
-            className="flex w-full max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap border border-line bg-panel/90 p-0.5 backdrop-blur-sm sm:w-auto sm:max-w-[72vw] sm:flex-wrap sm:justify-end sm:overflow-visible"
+            aria-label="Quick-select ULD model"
+            className="hidden w-full max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap border border-line bg-panel/90 p-0.5 backdrop-blur-sm xl:flex xl:w-auto xl:max-w-[72vw] xl:flex-wrap xl:justify-end xl:overflow-visible"
           >
             {(Object.keys(MODELS) as ModelId[]).map((id) => (
               <button
@@ -1006,6 +1028,29 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {modelExplorerOpen && (
+        <ModelExplorer
+          activeModel={state.model}
+          onClose={() => setModelExplorerOpen(false)}
+          onInspect={(id) => {
+            setModelExplorerOpen(false);
+            setFocusMode(false);
+            setMobileDeckOpen(false);
+            setSheet(false);
+            selectModel(id);
+            viewer.current?.frameAll();
+          }}
+          onCompare={(id) => {
+            setModelExplorerOpen(false);
+            setFocusMode(false);
+            patch({ compare: id });
+            setMobileDeckOpen(false);
+            setTab("spec");
+            setSheet(true);
+          }}
+        />
+      )}
 
       {/* ---------------- left: control deck ---------------- */}
       <div className={cn("anim-rise pointer-events-none absolute bottom-16 left-3 z-20 hidden xl:bottom-14 xl:block xl:left-4", focusMode && "xl:!hidden")}>
