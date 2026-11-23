@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   cargoCoreForModel,
   type CargoItem,
@@ -8,19 +8,14 @@ import { Btn } from "./ui";
 import { MODELS, type ModelId } from "@/three/models";
 import { assessCargoEvidence } from "@/lib/cargoEvidence";
 import { CargoEvidencePanel } from "@/components/CargoEvidencePanel";
+import { diagnoseCartons, exportCartonDiagnosticsCSV } from "@/lib/cargoDiagnostics";
+import { downloadText } from "@/lib/io";
 
 const PRESETS = [
   { name: "Small", widthM: 0.4, depthM: 0.4, heightM: 0.4, massKg: 20 },
   { name: "Medium", widthM: 0.6, depthM: 0.4, heightM: 0.35, massKg: 35 },
   { name: "Large", widthM: 0.8, depthM: 0.6, heightM: 0.45, massKg: 65 },
 ] as const;
-
-const REASONS = {
-  invalid: "Invalid dimensions or mass",
-  oversize: "Exceeds conservative interior bounds",
-  overweight: "Exceeds remaining nominal payload",
-  "no-space": "No collision-free, supported position",
-} as const;
 
 export function CargoLab({
   items, plan, onChange, model, contour, onOpenDoor, onLoadDemo,
@@ -37,6 +32,14 @@ export function CargoLab({
   const core = cargoCoreForModel(model, contour);
   const spec = MODELS[model];
   const evidence = assessCargoEvidence(model, items, plan);
+  const diagnostics = useMemo(
+    () => diagnoseCartons(model, items, plan, contour),
+    [model, items, plan, contour],
+  );
+  const [manifestFilter, setManifestFilter] = useState<"all" | "placed" | "rejected">("all");
+  const visibleRows = diagnostics.rows.filter(row =>
+    manifestFilter === "all" || row.status === manifestFilter,
+  );
   const [draft, setDraft] = useState({
     widthM: "0.40", depthM: "0.40", heightM: "0.40", massKg: "20",
   });
@@ -134,30 +137,108 @@ export function CargoLab({
         </div>
       </div>
 
-      <div className="space-y-1 border-t border-line pt-3">
-        <div className="flex items-center justify-between">
-          <span className="stencil text-[10px] text-ink">Cargo manifest · session only</span>
-          <Btn tone="ghost" disabled={!items.length} onClick={() => { onChange([]); setValidation(""); }}>
-            clear all
-          </Btn>
+      <section aria-label="Carton diagnostics" className="space-y-2 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="stencil text-[10px] text-ink">Carton diagnostics · session only</h3>
+            <p className="mt-1 font-mono text-[9px] text-dim" aria-live="polite">
+              {diagnostics.placed} placed · {diagnostics.rejected} not placed · {diagnostics.total} submitted
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <Btn tone="ghost" title="Export per-carton diagnostics as CSV"
+              disabled={!items.length}
+              onClick={() => downloadText(
+                exportCartonDiagnosticsCSV(diagnostics),
+                `uld360-${spec.code.toLowerCase()}-carton-diagnostics.csv`,
+                "text/csv",
+              )}>
+              export CSV
+            </Btn>
+            <Btn tone="ghost" disabled={!items.length}
+              onClick={() => { onChange([]); setValidation(""); setManifestFilter("all"); }}>
+              clear all
+            </Btn>
+          </div>
+        </div>
+        <div role="group" aria-label="Filter carton diagnostics" className="flex flex-wrap gap-1">
+          {([
+            ["all", "All", diagnostics.total],
+            ["rejected", "Not placed", diagnostics.rejected],
+            ["placed", "Placed", diagnostics.placed],
+          ] as const).map(([key, label, count]) => (
+            <button key={key} type="button" aria-pressed={manifestFilter === key}
+              onClick={() => setManifestFilter(key)}
+              className={`min-h-9 border px-2.5 font-mono text-[10px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${manifestFilter === key
+                ? "border-[#8ed4e8] bg-[#193d50] text-white"
+                : "border-[#47677b] text-[#bbd5e2] hover:bg-[#19303d]"}`}>
+              {label} ({count})
+            </button>
+          ))}
         </div>
         {items.length === 0 && (
-          <p className="py-3 text-[10px] text-dim">Add a carton to visualize its position inside the selected ULD.</p>
+          <p className="py-3 text-[10px] text-dim">Add a carton or load the demo to inspect its position in the selected ULD.</p>
         )}
-        {items.map(item => {
-          const problem = plan.rejected.find(r => r.item.id === item.id);
-          return (
-            <div key={item.id} className="flex items-center justify-between gap-2 border border-line-soft bg-void/45 px-2 py-2">
-              <div className="min-w-0">
-                <div className="font-semibold text-ink">{item.label} <span className={problem ? "text-signal" : "text-jade"}>· {problem ? "NOT PLACED" : "PLACED"}</span></div>
-                <div className="mt-0.5 text-[9px] text-dim">{item.widthM} × {item.depthM} × {item.heightM} m · {item.massKg} kg</div>
-                {problem && <p className="mt-1 text-[9px] text-signal">{REASONS[problem.reason]}</p>}
-              </div>
-              <Btn tone="ghost" title={`Remove ${item.label}`} onClick={() => onChange(items.filter(i => i.id !== item.id))}>remove</Btn>
-            </div>
-          );
-        })}
-      </div>
+        {items.length > 0 && !visibleRows.length && (
+          <p role="status" className="py-3 text-[10px] text-dim">
+            No cartons in this category. Choose All to view the manifest.
+          </p>
+        )}
+        <div className="space-y-1.5">
+          {visibleRows.map(row => {
+            const item = items[row.index - 1];
+            const rejected = row.status === "rejected";
+            return (
+              <article key={row.id} className="border border-line-soft bg-void/45 p-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="break-words font-semibold text-ink">
+                      {item.label}
+                      <span className={rejected ? "text-signal" : "text-jade"}>
+                        {" · "}{rejected ? "NOT PLACED" : "PREVIEW PLACED"}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 break-words font-mono text-[9px] text-dim">
+                      {item.widthM} × {item.depthM} × {item.heightM} m · {item.massKg} kg
+                    </div>
+                    {rejected && (
+                      <p className="mt-1 text-[10px] font-semibold text-[#e9af9c]">
+                        {row.title}
+                      </p>
+                    )}
+                  </div>
+                  <Btn tone="ghost" title={`Remove ${item.label}`}
+                    onClick={() => onChange(items.filter(i => i.id !== item.id))}>remove</Btn>
+                </div>
+                <details className="mt-1">
+                  <summary className="min-h-9 cursor-pointer select-none py-2 font-mono text-[10px] text-[#9dd3e6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                    {rejected ? "Why not placed? · How to fix" : "Position · carton details"}
+                  </summary>
+                  <div className="space-y-1.5 border-t border-line-soft pb-1 pt-2 text-[10px] leading-relaxed text-[#bfd4dd]">
+                    <p>{row.explanation}</p>
+                    <p><strong className="text-[#b7e5f1]">Next:</strong> {row.nextStep}</p>
+                    {row.centreM && (
+                      <p>
+                        Core-relative centre: X {row.centreM.x.toFixed(3)} m ·
+                        Y {row.centreM.y.toFixed(3)} m · Z {row.centreM.z.toFixed(3)} m.
+                        Not aircraft station coordinates.
+                      </p>
+                    )}
+                    <p>
+                      Carton volume: {row.volumeM3?.toFixed(4) ?? "unavailable"} m³ ·
+                      illustrative density: {row.densityKgM3?.toFixed(1) ?? "unavailable"} kg/m³.
+                      These values are not floor pressure or stack-strength limits.
+                    </p>
+                  </div>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+        <p className="font-mono text-[9px] leading-relaxed text-[#bb9d78]">
+          Diagnostics describe this first-fit 3D sandbox only. No OEM or aircraft loading approval is implied.
+        </p>
+      </section>
     </div>
   );
 }
