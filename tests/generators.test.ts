@@ -425,3 +425,30 @@ test("the whole aviation lockup fits a clear surface on all 17 ULD families", ()
     else delete (globalThis as typeof globalThis & { Image?: unknown }).Image;
   }
 });
+
+test("AKE hinge leaves have depth clearance without growing the nominal envelope", () => {
+  const built = MODELS.ake.build(options);
+  const depth: number[] = [];
+  built.group.updateMatrixWorld(true);
+  built.group.traverse((node) => {
+    if (node.name === "Hinge strap") {
+      depth.push(node.getWorldPosition(new THREE.Vector3()).z);
+    }
+  });
+  assert.equal(depth.length, 6, "three moving and three fixed hinge leaves");
+  assert.equal(depth.filter(z => z < Math.min(...depth) + 0.001).length, 3);
+  assert.equal(depth.filter(z => z > Math.max(...depth) - 0.001).length, 3);
+  assert.ok(Math.max(...depth) - Math.min(...depth) > 0.016,
+    "hinge leaves need articulation clearance rather than shared planes");
+  const bounds = new THREE.Box3().setFromObject(built.group);
+  assert.ok(bounds.min.x >= -1.02 && bounds.max.x <= 1.02);
+  built.dispose();
+});
+
+test("pallet identification decals are visual-only rather than STL solids", () => {
+  const built = MODELS.pmc.build(options);
+  const ink = built.group.getObjectByName("Pallet identification plate");
+  assert.ok(ink, "PMC has a visible identification plate");
+  assert.equal(ink.userData.visualOnlyDecal, true);
+  built.dispose();
+});
