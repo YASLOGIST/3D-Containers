@@ -24,6 +24,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { applyInteriorFloorGroups, makeInteriorFloorMaterial } from "./interiorFloor";
 import { rigidDoorPose } from "./doorKinematics";
 import {
   makeCondenserGrille,
@@ -299,7 +300,15 @@ export function createRAPContainer(
     { depth: hullLen, bevelEnabled: false, curveSegments: 10, steps: 1 },
   );
   hullGeo.translate(0, 0, -hullLen / 2);
-  A_HULL.group.add(mesh(hullGeo, mat.insulated, "Hull — insulated panel tube"));
+  applyInteriorFloorGroups(hullGeo, CHASSIS + RAIL_T + WALL);
+  const hullMesh = mesh(hullGeo, mat.insulated, "Hull — insulated panel tube");
+  const floorMaterial = makeInteriorFloorMaterial();
+  const floorHull = new THREE.Mesh(hullGeo, [mat.insulated, floorMaterial]);
+  floorHull.name = hullMesh.name;
+  floorHull.userData = hullMesh.userData;
+  floorHull.castShadow = hullMesh.castShadow;
+  floorHull.receiveShadow = hullMesh.receiveShadow;
+  A_HULL.group.add(floorHull);
 
   // roof panel closes the envelope flush with the frame extrusions
   const roof = box(mat.alloy, W - 0.14, RAIL_T, D - 0.14, "Roof panel", 0.008);

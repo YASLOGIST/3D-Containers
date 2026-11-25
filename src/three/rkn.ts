@@ -28,6 +28,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { applyInteriorFloorGroups, makeInteriorFloorMaterial } from "./interiorFloor";
 import { rigidDoorPose } from "./doorKinematics";
 import {
   makeCondenserGrille,
@@ -292,7 +293,15 @@ export function createRKNContainer(
     { depth: hullLen, bevelEnabled: false, curveSegments: 10, steps: 1 },
   );
   hullGeo.translate(0, 0, -hullLen / 2);
-  A_HULL.group.add(mesh(hullGeo, mat.shell, "Hull — rectangular tube"));
+  applyInteriorFloorGroups(hullGeo, CHASSIS + RAIL_T + WALL);
+  const hullMesh = mesh(hullGeo, mat.shell, "Hull — rectangular tube");
+  const floorMaterial = makeInteriorFloorMaterial();
+  const floorHull = new THREE.Mesh(hullGeo, [mat.shell, floorMaterial]);
+  floorHull.name = hullMesh.name;
+  floorHull.userData = hullMesh.userData;
+  floorHull.castShadow = hullMesh.castShadow;
+  floorHull.receiveShadow = hullMesh.receiveShadow;
+  A_HULL.group.add(floorHull);
 
   // roof panel closes the envelope flush with the frame extrusions
   const roof = box(mat.alloy, W - 0.13, RAIL_T, D - 0.13, "Roof panel", 0.006);

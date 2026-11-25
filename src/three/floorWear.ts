@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { cachedTexture, seededRandom } from "./textureSupport";
 
-export type WearSurface = "strip" | "deck";
+export type WearSurface = "strip" | "deck" | "interior";
 
 /** Art-directed surface modulation on existing handling parts only.
  * No physical wear depth, damage diagnosis, traction or load rating. */
@@ -11,7 +11,7 @@ export function makeFloorWear(surface: WearSurface): THREE.Texture {
     c.width=512;c.height=surface==="strip"?128:512;
     const ctx=c.getContext("2d")!;
     const w=c.width,h=c.height;
-    const rand=seededRandom(surface==="strip"?0x64abf:0xa44e7);
+    const rand=seededRandom(surface==="strip"?0x64abf:surface==="interior"?0x7119e:0xa44e7);
     ctx.fillStyle="#f5f5f3";ctx.fillRect(0,0,w,h);
     // Soft, elongated handling haze rather than a repeated woodgrain.
     for(let i=0;i<28;i++){
@@ -32,6 +32,16 @@ export function makeFloorWear(surface: WearSurface): THREE.Texture {
       ctx.lineWidth=.45+rand()*.8;
       ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(angle)*len,y+Math.sin(angle)*len);ctx.stroke();
     }
+    if(surface==="interior"){
+      // Longitudinal loading lanes, with subtle edge polish and short scuffs.
+      for(const x of [w*.23,w*.77]){
+        const lane=ctx.createLinearGradient(x-36,0,x+36,0);
+        lane.addColorStop(0,"rgba(78,82,83,0)");
+        lane.addColorStop(.5,"rgba(78,82,83,.13)");
+        lane.addColorStop(1,"rgba(78,82,83,0)");
+        ctx.fillStyle=lane;ctx.fillRect(x-36,0,72,h);
+      }
+    }
     if(surface==="strip"){
       // A thin light abrasion band on each strip edge, not embossed grooves.
       ctx.fillStyle="rgba(255,255,255,.38)";
@@ -48,7 +58,7 @@ export function makeFloorWear(surface: WearSurface): THREE.Texture {
  * and explicit reset without creating disposable texture clones repeatedly. */
 export function applyFloorWear(material: THREE.MeshStandardMaterial, service: boolean) {
   const surface=material.userData.wearSurface as WearSurface|undefined;
-  if(surface!=="strip"&&surface!=="deck")return;
+  if(surface!=="strip"&&surface!=="deck"&&surface!=="interior")return;
   if(service&&!material.map){
     material.map=makeFloorWear(surface);
     material.needsUpdate=true;
