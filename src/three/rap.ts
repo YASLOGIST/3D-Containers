@@ -1285,6 +1285,10 @@ export function createRAPContainer(
       const mats = new Set<THREE.Material>();
       const texs = new Set<THREE.Texture>();
       root.traverse((obj) => {
+        // Geometry disposal does not release the per-instance GPU buffers.
+        if ((obj as THREE.InstancedMesh).isInstancedMesh) {
+          (obj as THREE.InstancedMesh).dispose();
+        }
         const m = obj as THREE.Mesh;
         if (m.geometry) geos.add(m.geometry);
         const mm = m.material as THREE.Material | THREE.Material[] | undefined;
