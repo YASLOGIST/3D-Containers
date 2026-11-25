@@ -214,7 +214,7 @@ function SpecSheetBase({
         z: (measured.z - envelope.z) * 1000,
       }
     : null;
-  const spansWithinTolerance = deltaMm ? deltaMm.x <= 1 && deltaMm.y <= 1 && deltaMm.z <= 1 : null;
+  const noExcessAboveTolerance = deltaMm ? deltaMm.x <= 1 && deltaMm.y <= 1 && deltaMm.z <= 1 : null;
   const fmtDelta = (v: number) => `${v > 0.005 ? "+" : ""}${Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2)}`;
   return (
     <div className="space-y-3">
@@ -289,16 +289,17 @@ function SpecSheetBase({
               ? `${fmtDelta(deltaMm.x)} · ${fmtDelta(deltaMm.y)} · ${fmtDelta(deltaMm.z)}`
               : "—"
           }
-          tone={spansWithinTolerance === false ? "amber" : "steel"}
+          tone={noExcessAboveTolerance === false ? "amber" : "steel"}
         />
         <Row
           k="Overall span check"
-          v={spansWithinTolerance === null ? "—" : spansWithinTolerance ? "WITHIN 1 MM" : "SPAN EXCEEDS 1 MM"}
-          tone={spansWithinTolerance === false ? "amber" : "steel"}
+          v={noExcessAboveTolerance === null ? "—" : noExcessAboveTolerance ? "NO EXCESS ABOVE 1 MM" : "SPAN EXCEEDS 1 MM"}
+          tone={noExcessAboveTolerance === false ? "amber" : "steel"}
         />
         <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
-          Door closed and pallet load stowed. This compares bounding-box
-          dimensions with the registry's overall spans, allowing 1 mm excess.
+          Door closed and pallet load stowed. This compares visible structural
+          vertex spans (excluding printed decals) with registry overall spans,
+          allowing 1 mm excess.
           It does not check position, contour clearance or certify the model.
           The section above is a registry reference, not a live geometry check.
         </p>

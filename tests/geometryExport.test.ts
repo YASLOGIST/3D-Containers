@@ -3,7 +3,7 @@ import test from "node:test";
 import * as THREE from "three";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
-import { geometryOnlyExportScene } from "../src/three/geometryExport.ts";
+import { geometryOnlyExportScene, structuralVertexBounds } from "../src/three/geometryExport.ts";
 
 const tolerance = 1e-5;
 
@@ -112,4 +112,50 @@ test("geometry-only exports exclude ink labels, while GLB preview retains them",
   assert.ok(root.getObjectByName("Printed decal"), "live scene never mutated");
   geo.dispose();
   material.dispose();
+});
+
+test("structural vertex bounds ignore hidden variants, decals and unused indexed vertices", () => {
+  const {root, geo, material} = synthetic();
+  const shape = new THREE.BufferGeometry();
+  shape.setAttribute("position", new THREE.Float32BufferAttribute([0,0,0, 2,0,0, 0,1,0, 999,999,999],3));
+  shape.setIndex([0,1,2]);
+  const triangle = new THREE.Mesh(shape, material);
+  triangle.position.set(0,0,0);
+  triangle.rotation.z = Math.PI/4;
+  root.add(triangle);
+  const decal = new THREE.Mesh(geo, material);
+  decal.position.set(500,500,500);
+  decal.userData.visualOnlyDecal = true;
+  root.add(decal);
+  const bounds = structuralVertexBounds(root);
+  const stl = new STLExporter().parse(geometryOnlyExportScene(root), {binary:true}) as DataView;
+  const actual = new THREE.Box3();
+  for(let i=0; i<stl.getUint32(80,true); i++){
+    for(const offset of [12,24,36]){
+      const at=84+i*50+offset;
+      actual.expandByPoint(new THREE.Vector3(stl.getFloat32(at,true),stl.getFloat32(at+4,true),stl.getFloat32(at+8,true)));
+    }
+  }
+  assert.ok(bounds.min.distanceTo(actual.min)<1e-5);
+  assert.ok(bounds.max.distanceTo(actual.max)<1e-5);
+  assert.ok(bounds.max.x<2 && bounds.max.z<5);
+  assert.equal(root.children.length,4);
+  assert.ok(decal.parent);
+  shape.dispose();geo.dispose();material.dispose();
+});
+
+test("rotated instanced geometry uses actual vertices rather than rotated AABBs", () => {
+  const root=new THREE.Group();
+  const g=new THREE.BufferGeometry();
+  g.setAttribute("position",new THREE.Float32BufferAttribute([0,0,0,2,0,0,0,1,0],3));
+  const mat=new THREE.MeshStandardMaterial();
+  const mesh=new THREE.InstancedMesh(g,mat,2);
+  mesh.setMatrixAt(0,new THREE.Matrix4().makeRotationZ(Math.PI/4));
+  mesh.setMatrixAt(1,new THREE.Matrix4().makeRotationZ(-Math.PI/4).setPosition(4,0,0));
+  root.add(mesh);
+  const measured=structuralVertexBounds(root);
+  assert.ok(Math.abs(measured.max.y-Math.SQRT2)<1e-6);
+  assert.ok(Math.abs(measured.min.y+Math.SQRT2)<1e-6);
+  assert.ok(Math.abs(measured.max.x-(4+Math.SQRT2))<1e-6);
+  g.dispose();mat.dispose();
 });
