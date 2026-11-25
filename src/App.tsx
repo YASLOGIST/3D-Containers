@@ -959,6 +959,7 @@ export default function App() {
       {/* ---------------- top bar ---------------- */}
       <header ref={header} className={cn(
         "anim-in pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-stretch justify-between gap-1.5 p-2.5 [margin-top:env(safe-area-inset-top)] [margin-left:env(safe-area-inset-left)] [margin-right:env(safe-area-inset-right)] sm:flex-row sm:items-start sm:gap-4 sm:p-4",
+        state.mood === "studio" && "bg-[#0d151d]/95",
         focusMode && "hidden",
       )}>
         <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
