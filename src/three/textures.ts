@@ -247,118 +247,68 @@ export interface PlacardOptions {
   volumeM3: number;
 }
 
-/** Data plate riveted beside the door: ULD id, weights, volume, barcode. */
+/** Representative identification plate. No certificate or scannable identity is implied. */
 export function makeIdPlate(o: PlacardOptions) {
-  const key = `id-plate:${JSON.stringify(o)}`;
+  const key = `id-plate:v2:${JSON.stringify(o)}`;
   return cachedTexture(key, () => {
-    const rand = seededRandom(0x1d91a7e);
-    const W = 1536;
-    const H = Math.round((W * o.height) / o.width);
-    const { c, ctx } = canvas2d(W, H);
-    const s = W / 1024;
-
-    const plate = ctx.createLinearGradient(0, 0, 0, H);
-    plate.addColorStop(0, "#cfd4d8");
-    plate.addColorStop(0.5, "#aeb4ba");
-    plate.addColorStop(1, "#9aa1a8");
-    ctx.fillStyle = plate;
-    ctx.fillRect(0, 0, W, H);
-
-    // brushed streaks on the plate
-    for (let i = 0; i < 900; i++) {
-      const y = rand() * H;
-      ctx.strokeStyle = `rgba(255,255,255,${rand() * 0.1})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(rand() * W, y);
-      ctx.lineTo(rand() * W, y);
-      ctx.stroke();
+    const rand=seededRandom(0x1d91a7e);
+    const W=1536,H=Math.round(W*o.height/o.width);
+    const {c,ctx}=canvas2d(W,H);
+    ctx.scale(W/1024,H/540);
+    const metal=ctx.createLinearGradient(0,0,0,540);
+    metal.addColorStop(0,"#e1e5e7");metal.addColorStop(.48,"#c4cbd0");
+    metal.addColorStop(1,"#a7b0b7");
+    ctx.fillStyle=metal;ctx.fillRect(0,0,1024,540);
+    for(let i=0;i<650;i++){
+      const x=rand()*1024,y=rand()*540;
+      ctx.strokeStyle=rand()<.55?"rgba(255,255,255,.12)":"rgba(40,50,56,.045)";
+      ctx.lineWidth=.65;ctx.beginPath();ctx.moveTo(x,y);
+      ctx.lineTo(Math.min(1024,x+15+rand()*180),y);ctx.stroke();
     }
-
-    ctx.strokeStyle = "#4a5158";
-    ctx.lineWidth = 3 * s;
-    ctx.strokeRect(10 * s, 10 * s, W - 20 * s, H - 20 * s);
-
-    // rivets
-    ctx.fillStyle = "#6d757c";
-    const inset = 30 * s;
-    for (const [rx, ry] of [
-      [inset, inset],
-      [W - inset, inset],
-      [inset, H - inset],
-      [W - inset, H - inset],
-    ]) {
-      ctx.beginPath();
-      ctx.arc(rx, ry, 7 * s, 0, Math.PI * 2);
-      ctx.fill();
+    ctx.strokeStyle="#66737b";ctx.lineWidth=2;ctx.strokeRect(12,12,1000,516);
+    ctx.strokeStyle="rgba(255,255,255,.8)";ctx.lineWidth=1;ctx.strokeRect(15,15,994,510);
+    // Painted representation of four fastener heads, not additional geometry.
+    for(const [x,y] of [[29,29],[995,29],[29,511],[995,511]]){
+      const g=ctx.createRadialGradient(x-3,y-3,1,x,y,10);
+      g.addColorStop(0,"#ecf0f1");g.addColorStop(.65,"#859198");g.addColorStop(1,"#48535a");
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#515e64";ctx.beginPath();ctx.arc(x,y,2.2,0,Math.PI*2);ctx.fill();
     }
-
-    ctx.fillStyle = "#1b1f23";
-    ctx.textBaseline = "top";
-    ctx.font = `700 ${74 * s}px "Chakra Petch", sans-serif`;
-    ctx.fillText(o.id, 56 * s, 52 * s, 310 * s);
-    ctx.font = `500 ${34 * s}px "IBM Plex Mono", monospace`;
-    ctx.fillStyle = "#333a40";
-    ctx.fillText(
-      o.carrier,
-      386 * s,
-      74 * s,
-    );
-
-    const kg = (v: number) => `${v.toLocaleString("en-US")} KG`;
-    const rows: [string, string][] = [
-      ["TARE", kg(o.tareKg)],
-      ["MAX GROSS", kg(o.maxGrossKg)],
-      ["NET PAYLOAD", kg(o.maxGrossKg - o.tareKg)],
-      ["VOLUME", `${o.volumeM3.toFixed(1)} M\u00B3`],
-    ];
-    ctx.font = `500 ${30 * s}px "IBM Plex Mono", monospace`;
-    rows.forEach(([k, v], i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const x = 56 * s + col * 470 * s;
-      const y = 168 * s + row * 62 * s;
-      ctx.fillStyle = "#5c646b";
-      ctx.fillText(k, x, y);
-      ctx.fillStyle = "#14181b";
-      ctx.font = `600 ${34 * s}px "IBM Plex Mono", monospace`;
-      ctx.fillText(v, x + 250 * s, y - 2 * s, 210 * s);
-      ctx.font = `500 ${30 * s}px "IBM Plex Mono", monospace`;
+    ctx.textBaseline="top";
+    const label=(t:string,x:number,y:number,w:number)=> {
+      ctx.font='600 24px "IBM Plex Mono", monospace';ctx.fillStyle="#35434c";ctx.fillText(t,x,y,w);
+    };
+    const value=(t:string,x:number,y:number,w:number)=> {
+      ctx.font='700 42px "IBM Plex Mono", monospace';ctx.fillStyle="#17232a";ctx.fillText(t,x,y,w);
+    };
+    label("YASLOGIST / ULD360",52,29,530);
+    ctx.fillStyle="#263640";ctx.fillRect(735,27,230,46);
+    ctx.font='700 26px "IBM Plex Mono", monospace';ctx.fillStyle="#f1f5f6";
+    ctx.fillText("DEMO PLATE",753,36,194);
+    ctx.font='700 76px "Chakra Petch", sans-serif';ctx.fillStyle="#14232b";
+    ctx.fillText(o.id,52,76,660);
+    label("OWNER REF",755,89,205);value(o.carrier,755,115,205);
+    ctx.strokeStyle="#738089";ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(52,169);ctx.lineTo(972,169);ctx.stroke();
+    const kg=(n:number)=>`${n.toLocaleString("en-US")} kg`;
+    const rows=[["TARE REF",kg(o.tareKg)],["GROSS REF",kg(o.maxGrossKg)],
+      ["PAYLOAD REF",kg(o.maxGrossKg-o.tareKg)],["VOLUME REF",`${o.volumeM3.toFixed(1)} m³`]];
+    rows.forEach(([k,v],i)=>{
+      const x=52+(i%2)*470,y=185+Math.floor(i/2)*100;
+      label(k,x,y,440);value(v,x,y+30,440);
     });
-
-    drawBarcode(ctx, 56 * s, H - 132 * s, 560 * s, 86 * s, o.serial);
-    ctx.fillStyle = "#22282c";
-    ctx.font = `500 ${26 * s}px "IBM Plex Mono", monospace`;
-    ctx.fillText(o.serial, 640 * s, H - 104 * s, 328 * s);
-    ctx.fillText("IATA ULD / AS1811", 640 * s, H - 68 * s);
-
-    return toTexture(c, true);
+    ctx.strokeStyle="#738089";ctx.beginPath();ctx.moveTo(52,382);ctx.lineTo(972,382);ctx.stroke();
+    label("DEMO SERIAL",52,393,300);
+    ctx.font='700 31px "IBM Plex Mono", monospace';ctx.fillStyle="#17232a";
+    ctx.fillText(o.serial,52,427,920);
+    ctx.fillStyle="#34434b";ctx.fillRect(52,475,920,35);
+    ctx.font='700 23px "IBM Plex Mono", monospace';ctx.fillStyle="#f4f6f7";
+    ctx.fillText("REFERENCE ONLY / NOT FOR LOADING",67,480,890);
+    const t=toTexture(c,true);
+    t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+    t.userData={referenceOnly:true,scannableIdentity:false,plateLayout:2};
+    return t;
   });
-}
-
-function drawBarcode(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  seed: string,
-) {
-  let n = 0;
-  for (let i = 0; i < seed.length; i++) n = (n * 31 + seed.charCodeAt(i)) >>> 0;
-  const rnd = () => {
-    n = (n * 1664525 + 1013904223) >>> 0;
-    return n / 4294967296;
-  };
-  ctx.fillStyle = "#e9ecee";
-  ctx.fillRect(x - 6, y - 6, w + 12, h + 12);
-  ctx.fillStyle = "#101315";
-  let cx = x;
-  while (cx < x + w - 4) {
-    const bw = 1 + Math.floor(rnd() * 4) * 1.6;
-    ctx.fillRect(cx, y, bw, h);
-    cx += bw + 1 + rnd() * 4;
-  }
 }
 
 /** Large livery decal for the blind end: type code, contour diagram, handling marks. */
