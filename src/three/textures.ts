@@ -249,7 +249,7 @@ export interface PlacardOptions {
 
 /** Representative identification plate. No certificate or scannable identity is implied. */
 export function makeIdPlate(o: PlacardOptions) {
-  const key = `id-plate:v2:${JSON.stringify(o)}`;
+  const key = `id-plate:v3:${JSON.stringify(o)}`;
   return cachedTexture(key, () => {
     const rand=seededRandom(0x1d91a7e);
     const W=1536,H=Math.round(W*o.height/o.width);
@@ -281,7 +281,10 @@ export function makeIdPlate(o: PlacardOptions) {
     const value=(t:string,x:number,y:number,w:number)=> {
       ctx.font='700 42px "IBM Plex Mono", monospace';ctx.fillStyle="#17232a";ctx.fillText(t,x,y,w);
     };
-    label("YASLOGIST / ULD360",52,29,530);
+    label("YASLOGIST / ULD360",52,29,300);
+    // Discreet project credit, separate from the owner and reference data.
+    ctx.font='400 18px "IBM Plex Mono", monospace';ctx.fillStyle="#35434c";
+    ctx.fillText("Ahmed Yasser Ali",370,33,330);
     ctx.fillStyle="#263640";ctx.fillRect(735,27,230,46);
     ctx.font='700 26px "IBM Plex Mono", monospace';ctx.fillStyle="#f1f5f6";
     ctx.fillText("DEMO PLATE",753,36,194);
@@ -306,7 +309,7 @@ export function makeIdPlate(o: PlacardOptions) {
     ctx.fillText("REFERENCE ONLY / NOT FOR LOADING",67,480,890);
     const t=toTexture(c,true);
     t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
-    t.userData={referenceOnly:true,scannableIdentity:false,plateLayout:2};
+    t.userData={referenceOnly:true,scannableIdentity:false,plateLayout:3,projectCredit:"Ahmed Yasser Ali"};
     return t;
   });
 }
