@@ -38,8 +38,11 @@ test("span check uses unrounded measurements and does not claim contour certific
   const envelope = { x: Math.max(dims.width, dims.topWidth), y: dims.height, z: dims.depth };
   const within = render(MODELS.ake, "0", "0", { ...envelope, x: envelope.x + 0.00099 });
   const beyond = render(MODELS.ake, "0", "0", { ...envelope, x: envelope.x + 0.00101 });
-  assert.match(within, /WITHIN 1 MM/);
+  assert.match(within, /NO EXCESS ABOVE 1 MM/);
   assert.match(beyond, /SPAN EXCEEDS 1 MM/);
+  const undersize = render(MODELS.ake, "0", "0", { ...envelope, x: envelope.x - 0.017 });
+  assert.match(undersize, /NO EXCESS ABOVE 1 MM/);
+  assert.doesNotMatch(undersize, /WITHIN 1 MM/);
   assert.match(beyond, /\+1\.01/);
   assert.match(within, /does not check position, contour clearance or certify/);
   assert.doesNotMatch(within, /INSCRIBED/);
