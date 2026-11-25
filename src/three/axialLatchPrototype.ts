@@ -25,7 +25,7 @@ export function buildAKEAxialLatchPrototype(detail = true) {
       new THREE.Vector2(outer,-half),new THREE.Vector2(outer,half),
       new THREE.Vector2(inner,half),new THREE.Vector2(inner,-half),
       new THREE.Vector2(outer,-half)],32);
-    const ringGeometry=section(.024,.009,.0015);
+    const ringGeometry=section(.022,.009,.0015);
     const pinGeometry=new THREE.CylinderGeometry(.007,.007,.032,24);
     for(const [i,s] of spindles.entries()){
       if(i===0)s.position.x+=.075;
