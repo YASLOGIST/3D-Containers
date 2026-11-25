@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
+import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { geometryOnlyExportScene } from "../src/three/geometryExport.ts";
 
 import { MODELS, type ModelId } from "../src/three/models.ts";
 import type {
@@ -451,4 +453,99 @@ test("pallet identification decals are visual-only rather than STL solids", () =
   assert.ok(ink, "PMC has a visible identification plate");
   assert.equal(ink.userData.visualOnlyDecal, true);
   built.dispose();
+});
+
+test("RKN/RAP interior rails and long-wall stiffeners belong to opposite walls", () => {
+  for (const id of ["rkn", "rap"] as const) {
+    const built = MODELS[id].build({ ...options, detail: true });
+    built.group.updateMatrixWorld(true);
+    for (const [name, perSide] of [
+      ["Interior tie-down rail", 2],
+      ["Wall stiffener", id === "rkn" ? 3 : 4],
+    ] as const) {
+      const positions: THREE.Vector3[] = [];
+      built.group.traverse(obj => {
+        if (obj.name === name && obj instanceof THREE.Mesh) {
+          positions.push(obj.getWorldPosition(new THREE.Vector3()));
+        }
+      });
+      assert.equal(positions.length, perSide * 2, id + " " + name + " count");
+      const left = positions.filter(p => p.x < -0.5);
+      const right = positions.filter(p => p.x > 0.5);
+      assert.equal(left.length, perSide, id + " " + name + " on left wall");
+      assert.equal(right.length, perSide, id + " " + name + " on right wall");
+      const unique = new Set(positions.map(p =>
+        [p.x,p.y,p.z].map(v => v.toFixed(5)).join(",")));
+      assert.equal(unique.size, positions.length, id + " " + name + " must not be coincident");
+    }
+    built.dispose();
+  }
+});
+
+test("RKN door hinge leaves have clearance when closed", () => {
+  const built = MODELS.rkn.build({ ...options, doorOpen: 0 });
+  built.group.updateMatrixWorld(true);
+  const straps: THREE.Mesh[] = [];
+  built.group.traverse(obj => {
+    if (obj.name === "Hinge strap" && obj instanceof THREE.Mesh) straps.push(obj);
+  });
+  assert.equal(straps.length, 6);
+  const atHeight = new Map<string, THREE.Box3[]>();
+  for (const strap of straps) {
+    const center = strap.getWorldPosition(new THREE.Vector3());
+    const key = center.y.toFixed(4);
+    if (!atHeight.has(key)) atHeight.set(key, []);
+    atHeight.get(key)?.push(new THREE.Box3().setFromObject(strap));
+  }
+  assert.equal(atHeight.size, 3);
+  for (const boxes of atHeight.values()) {
+    assert.equal(boxes.length, 2);
+    assert.equal(boxes[0].intersectsBox(boxes[1]), false,
+      "moving and fixed hinge leaves must not share a coincident face");
+  }
+  built.dispose();
+});
+
+test("RAP cooling coil fins are spaced rather than coincident slabs", () => {
+  const built = MODELS.rap.build(options);
+  built.group.updateMatrixWorld(true);
+  const fins: THREE.Box3[] = [];
+  built.group.traverse(obj => {
+    if (obj.name === "Coil fin" && obj instanceof THREE.Mesh) {
+      fins.push(new THREE.Box3().setFromObject(obj));
+    }
+  });
+  fins.sort((a,b) => a.getCenter(new THREE.Vector3()).x - b.getCenter(new THREE.Vector3()).x);
+  assert.equal(fins.length, 12);
+  for (let i = 1; i < fins.length; i++) {
+    assert.ok(fins[i-1].max.x < fins[i].min.x - 0.005,
+      "each fin should leave at least 5 mm clearance to the next");
+  }
+  built.dispose();
+});
+
+test("RKN/RAP exported binary STL meshes are edge-closed without duplicate rail faces", () => {
+  for (const id of ["rkn", "rap"] as const) {
+    const built = MODELS[id].build({ ...options, doorOpen: 0, load: 0 });
+    const scene = geometryOnlyExportScene(built.group);
+    const stl = new STLExporter().parse(scene, { binary: true }) as DataView;
+    const triangleCount = stl.getUint32(80, true);
+    assert.ok(triangleCount > 40_000);
+    assert.equal(stl.byteLength, 84 + triangleCount * 50);
+
+    const edges = new Map<string, number>();
+    const keyOf = (offset: number) =>
+      [0, 4, 8].map(i => Math.round(stl.getFloat32(offset + i, true) * 1e7)).join(",");
+    for (let face = 0; face < triangleCount; face++) {
+      const base = 84 + face * 50 + 12;
+      const vertices = [base, base + 12, base + 24].map(keyOf);
+      for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) {
+        const key = [vertices[a], vertices[b]].sort().join("|");
+        edges.set(key, (edges.get(key) ?? 0) + 1);
+      }
+    }
+    const bad = [...edges.values()].filter(n => n !== 2).length;
+    assert.equal(bad, 0, id + " export has open or over-subscribed triangle edges");
+    built.dispose();
+  }
 });

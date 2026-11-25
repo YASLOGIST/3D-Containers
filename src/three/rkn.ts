@@ -326,7 +326,11 @@ export function createRKNContainer(
           0.02,
           n,
           upY,
-          new THREE.Vector3(X0 + RAIL_T + WALL + 0.012, yy, 0),
+          new THREE.Vector3(
+            n.x > 0 ? X0 + W - RAIL_T - WALL - 0.012 : X0 + RAIL_T + WALL + 0.012,
+            yy,
+            0,
+          ),
           "Interior tie-down rail",
         ),
       );
@@ -346,7 +350,11 @@ export function createRKNContainer(
             RAIL_T,
             n,
             upY,
-            new THREE.Vector3(X0 + W / 2 - RAIL_T * 0.5, (CHASSIS + H) / 2, z),
+            new THREE.Vector3(
+              n.x > 0 ? X0 + W - RAIL_T * 0.5 : X0 + RAIL_T * 0.5,
+              (CHASSIS + H) / 2,
+              z,
+            ),
             "Wall stiffener",
           ),
         );
@@ -820,7 +828,9 @@ export function createRKNContainer(
     leafArm.position.set(px(HINGE_X + 0.048), hy, FACE + 0.008);
     doorPivot.add(leafArm);
     const frameArm = box(mat.steel, 0.09, 0.1, 0.014, "Hinge strap", 0.005);
-    frameArm.position.set(HINGE_X + 0.048, hy, D / 2 - 0.014);
+    // The frame leaf must not share a coincident contact face with the
+    // moving leaf. A 4 mm recess separation preserves the outer envelope.
+    frameArm.position.set(HINGE_X + 0.048, hy, D / 2 - 0.010);
     A_DOOR.group.add(frameArm);
   }
 
