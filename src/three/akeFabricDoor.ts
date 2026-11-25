@@ -13,7 +13,7 @@ const ROWS = 34;
 const TAU = Math.PI * 2;
 
 function makeTextileMap(): THREE.Texture {
-  return cachedTexture("ake:textile-weave:v1", () => {
+  return cachedTexture("ake:textile-weave:v2", () => {
     const c = document.createElement("canvas");
     c.width = c.height = 512;
     const ctx = c.getContext("2d")!;
@@ -33,13 +33,65 @@ function makeTextileMap(): THREE.Texture {
       ctx.fillStyle = rnd() < 0.5 ? "rgba(40,46,53,0.05)" : "rgba(255,255,255,0.05)";
       ctx.fillRect(x, y, 1 + rnd() * 3, 1);
     }
+    // Bound edges and stitch rows are part of the material UVs, so they
+    // remain attached to the existing deforming surface.
+    const binding = 8;
+    ctx.fillStyle = "#9da6aa";
+    ctx.fillRect(0, 0, binding, 512);
+    ctx.fillRect(512 - binding, 0, binding, 512);
+    ctx.fillRect(0, 0, 512, binding);
+    ctx.fillRect(0, 512 - binding, 512, binding);
+    for (const edge of [3, 508]) {
+      for (let i = 10; i < 502; i += 5) {
+        ctx.fillStyle = "rgba(34,44,48,.45)";
+        ctx.fillRect(edge, i, 1, 3);
+        ctx.fillRect(i, edge, 3, 1);
+        ctx.fillStyle = "rgba(235,239,237,.48)";
+        ctx.fillRect(edge + 1, i, 1, 2);
+        ctx.fillRect(i, edge + 1, 2, 1);
+      }
+    }
     const tex = new THREE.CanvasTexture(c);
     tex.name = "AKE representative coated textile";
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(1.1, 1.6);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.anisotropy = 8;
     return tex;
+  });
+}
+
+/** Procedural woven webbing; illustrative rather than a measured OEM textile. */
+function makeWebbingMap(): THREE.Texture {
+  return cachedTexture("ake:webbing:v1", () => {
+    const c = document.createElement("canvas");
+    c.width = 64; c.height = 512;
+    const ctx = c.getContext("2d")!;
+    const rand = seededRandom(0x57a9);
+    ctx.fillStyle = "#cbd0d2";
+    ctx.fillRect(0, 0, 64, 512);
+    for (let x = 0; x < 64; x += 3) {
+      ctx.fillStyle = x % 2 ? "rgba(25,35,43,.20)" : "rgba(255,255,255,.25)";
+      ctx.fillRect(x, 0, 1, 512);
+    }
+    for (let y = 0; y < 512; y += 3) {
+      ctx.fillStyle = "rgba(30,40,48,.15)";
+      ctx.fillRect(0, y, 64, 1);
+    }
+    for (let i = 0; i < 400; i++) {
+      ctx.fillStyle = "rgba(255,255,255,.13)";
+      ctx.fillRect(rand() * 64, rand() * 512, 1, 2);
+    }
+    ctx.fillStyle = "rgba(22,30,38,.30)";
+    ctx.fillRect(0, 0, 3, 512); ctx.fillRect(61, 0, 3, 512);
+    for (let y = 4; y < 508; y += 8) {
+      ctx.fillStyle = "rgba(244,248,250,.65)";
+      ctx.fillRect(5, y, 1, 5); ctx.fillRect(58, y, 1, 5);
+    }
+    const texture = new THREE.CanvasTexture(c);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.anisotropy = 4;
+    return texture;
   });
 }
 
@@ -75,7 +127,8 @@ export function createAKEFabricDoor(o: FabricDoorOptions): FabricDoor {
     map: makeTextileMap(), side: THREE.DoubleSide,
   });
   const strapMaterial = new THREE.MeshStandardMaterial({
-    color: "#29435b", metalness: 0, roughness: 0.83, side: THREE.DoubleSide,
+    color: "#39556b", metalness: 0, roughness: 0.83, side: THREE.DoubleSide,
+    map: o.detailed ? makeWebbingMap() : null,
   });
   const hemMaterial = new THREE.MeshStandardMaterial({
     color: "#818a92", metalness: 0, roughness: 0.75, side: THREE.DoubleSide,
@@ -125,6 +178,13 @@ export function createAKEFabricDoor(o: FabricDoorOptions): FabricDoor {
         faces.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
       }
       strapGeo.setAttribute("position", new THREE.BufferAttribute(coords, 3).setUsage(THREE.DynamicDrawUsage));
+      // UVs use the undeformed material coordinates. Door motion only
+      // updates positions and normals, preserving the woven pattern.
+      const strapUV = new Float32Array((ROWS + 1) * 4);
+      for (let j = 0; j <= ROWS; j++) {
+        strapUV.set([0, j / ROWS, 1, j / ROWS], j * 4);
+      }
+      strapGeo.setAttribute("uv", new THREE.BufferAttribute(strapUV, 2));
       strapGeo.setIndex(faces);
       const mesh = new THREE.Mesh(strapGeo, strapMaterial);
       mesh.name = "AKE fabric tension strap";
