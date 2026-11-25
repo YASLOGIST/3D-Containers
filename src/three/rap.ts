@@ -333,7 +333,11 @@ export function createRAPContainer(
           0.024,
           n,
           upY,
-          new THREE.Vector3(X0 + RAIL_T + WALL + 0.014, yy, 0),
+          new THREE.Vector3(
+            n.x > 0 ? X0 + W - RAIL_T - WALL - 0.014 : X0 + RAIL_T + WALL + 0.014,
+            yy,
+            0,
+          ),
           "Interior tie-down rail",
         ),
       );
@@ -412,7 +416,11 @@ export function createRAPContainer(
             RAIL_T,
             n,
             upY,
-            new THREE.Vector3(X0 + W / 2 - RAIL_T * 0.5, (CHASSIS + H) / 2, z),
+            new THREE.Vector3(
+              n.x > 0 ? X0 + W - RAIL_T * 0.5 : X0 + RAIL_T * 0.5,
+              (CHASSIS + H) / 2,
+              z,
+            ),
             "Wall stiffener",
           ),
         );
@@ -1069,11 +1077,13 @@ export function createRAPContainer(
   hook.position.copy(at(inletUx - 0.09, inletUy + 0.19, UNIT_FACE - 0.017));
   A_CLIMATE.group.add(hook);
 
-  // condenser coil fins along the top of the unit
+  // Twelve separated coil fins across the top of the unit, not twelve
+  // overlapping full-width slabs. The gaps remain visible for airflow.
+  const finPitch = (unitW * 0.8) / 11;
   for (let i = 0; i < 12; i++) {
-    const fin = box(mat.steel, unitW * 0.8, 0.05, 0.02, "Coil fin", 0.002);
+    const fin = box(mat.steel, finPitch * 0.4, 0.05, 0.02, "Coil fin", 0.002);
     fin.position.copy(
-      at(-unitW * 0.4 + (i * unitW * 0.8) / 11, unitH / 2 - 0.01, FACE + 0.03),
+      at(-unitW * 0.4 + i * finPitch, unitH / 2 - 0.01, FACE + 0.03),
     );
     A_CLIMATE.group.add(fin);
   }
