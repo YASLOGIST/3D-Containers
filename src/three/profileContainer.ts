@@ -543,7 +543,10 @@ export function createProfileContainer(
       // Mirror the lever offset with the spindle's release direction.
       // The folded lever stays inside the depth envelope and clears the
       // leaf face through the sampled release sequence.
-      handle.position.set(latchSpindles.length === 1 ? -0.009 : 0.009, hy - 0.045, 0.006);
+      // Compact representative lever: 105 mm finished length, with its
+      // upper end clear of the cam and the hub connection retained.
+      handle.scale.y = 0.75;
+      handle.position.set(latchSpindles.length === 1 ? -0.009 : 0.009, hy - 0.0675, 0.006);
       handle.rotation.x = -0.1;
       spindle.add(handle);
     }
