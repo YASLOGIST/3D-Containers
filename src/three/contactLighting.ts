@@ -33,6 +33,6 @@ export function makeContactTexture(size=128) {
  * or behind a closed rigid door. This is not a simulated installed lamp. */
 export function inspectionFill(door: number, section: boolean, pallet: boolean, fabric: boolean) {
   if(pallet)return 0;
-  if(section)return 1.35;
-  return 1.45*THREE.MathUtils.smoothstep(door,fabric ? .04 : .18,.78);
+  if(section)return .65;
+  return .65*THREE.MathUtils.smoothstep(door,fabric ? .04 : .18,.78);
 }
