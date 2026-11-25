@@ -17,6 +17,9 @@ test("cargo panel exposes per-carton explanations, filters and CSV export", () =
     selectedCartonId: null, onSelectCarton: () => {},
   }));
   assert.match(html, /Carton diagnostics/);
+  assert.match(html, /Mass ledger/);
+  assert.match(html, /Weighted centroid above preview floor/);
+  assert.match(html, /Container tare mass is excluded/);
   assert.match(html, /Not placed \(1\)/);
   assert.match(html, /Placed \(1\)/);
   assert.match(html, /export CSV/);

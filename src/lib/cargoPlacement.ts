@@ -73,7 +73,9 @@ export function cargoCoreForModel(model: ModelId, contour = true): CargoCore {
   if (spec.palletOption) {
     const minX = Math.min(...profile.map(p => p.x));
     const maxX = Math.max(...profile.map(p => p.x));
-    const padX = 0.14, padZ = 0.14;
+    // The shared pallet generator has 190 mm corner blocks inset 10 mm.
+    // Leave 10 mm of illustrated clearance beyond their full footprint.
+    const padX = 0.21, padZ = 0.21;
     // Plate top is nominal thickness plus the 16 mm skid in pallet engine.
     const floorY = spec.dims.height + 0.021;
     return {
@@ -91,9 +93,12 @@ export function cargoCoreForModel(model: ModelId, contour = true): CargoCore {
   const ceilingY = high - (reefer ? 0.20 : 0.10);
   const marginX = reefer ? 0.20 : 0.13;
   const marginZ = reefer ? 0.24 : 0.12;
-  const sampled = Array.from({ length: 9 }, (_, i) =>
-    profileSegment(profile, floorY + (ceilingY - floorY) * (i / 8)),
-  ).filter((p): p is { left: number; right: number } => !!p);
+  // The profile is piecewise linear; include every in-range vertex height
+  // so a narrow knee cannot disappear between uniform sample heights.
+  const heights = [floorY, ceilingY, ...profile.map(p => p.y)
+    .filter(y => y > floorY && y < ceilingY)];
+  const sampled = heights.map(y => profileSegment(profile, y))
+    .filter((p): p is { left: number; right: number } => !!p);
   if (!sampled.length) throw new Error(`No reference cargo section for ${model}`);
   const minX = Math.max(...sampled.map(s => s.left)) + marginX;
   const maxX = Math.min(...sampled.map(s => s.right)) - marginX;
@@ -166,7 +171,11 @@ export function planCargoForModel(
   payloadOverride?: number,
 ): CargoPlan {
   const core = cargoCoreForModel(model, contour);
-  const payloadKg = payloadOverride ?? MODELS[model].ratings.payloadKg;
+  const nominal = MODELS[model].ratings.payloadKg;
+  // A caller can impose a stricter preview cap, never silently override the
+  // registry upward or turn NaN into unlimited capacity.
+  const payloadKg = payloadOverride === undefined ? nominal
+    : Number.isFinite(payloadOverride) ? Math.max(0, Math.min(nominal, payloadOverride)) : 0;
   const coreM3 = core.widthM * core.depthM * core.heightM;
   const local: Array<CargoItem & { x: number; y: number; z: number }> = [];
   const rejected: CargoRejection[] = [];

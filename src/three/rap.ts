@@ -354,7 +354,10 @@ export function createRAPContainer(
       mat.steel,
       "Temp probe",
     );
-    probe.position.set(X0 + W * 0.5, floorY + 0.05, pz);
+    // Representative wall-adjacent probe location, outside the preview
+    // cargo core. The previous centre-floor placement intersected cartons.
+    // No manufacturer-specific sensor installation is implied.
+    probe.position.set(X0 + W - RAIL_T - WALL - 0.04, floorY + 0.05, pz);
     A_HULL.group.add(probe);
   }
 
