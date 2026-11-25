@@ -19,7 +19,8 @@ test("all 17 model plate textures are bounded, explicitly illustrative and non-s
      plates++;
      assert.equal(map.userData.referenceOnly,true,id);
      assert.equal(map.userData.scannableIdentity,false,id);
-     assert.equal(map.userData.plateLayout,2,id);
+     assert.equal(map.userData.plateLayout,3,id);
+     assert.equal(map.userData.projectCredit,"Ahmed Yasser Ali",id);
      assert.equal(map.image.width,1536,id);
      assert.ok(map.image.height>0&&map.image.height<=1536,id);
      assert.equal(map.wrapS,THREE.ClampToEdgeWrapping);
@@ -36,4 +37,30 @@ test("plate texture consumers share source raster but own independent texture ha
  const a=makeIdPlate(o),b=makeIdPlate(o);
  assert.notEqual(a,b);assert.equal(a.image,b.image);assert.equal(a.image.height,Math.round(1536*.19/.36));
  a.dispose();b.dispose();
+});
+
+test("project credit is drawn once as small regular text, not an owner field",()=>{
+ const original=document.createElement;
+ const calls:{text:string;font:string;x:number;y:number;maxWidth?:number}[]=[];
+ document.createElement=((tag:string)=>{
+  const canvas=original.call(document,tag) as HTMLCanvasElement;
+  const originalContext=canvas.getContext.bind(canvas);
+  canvas.getContext=((type:string)=>{
+   const ctx=originalContext(type as "2d")!;
+   ctx.fillText=(text,x,y,maxWidth)=>{calls.push({text,font:ctx.font,x,y,maxWidth});};
+   return ctx;
+  }) as typeof canvas.getContext;
+  return canvas;
+ }) as typeof document.createElement;
+ let texture:THREE.Texture|undefined;
+ try{
+  texture=makeIdPlate({width:.37,height:.19,id:"CREDIT-QA",carrier:"YL",serial:"CREDIT-QA-1",tareKg:92,maxGrossKg:1588,volumeM3:4.3});
+  const credit=calls.filter(c=>c.text==="Ahmed Yasser Ali");
+  assert.equal(credit.length,1);
+  assert.match(credit[0].font,/^400 18px /);
+  assert.equal(credit[0].x,370);
+  assert.ok(credit[0].x+(credit[0].maxWidth??0)<735);
+  assert.ok(calls.some(c=>c.text==="OWNER REF"));
+  assert.ok(calls.some(c=>c.text==="REFERENCE ONLY / NOT FOR LOADING"));
+ }finally{document.createElement=original;texture?.dispose();}
 });
