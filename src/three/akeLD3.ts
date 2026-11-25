@@ -816,7 +816,10 @@ export function createAKEContainer(
       cam.position.set(0.032, hy, -0.015);
       spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
-      handle.position.set(0.009, hy - 0.045, 0.023);
+      // Mirror the lever offset with the spindle's release direction.
+      // The folded lever stays inside the depth envelope and clears the
+      // leaf face through the sampled release sequence.
+      handle.position.set(latchSpindles.length === 1 ? -0.009 : 0.009, hy - 0.045, 0.006);
       handle.rotation.x = -0.1;
       spindle.add(handle);
     }
