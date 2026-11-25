@@ -21,5 +21,9 @@ test("inspection fill only increases after door release and is absent on pallets
   assert.ok(inspectionFill(.5,false,false,false)>0);
   assert.ok(inspectionFill(1,false,false,false)>inspectionFill(.5,false,false,false));
   assert.equal(inspectionFill(1,true,true,false),0);
-  assert.equal(inspectionFill(0,true,false,false),1.35);
+  assert.equal(inspectionFill(0,true,false,false),.65);
+  for(const fabric of [false,true])for(let i=0;i<=100;i++){
+    const fill=inspectionFill(i/100,false,false,fabric);
+    assert.ok(fill>=0&&fill<=.65);
+  }
 });
