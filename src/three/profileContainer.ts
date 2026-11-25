@@ -441,7 +441,11 @@ export function createProfileContainer(
   // hinge. Knuckles still follow the leaf's left edge chain.
   const doorPivot = tag(new THREE.Group(), "Door pivot");
   const HINGE_X = Math.min(...leafPoly.map((p) => p.x)) + 0.004;
-  const HINGE_Z = BL / 2 - END_FRAME * 0.5;
+  // These illustrated profiles require additional front-frame clearance
+  // during the sampled large-angle swing. Preserve the closed leaf pose.
+  const clearanceProfiles = ["DQF", "AKH", "ALF", "AMA", "AMD", "AGA"];
+  const HINGE_Z = BL / 2 - END_FRAME * 0.5
+    + (clearanceProfiles.includes(cfg.code) ? 0.010 : 0);
   doorPivot.position.set(HINGE_X, 0, HINGE_Z);
   A_DOOR.group.add(doorPivot);
   const px = (x: number) => x - HINGE_X;

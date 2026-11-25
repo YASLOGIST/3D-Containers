@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
+import { worldFaces, hasSurfaceCrossing } from "./meshSurfaceIntersection.ts";
+import { rigidDoorPose } from "../src/three/doorKinematics.ts";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { geometryOnlyExportScene } from "../src/three/geometryExport.ts";
 
@@ -13,77 +15,7 @@ import type {
 import { makeBrushedMetal, makeInServicePatina } from "../src/three/textures.ts";
 import { addAirCargoOperatorMark, AIR_MARK_NAME } from "../src/three/airServiceBrand.ts";
 
-type FakeCanvas = {
-  width: number;
-  height: number;
-  getContext: (type: string) => CanvasRenderingContext2D;
-};
-
-const gradient = { addColorStop() {} };
-
-function fakeContext(canvas: FakeCanvas): CanvasRenderingContext2D {
-  return {
-    canvas,
-    createLinearGradient: () => gradient,
-    createRadialGradient: () => gradient,
-    measureText: (text: string) => ({ width: text.length * 20 }) as TextMetrics,
-    createImageData: (w: number, h: number) =>
-      ({
-        width: w,
-        height: h,
-        data: new Uint8ClampedArray(w * h * 4),
-      }) as ImageData,
-    getImageData: (_x: number, _y: number, w: number, h: number) =>
-      ({
-        width: w,
-        height: h,
-        data: new Uint8ClampedArray(w * h * 4).fill(128),
-      }) as ImageData,
-    putImageData() {},
-    clearRect() {},
-    fillRect() {},
-    strokeRect() {},
-    beginPath() {},
-    closePath() {},
-    rect() {},
-    roundRect() {},
-    arc() {},
-    moveTo() {},
-    lineTo() {},
-    quadraticCurveTo() {},
-    fill() {},
-    stroke() {},
-    fillText() {},
-    strokeText() {},
-    save() {},
-    restore() {},
-    clip() {},
-    setLineDash() {},
-    translate() {},
-    rotate() {},
-    scale() {},
-  } as unknown as CanvasRenderingContext2D;
-}
-
-const fakeDocument = {
-  createElement(tag: string) {
-    if (tag !== "canvas") throw new Error(`Unexpected element: ${tag}`);
-    const canvas: FakeCanvas = {
-      width: 1,
-      height: 1,
-      getContext: () => fakeContext(canvas),
-    };
-    return canvas;
-  },
-  createElementNS(_ns: string, tag: string) {
-    return this.createElement(tag);
-  },
-};
-
-Object.defineProperty(globalThis, "document", {
-  value: fakeDocument,
-  configurable: true,
-});
+import "./headlessCanvas.ts";
 
 const options: ViewerOptions = {
   contour: true,
@@ -546,6 +478,90 @@ test("RKN/RAP exported binary STL meshes are edge-closed without duplicate rail 
     }
     const bad = [...edges.values()].filter(n => n !== 2).length;
     assert.equal(bad, 0, id + " export has open or over-subscribed triangle edges");
+    built.dispose();
+  }
+});
+
+
+test("reefer latch release precedes the actual door swing and agrees with initial pose", () => {
+  for (const id of ["rkn", "rap"] as const) {
+    const built = MODELS[id].build({ ...options, doorOpen: 0 });
+    const pivot = built.group.getObjectByName("Door pivot")!;
+    assert.ok(pivot);
+    const spindles = pivot.children.filter(obj => obj.name === "Articulated cam latch spindle");
+    assert.equal(spindles.length, id === "rkn" ? 2 : 4);
+    for (const t of [0, 0.09, 0.18, 0.5, 1, 0.18, 0]) {
+      built.setDoorOpen(t);
+      const expected = rigidDoorPose(t, THREE.MathUtils.degToRad(112));
+      assert.ok(Math.abs(pivot.rotation.y + expected.swingRadians) < 1e-10);
+      for (const [i, spindle] of spindles.entries()) {
+        assert.ok(Math.abs(spindle.rotation.y - (i % 2 === 0 ? 1 : -1) * expected.latchRadians) < 1e-10);
+      }
+      if (t <= 0.18) assert.equal(Math.abs(pivot.rotation.y), 0);
+    }
+    built.dispose();
+    const initial = MODELS[id].build({ ...options, doorOpen: 0.5 });
+    const initialPivot = initial.group.getObjectByName("Door pivot")!;
+    assert.ok(Math.abs(initialPivot.rotation.y + rigidDoorPose(0.5, THREE.MathUtils.degToRad(112)).swingRadians) < 1e-10);
+    initial.dispose();
+  }
+});
+
+test("surface-crossing diagnostic rejects a known crossing and accepts separated triangles", () => {
+  function triangle(points: number[]) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+    const mesh = new THREE.Mesh(geometry);
+    mesh.updateMatrixWorld(true);
+    const faces = worldFaces(mesh);
+    geometry.dispose();
+    return faces;
+  }
+  const a = triangle([0,0,0, 1,0,0, 0,1,0]);
+  assert.ok(hasSurfaceCrossing(a, triangle([0.2,0.2,-1, 0.2,0.2,1, 0.3,0.2,1])));
+  assert.equal(hasSurfaceCrossing(a, triangle([0.2,0.2,2, 0.2,0.2,3, 0.3,0.2,3])), false);
+});
+
+test("rigid doors and reefer housings do not cross selected frame surfaces at sampled poses", () => {
+  const poses = [0, 0.09, 0.18, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+    0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
+  for (const id of Object.keys(MODELS) as ModelId[]) {
+    if (MODELS[id].palletOption) continue;
+    const built = MODELS[id].build({ ...options, detail: true, rivets: true, doorOpen: 0, load: 0 });
+    built.group.updateMatrixWorld(true);
+    const pivot = built.group.getObjectByName("Door pivot")!;
+    const moving: THREE.Mesh[] = [];
+    pivot.traverse(obj => {
+      if (obj instanceof THREE.Mesh &&
+        ["Door leaf", "Reefer housing", "Climate unit housing", "Reefer bezel", "Climate unit bezel"].includes(obj.name)) moving.push(obj);
+    });
+    assert.ok(moving.length > 0, id + " missing moving geometry");
+    const fixed: { name: string; bounds: THREE.Box3; faces: ReturnType<typeof worldFaces> }[] = [];
+    built.group.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh) || obj instanceof THREE.InstancedMesh) return;
+      for (let parent: THREE.Object3D | null = obj; parent; parent = parent.parent) {
+        if (parent === pivot) return;
+      }
+      if (obj.name === "Door end frame" || obj.name.startsWith("Hull —")
+        || obj.name.startsWith("Corner extrusion") || obj.name.startsWith("Edge extrusion")) {
+        fixed.push({ name: obj.name, bounds: new THREE.Box3().setFromObject(obj), faces: worldFaces(obj) });
+      }
+    });
+    assert.ok(fixed.some(part => part.name === "Door end frame"), id + " missing fixed frame");
+    for (const t of poses) {
+      built.setDoorOpen(t);
+      built.group.updateMatrixWorld(true);
+      for (const obj of moving) {
+        const box = new THREE.Box3().setFromObject(obj);
+        let faces: ReturnType<typeof worldFaces> | undefined;
+        for (const part of fixed) {
+          if (!box.intersectsBox(part.bounds)) continue;
+          faces ??= worldFaces(obj);
+          assert.equal(hasSurfaceCrossing(faces, part.faces), false,
+            id + " at " + t + ": " + obj.name + " crosses " + part.name);
+        }
+      }
+    }
     built.dispose();
   }
 });

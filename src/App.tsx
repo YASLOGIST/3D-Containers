@@ -670,7 +670,10 @@ export default function App() {
           data.byteOffset + data.byteLength,
         ) as ArrayBuffer;
         downloadBlob(new Blob([buffer], { type: "model/stl" }), `${stamp}.stl`);
-        notify(`STL mesh · not print-certified · ${(data.byteLength / 1024).toFixed(0)} KB`);
+        const surfaceWarning = state.model === "ake" && state.akeDoor === "fabric"
+          ? "STL · open textile surfaces"
+          : "STL mesh · not print-certified";
+        notify(`${surfaceWarning} · ${(data.byteLength / 1024).toFixed(0)} KB`);
       }
     } catch (cause) {
       notify(
@@ -1079,7 +1082,9 @@ export default function App() {
           <Btn
             onClick={() => doExport("stl")}
             disabled={!ready || !!error || exporting}
-            title="Binary STL · metre coordinates · preview geometry only; not verified manifold or print-ready"
+            title={state.model === "ake" && state.akeDoor === "fabric"
+              ? "Binary STL · open textile curtain and straps · not a solid or print-ready"
+              : "Binary STL · metre coordinates · preview geometry only; not verified manifold or print-ready"}
             className="hidden sm:inline-flex"
           >
             <DlIcon /> stl

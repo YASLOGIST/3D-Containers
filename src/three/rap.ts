@@ -24,6 +24,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { rigidDoorPose } from "./doorKinematics";
 import {
   makeCondenserGrille,
   makeIdPlate,
@@ -751,7 +752,11 @@ export function createRAPContainer(
   /* --- 5.9 door assembly: pivot, leaf, gasket, four cam latches --------- */
   const doorPivot = tag(new THREE.Group(), "Door pivot");
   const HINGE_X = X0 + FRAME_W - 0.01; // pin axis, just inside the frame lip
-  const HINGE_Z = D / 2 - END_FRAME * 0.5;
+  // Offset the illustrative axis outward within the front-frame envelope.
+  // The leaf and its hardware keep their original closed-world positions.
+  // A sampled surface-intersection sweep found the recessed axis clipped
+  // the end frame at large swing angles.
+  const HINGE_Z = D / 2 - END_FRAME * 0.5 + 0.015;
   doorPivot.position.set(HINGE_X, 0, HINGE_Z);
   A_DOOR.group.add(doorPivot);
   const px = (x: number) => x - HINGE_X; // world X → pivot-local X
@@ -802,7 +807,9 @@ export function createRAPContainer(
     { depth: 0.02, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.022);
-  doorPivot.add(mesh(sealGeo, mat.dark, "Door gasket", false));
+  const sealMesh = mesh(sealGeo, mat.dark, "Door gasket", false);
+  doorPivot.add(sealMesh);
+  const latchSpindles: THREE.Group[] = [];
 
   // four cam latch rods with fold-flat handles, clear of the climate unit
   for (const rx of [
@@ -812,13 +819,18 @@ export function createRAPContainer(
     X0 + W - 0.12,
   ]) {
     const rodLen = H - CHASSIS - 0.24;
+    const spindle = new THREE.Group();
+    spindle.name = "Articulated cam latch spindle";
+    spindle.position.set(px(rx), 0, FACE + 0.015);
+    doorPivot.add(spindle);
+    latchSpindles.push(spindle);
     const rod = mesh(
       new THREE.CylinderGeometry(0.014, 0.014, rodLen, 14),
       mat.steel,
       "Cam latch rod",
     );
-    rod.position.set(px(rx), CHASSIS + rodLen / 2 + 0.12, FACE + 0.015);
-    doorPivot.add(rod);
+    rod.position.set(0, CHASSIS + rodLen / 2 + 0.12, 0);
+    spindle.add(rod);
 
     for (const hy of [
       CHASSIS + 0.24,
@@ -826,12 +838,12 @@ export function createRAPContainer(
       H - 0.24,
     ]) {
       const hub = box(mat.steel, 0.055, 0.058, 0.046, "Latch hub", 0.012);
-      hub.position.set(px(rx), hy, FACE + 0.015);
-      doorPivot.add(hub);
+      hub.position.set(0, hy, 0);
+      spindle.add(hub);
       const handle = box(mat.accent, 0.034, 0.16, 0.02, "Latch handle", 0.009);
-      handle.position.set(px(rx) + 0.01, hy - 0.052, FACE + 0.019);
+      handle.position.set(0.01, hy - 0.052, 0.004);
       handle.rotation.x = -0.1;
-      doorPivot.add(handle);
+      spindle.add(handle);
     }
   }
 
@@ -899,7 +911,12 @@ export function createRAPContainer(
   const unitW = 1.95;
   const unitH = 1.2;
   const unitCx = 0; // centred on the front panel
-  const unitCy = CHASSIS + (H - CHASSIS) * 0.53;
+  // Keep the entire bezel below the inner top frame, preserving its
+  // dimensions. The former centre placed its top flange inside the frame.
+  const unitCy = Math.min(
+    CHASSIS + (H - CHASSIS) * 0.53,
+    H - FRAME_W - 0.010 - (unitH + 0.08) / 2,
+  );
   const at = (ux: number, uy: number, z: number) =>
     new THREE.Vector3(px(unitCx + ux), unitCy + uy, z);
 
@@ -1168,7 +1185,17 @@ export function createRAPContainer(
   };
   setReefer(reeferOn);
   panelTex.setSetpoint(o.setpoint);
-  doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  // Match the shared control deck: release the visible latch hardware
+  // before swinging the leaf. Representative animation, not force analysis.
+  const setRigidPose = (progress: number) => {
+    const pose = rigidDoorPose(progress, MAX_DOOR);
+    latchSpindles.forEach((spindle, i) => {
+      spindle.rotation.y = (i % 2 === 0 ? 1 : -1) * pose.latchRadians;
+    });
+    doorPivot.rotation.y = -pose.swingRadians;
+    sealMesh.position.z = -0.002 * (1 - pose.engagement);
+  };
+  setRigidPose(o.doorOpen);
 
   /* --- 5.13 stats ------------------------------------------------------- */
   let triangles = 0;
@@ -1226,7 +1253,7 @@ export function createRAPContainer(
       }
     },
     setDoorOpen(t: number) {
-      doorPivot.rotation.y = -THREE.MathUtils.clamp(t, 0, 1) * MAX_DOOR;
+      setRigidPose(t);
     },
     setReefer,
     setSetpoint(celsius: number) {

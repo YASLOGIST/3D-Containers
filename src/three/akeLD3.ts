@@ -718,7 +718,11 @@ export function createAKEContainer(
   /* --- 7.9 door assembly: pivot, leaf, gasket, cam latches, hinges ----- */
   const doorPivot = tag(new THREE.Group(), "Door pivot");
   const HINGE_X = X0 + FRAME_W - 0.008; // pin axis, just inside the frame lip
-  const HINGE_Z = BL / 2 - END_FRAME * 0.5;
+  // Offset the illustrative axis outward within the front-frame envelope.
+  // The leaf and its hardware keep their original closed-world positions.
+  // A sampled surface-intersection sweep found the recessed axis clipped
+  // the end frame at large swing angles.
+  const HINGE_Z = BL / 2 - END_FRAME * 0.5 + 0.010;
   doorPivot.position.set(HINGE_X, 0, HINGE_Z);
   A_DOOR.group.add(doorPivot);
   const px = (x: number) => x - HINGE_X; // world X → pivot-local X

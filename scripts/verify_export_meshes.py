@@ -32,8 +32,6 @@ def matrix(node):
  if "matrix" in node:
   v=node["matrix"];return tuple(v[c*4+r] for r in range(4) for c in range(4))
  return trs(node.get("translation",(0,0,0)),node.get("rotation",(0,0,0,1)),node.get("scale",(1,1,1)))
-def corners(lo,hi):
- for i in range(8):yield tuple(hi[j] if (i>>j)&1 else lo[j] for j in range(3))
 def obj(path):
  b=mm();vert=0;face=0
  with path.open(encoding="utf-8") as f:
@@ -81,10 +79,10 @@ def glb(path):
    ai=prim.get("attributes",{}).get("POSITION")
    if ai is None:continue
    a=accessors[ai]
-   if "min" in a and "max" in a:
-    for c in corners(a["min"],a["max"]):extend(box,transform(world,c))
-   else:
-    for i in range(a["count"]):extend(box,transform(world,read_accessor(ai,i)))
+   # Transform actual vertices, not the eight corners of a local AABB.
+   # A rotated rounded or triangular mesh need not occupy those corners.
+   # Using the corners inflates its world bounds in articulated poses.
+   for i in range(a["count"]):extend(box,transform(world,read_accessor(ai,i)))
  box=mm()
  nodes=meta["nodes"]
  countNodes=0;instanced=0
