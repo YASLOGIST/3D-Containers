@@ -22,6 +22,10 @@ export function buildAKEAxialLatchPrototype(detail = true) {
     const pins: {mesh: THREE.Mesh; closedY: number; direction: number; spindle: THREE.Object3D; hand: 1|-1}[]=[];
     const followers: THREE.Mesh[]=[];
     const antiRotationGuides: THREE.Mesh[]=[];
+    const guideMounts: THREE.Mesh[]=[];
+    const leaf=pivot.getObjectByName("Door leaf") as THREE.Mesh;
+    leaf.geometry.computeBoundingBox();
+    const leafFace=leaf.geometry.boundingBox!.max.z;
     const receivers: THREE.Mesh[]=[];
     const guides: THREE.Mesh[]=[];
     const section=(outer:number,inner:number,half:number)=>new THREE.LatheGeometry([
@@ -61,6 +65,14 @@ export function buildAKEAxialLatchPrototype(detail = true) {
         const channel=mesh(antiRotationGeometry,model.materials.steel,"Prototype anti-rotation channel");
         channel.position.set(s.position.x,top?1.499:.211,s.position.z);
         pivot.add(channel);antiRotationGuides.push(channel);
+        // Representative mounting tabs, not fastened or load-rated joints.
+        const back=leafFace+.000001,front=channel.position.z-.003;
+        if(front<=back)throw new Error("Invalid guide mount depth");
+        for(const end of [-1,1]){
+          const tab=mesh(new THREE.BoxGeometry(.005,.006,front-back),model.materials.steel,"Prototype guide mount");
+          tab.position.set(channel.position.x+.017,channel.position.y+end*.014,(back+front)/2);
+          pivot.add(tab);guideMounts.push(tab);
+        }
         pins.push({mesh:bolt,closedY,direction:top?-1:1,spindle:s,hand});
       }
     }
@@ -72,6 +84,6 @@ export function buildAKEAxialLatchPrototype(detail = true) {
     // The research adapter and its underlying model share one motion entry point.
     model.setDoorOpen=setDoorOpen;
     setDoorOpen(0);
-    return {model, guides, pins, receivers, followers, antiRotationGuides, originalKeepers:keepers, setDoorOpen};
+    return {model, guides, pins, receivers, followers, antiRotationGuides, guideMounts, originalKeepers:keepers, setDoorOpen};
   }catch(error){model.dispose();throw error;}
 }

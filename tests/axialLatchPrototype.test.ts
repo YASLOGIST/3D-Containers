@@ -185,3 +185,41 @@ test("door-local U-channels constrain the follower while allowing the complete a
   }
  }finally{a.model.dispose();}
 });
+
+test("representative guide tabs seat at the leaf and clear unrelated mesh surfaces",()=>{
+ const a=buildAKEAxialLatchPrototype();
+ try{
+  assert.equal(a.guideMounts.length,8);
+  const pivot=a.model.doorPivot!,leaf=pivot.getObjectByName("Door leaf") as THREE.Mesh;
+  const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+  try{
+   const probe=new THREE.Mesh(leaf.geometry,material);
+   const ray=new THREE.Raycaster(),targets:THREE.Mesh[]=[];
+   a.model.group.traverse(o=>{if(o instanceof THREE.Mesh&&o.visible&&!o.userData.visualOnlyDecal&&!a.guideMounts.includes(o))targets.push(o);});
+   a.model.group.updateMatrixWorld(true);probe.matrixWorld.copy(leaf.matrixWorld);
+   let seats=0,checks=0;
+   for(const tab of a.guideMounts){
+    assert.equal(tab.parent,pivot);
+    tab.geometry.computeBoundingBox();
+    const box=tab.geometry.boundingBox!;
+    for(const x of [box.min.x,0,box.max.x])for(const y of [box.min.y,0,box.max.y]){
+     const p=tab.localToWorld(new THREE.Vector3(x,y,box.min.z));
+     ray.set(p,new THREE.Vector3(0,0,-1));
+     const hit=ray.intersectObject(probe,false)[0];
+     assert.ok(hit&&hit.distance<.000002,"illustrative leaf seat");
+     seats++;
+    }
+   }
+   for(const pose of poses){
+    a.setDoorOpen(pose);a.model.group.updateMatrixWorld(true);
+    for(const [i,tab] of a.guideMounts.entries()){
+     const channel=a.antiRotationGuides[Math.floor(i/2)];
+     assert.ok(crossing(tab,channel),"intended assembly join");
+     for(const target of targets)if(target!==channel)assert.equal(crossing(tab,target),false,pose+" "+target.name);
+     checks++;
+    }
+   }
+   assert.equal(seats,72);assert.equal(checks,144);
+  }finally{material.dispose();}
+ }finally{a.model.dispose();}
+});
