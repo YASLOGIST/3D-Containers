@@ -95,6 +95,41 @@ function makeWebbingMap(): THREE.Texture {
   });
 }
 
+/**
+ * Representative two-slot webbing fitting. The original 67 x 58 x 12 mm
+ * envelope and existing attachment pose are retained. Slots reveal the
+ * strap behind the fitting; this is not a threaded restraint or cam solver.
+ */
+export function makeWebbingBuckleGeometry(): THREE.BufferGeometry {
+  const outline = new THREE.Shape();
+  function chamferedRectangle(path: THREE.Path, width: number, height: number,
+    cy: number, chamfer: number) {
+    const x = width / 2, y = height / 2;
+    path.moveTo(-x + chamfer, cy - y);
+    path.lineTo(x - chamfer, cy - y);
+    path.lineTo(x, cy - y + chamfer);
+    path.lineTo(x, cy + y - chamfer);
+    path.lineTo(x - chamfer, cy + y);
+    path.lineTo(-x + chamfer, cy + y);
+    path.lineTo(-x, cy + y - chamfer);
+    path.lineTo(-x, cy - y + chamfer);
+    path.closePath();
+  }
+  chamferedRectangle(outline, .065, .056, 0, .004);
+  for (const y of [-.013, .013]) {
+    const slot = new THREE.Path();
+    chamferedRectangle(slot, .049, .014, y, .002);
+    outline.holes.push(slot);
+  }
+  const geometry = new THREE.ExtrudeGeometry(outline, {
+    depth: .010, steps: 1, bevelEnabled: true, bevelThickness: .001,
+    bevelSize: .001, bevelSegments: 1, curveSegments: 1,
+  });
+  geometry.translate(0, 0, -.005);
+  geometry.computeBoundingBox();
+  return geometry;
+}
+
 export interface FabricDoorOptions {
   profile: readonly V2[];
   openingBottom: number;
@@ -196,9 +231,12 @@ export function createAKEFabricDoor(o: FabricDoorOptions): FabricDoor {
 
   const buckles: THREE.Mesh[] = [];
   if (o.detailed) {
+    const fittingGeometry = makeWebbingBuckleGeometry();
     for (const u of [0.25, 0.75]) {
-      const buckle = box(buckleMaterial, 0.067, 0.058, 0.012,
-        "AKE fabric strap cam buckle - illustration", 0.01);
+      const buckle = new THREE.Mesh(fittingGeometry, buckleMaterial);
+      buckle.name = "AKE fabric strap buckle - representative two-slot fitting";
+      buckle.castShadow = true;
+      buckle.receiveShadow = true;
       group.add(buckle);
       buckle.userData.u = u;
       buckles.push(buckle);
