@@ -530,8 +530,19 @@ export function createAKEContainer(
   const castingGeometry = makeAKEBasePlate(
     .18, .18, CHASSIS + .006, .022, [{x:0,z:0,radius:.038}],
   );
+  // Normalize the existing geometry's local XZ footprint for a
+  // contact-centred cosmetic map. Positions and topology stay untouched.
+  const castingPosition = castingGeometry.getAttribute("position");
+  const castingUV = castingGeometry.getAttribute("uv");
+  for (let i = 0; i < castingPosition.count; i++) {
+    castingUV.setXY(i, .5 + castingPosition.getX(i) / .18,
+      .5 + castingPosition.getZ(i) / .18);
+  }
+  castingUV.needsUpdate = true;
+  const castingMaterial = mat.alloy.clone();
+  castingMaterial.userData = { ...castingMaterial.userData, mechanicalSurface: "casting" };
   for (const a of apertureCentres) {
-    const c = mesh(castingGeometry, mat.alloy, "Corner casting");
+    const c = mesh(castingGeometry, castingMaterial, "Corner casting");
     c.position.set(X0 + BW / 2 + a.x, (CHASSIS + .006) / 2, a.z);
     A_BASE.group.add(c);
   }
