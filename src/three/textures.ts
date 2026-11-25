@@ -42,35 +42,23 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
   let pair = brushedSources.get(key);
   if (!pair) {
     const rand = seededRandom(0xa11ce ^ size ^ Math.round(strength * 1000));
-    const { c, ctx } = canvas2d(size, size);
+    const { ctx } = canvas2d(size, size);
 
-    // base grey (mid roughness)
+    // Fine rolling marks rather than thick, full-width grooves.
+    // The height source is separate from the calibrated roughness map:
+    // darker height values must not automatically become polished metal.
     ctx.fillStyle = "#b9b9b9";
     ctx.fillRect(0, 0, size, size);
-
-    // coarse grain
-    for (let i = 0; i < 2600; i++) {
+    for (let i = 0; i < size * 6; i++) {
       const y = rand() * size;
-      const len = 40 + rand() * size * 0.8;
-      const x = rand() * size - len * 0.5;
-      const v = 120 + Math.floor(rand() * 90);
-      ctx.strokeStyle = `rgba(${v},${v},${v},${0.05 + rand() * 0.14})`;
-      ctx.lineWidth = rand() < 0.85 ? 1 : 2;
+      const len = (3 + rand() * 90) * size / 1024;
+      const x = rand() * size;
+      const v = rand() < 0.5 ? 90 : 235;
+      ctx.strokeStyle = "rgba("+v+","+v+","+v+","+(0.05+rand()*0.13)+")";
+      ctx.lineWidth = 0.55 + rand()*0.75;
       ctx.beginPath();
       ctx.moveTo(x, y);
-      ctx.lineTo(x + len, y + (rand() - 0.5) * 1.4);
-      ctx.stroke();
-    }
-
-    // long sweeping passes
-    for (let i = 0; i < 90; i++) {
-      const y = rand() * size;
-      const v = rand() < 0.5 ? 60 : 190;
-      ctx.strokeStyle = `rgba(${v},${v},${v},0.05)`;
-      ctx.lineWidth = 1 + rand() * 3;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(size, y + (rand() - 0.5) * 3);
+      ctx.lineTo(x + len, y + (rand() - 0.5)*0.6);
       ctx.stroke();
     }
 
@@ -95,7 +83,19 @@ export function makeBrushedMetal(size = 1024, strength = 1) {
     }
     nctx.putImageData(out, 0, 0);
 
-    pair = { roughnessMap: toTexture(c), normalMap: toTexture(nc) };
+    const { c: rc, ctx: rctx } = canvas2d(size, size);
+    // Map multiplier stays near one; the finish slider controls the
+    // nominal roughness. Low-frequency rolling variation is restrained.
+    rctx.fillStyle = "#ebebeb";
+    rctx.fillRect(0, 0, size, size);
+    for (let i=0; i<60; i++) {
+      const x=rand()*size, y=rand()*size, radius=size*(0.035+rand()*0.16);
+      const g=rctx.createRadialGradient(x,y,0,x,y,radius);
+      g.addColorStop(0, rand()<.5?"rgba(155,155,155,.055)":"rgba(255,255,255,.05)");
+      g.addColorStop(1,"rgba(235,235,235,0)");
+      rctx.fillStyle=g; rctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+    }
+    pair = { roughnessMap: toTexture(rc), normalMap: toTexture(nc) };
     brushedSources.set(key, pair);
   }
 
@@ -184,6 +184,16 @@ export function makeInServicePatina(size = 1024): THREE.Texture {
     const { c, ctx } = canvas2d(size, size);
     ctx.fillStyle = "#f8f8f7";
     ctx.fillRect(0, 0, size, size);
+
+    // Sparse handling haze and oxidation-like tonal variation. These are
+    // cosmetic procedural cues, not evidence of real corrosion or defects.
+    for (let i=0;i<22;i++) {
+      const x=rand()*size,y=rand()*size,r=size*(.025+rand()*.095);
+      const g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,"rgba(99,104,109,.026)");
+      g.addColorStop(1,"rgba(99,104,109,0)");
+      ctx.fillStyle=g;ctx.fillRect(x-r,y-r,2*r,2*r);
+    }
 
     // Grouped contact marks rather than full-field isotropic random dirt.
     for (let cluster = 0; cluster < 32; cluster++) {
@@ -444,7 +454,7 @@ export function makeSpeckle(size = 512) {
   return cachedTexture(key, () => {
     const rand = seededRandom(0x5ec1e);
     const { c, ctx } = canvas2d(size, size);
-    ctx.fillStyle = "#191c1f";
+    ctx.fillStyle = "#34383b";
     ctx.fillRect(0, 0, size, size);
     for (let i = 0; i < 26000; i++) {
       const v = rand() * 60;
