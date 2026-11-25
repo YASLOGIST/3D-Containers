@@ -28,6 +28,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { rigidDoorPose } from "./doorKinematics";
 import {
   makeCondenserGrille,
   makeIdPlate,
@@ -735,7 +736,11 @@ export function createRKNContainer(
   /* --- 5.9 door assembly: pivot, leaf, gasket, cam latches, hinges ------ */
   const doorPivot = tag(new THREE.Group(), "Door pivot");
   const HINGE_X = X0 + FRAME_W - 0.008; // pin axis, just inside the frame lip
-  const HINGE_Z = D / 2 - END_FRAME * 0.5;
+  // Offset the illustrative axis outward within the front-frame envelope.
+  // The leaf and its hardware keep their original closed-world positions.
+  // A sampled surface-intersection sweep found the recessed axis clipped
+  // the end frame at large swing angles.
+  const HINGE_Z = D / 2 - END_FRAME * 0.5 + 0.010;
   doorPivot.position.set(HINGE_X, 0, HINGE_Z);
   A_DOOR.group.add(doorPivot);
   const px = (x: number) => x - HINGE_X; // world X → pivot-local X
@@ -781,28 +786,35 @@ export function createRKNContainer(
     { depth: 0.016, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.017);
-  doorPivot.add(mesh(sealGeo, mat.dark, "Door gasket", false));
+  const sealMesh = mesh(sealGeo, mat.dark, "Door gasket", false);
+  doorPivot.add(sealMesh);
+  const latchSpindles: THREE.Group[] = [];
 
   // cam latch rods with fold-flat handles
   for (const rx of [X0 + FRAME_W + 0.06, X0 + W - 0.1]) {
     const rodLen = H - CHASSIS - 0.2;
+    const spindle = new THREE.Group();
+    spindle.name = "Articulated cam latch spindle";
+    spindle.position.set(px(rx), 0, FACE + 0.013);
+    doorPivot.add(spindle);
+    latchSpindles.push(spindle);
     const rod = mesh(
       new THREE.CylinderGeometry(0.012, 0.012, rodLen, 14),
       mat.steel,
       "Cam latch rod",
     );
-    rod.position.set(px(rx), CHASSIS + rodLen / 2 + 0.1, FACE + 0.013);
-    doorPivot.add(rod);
+    rod.position.set(0, CHASSIS + rodLen / 2 + 0.1, 0);
+    spindle.add(rod);
 
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
       const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
-      hub.position.set(px(rx), hy, FACE + 0.013);
-      doorPivot.add(hub);
+      hub.position.set(0, hy, 0);
+      spindle.add(hub);
       // fold-flat lever, kept inside the frame rebate
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
-      handle.position.set(px(rx) + 0.009, hy - 0.045, FACE + 0.017);
+      handle.position.set(0.009, hy - 0.045, 0.004);
       handle.rotation.x = -0.1;
-      doorPivot.add(handle);
+      spindle.add(handle);
     }
   }
 
@@ -1128,7 +1140,17 @@ export function createRKNContainer(
   setReefer(reeferOn);
   panelTex.setSetpoint(o.setpoint);
 
-  doorPivot.rotation.y = -o.doorOpen * MAX_DOOR;
+  // Match the shared control deck: release the visible latch hardware
+  // before swinging the leaf. Representative animation, not force analysis.
+  const setRigidPose = (progress: number) => {
+    const pose = rigidDoorPose(progress, MAX_DOOR);
+    latchSpindles.forEach((spindle, i) => {
+      spindle.rotation.y = (i % 2 === 0 ? 1 : -1) * pose.latchRadians;
+    });
+    doorPivot.rotation.y = -pose.swingRadians;
+    sealMesh.position.z = -0.002 * (1 - pose.engagement);
+  };
+  setRigidPose(o.doorOpen);
 
   /* --- 5.13 stats ------------------------------------------------------- */
   let triangles = 0;
@@ -1184,7 +1206,7 @@ export function createRKNContainer(
       mat.shell.needsUpdate = true;
     },
     setDoorOpen(t: number) {
-      doorPivot.rotation.y = -THREE.MathUtils.clamp(t, 0, 1) * MAX_DOOR;
+      setRigidPose(t);
     },
     setReefer,
     setSetpoint(celsius: number) {
