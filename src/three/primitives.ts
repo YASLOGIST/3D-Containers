@@ -500,7 +500,13 @@ export interface BaseMaterials {
  */
 export function createBaseMaterials(finish: FinishId): BaseMaterials {
   const isPainted = finish === "cargo" || finish === "airline";
-  const surface = isPainted ? makeCoatedPanel(1024) : makeBrushedMetal(1024, 1);
+  const isBlasted = finish === "titanium";
+  const surface = isPainted || isBlasted ? makeCoatedPanel(1024) : makeBrushedMetal(1024, 1);
+  // Shared, small hardware microfinish: the three metallic hardware
+  // materials reference the same two textures, not three separate rasters.
+  const hardware = makeBrushedMetal(256, 0.65);
+  hardware.roughnessMap.repeat.set(1.5, 1.5);
+  hardware.normalMap.repeat.set(1.5, 1.5);
   surface.roughnessMap.repeat.set(2.5, 2.5);
   surface.normalMap.repeat.set(2.5, 2.5);
   const speckle = makeSpeckle(512);
@@ -514,7 +520,7 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       roughness: f.roughness,
       roughnessMap: surface.roughnessMap,
       normalMap: surface.normalMap,
-      normalScale: new THREE.Vector2(isPainted ? 0.18 : 0.32, isPainted ? 0.18 : 0.32),
+      normalScale: new THREE.Vector2(isPainted || isBlasted ? 0.22 : 0.34, isPainted || isBlasted ? 0.22 : 0.34),
       clearcoat: f.clearcoat,
       clearcoatRoughness: f.clearcoatRoughness,
       envMapIntensity: 0.85,
@@ -529,19 +535,25 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
     alloy: new THREE.MeshStandardMaterial({
       color: "#aeb9c2",
       metalness: 1.0,
-      roughness: 0.36,
+      roughness: 0.42,
+      roughnessMap: hardware.roughnessMap,
+      normalMap: hardware.normalMap,
+      normalScale: new THREE.Vector2(0.18,0.18),
       envMapIntensity: 0.85,
     }),
     steel: new THREE.MeshStandardMaterial({
       color: "#b7bec5",
       metalness: 1.0,
-      roughness: 0.28,
+      roughness: 0.34,
+      roughnessMap: hardware.roughnessMap,
+      normalMap: hardware.normalMap,
+      normalScale: new THREE.Vector2(0.12,0.12),
       envMapIntensity: 0.9,
     }),
     dark: new THREE.MeshStandardMaterial({
-      color: "#1b1f23",
-      metalness: 0.22,
-      roughness: 0.88,
+      color: "#d6d9db",
+      metalness: 0,
+      roughness: 0.91,
       map: speckle,
       envMapIntensity: 0.45,
     }),
@@ -583,8 +595,9 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
     rivet: new THREE.MeshStandardMaterial({
       color: "#d2d8dd",
       metalness: 1.0,
-      roughness: 0.28,
-      envMapIntensity: 1.3,
+      roughness: 0.32,
+      roughnessMap: hardware.roughnessMap,
+      envMapIntensity: 1.05,
     }),
   };
 }
