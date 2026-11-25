@@ -21,6 +21,7 @@ import type { FinishId } from "./primitives";
 import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
+import { contactFootprint, makeContactTexture, inspectionFill, CONTACT_PADDING_M } from "./contactLighting";
 import { formatDistance } from "@/lib/units";
 import { pixelRatioForViewport, stepAdaptiveResolution } from "@/lib/renderQuality";
 
@@ -312,6 +313,7 @@ export class AKEViewer {
   private interior!: THREE.PointLight;
   private floor!: THREE.Mesh;
   private floorMat!: THREE.MeshStandardMaterial;
+  private contactShadow!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
 
   private modelRoot = new THREE.Group();
   /** Carton sandbox is intentionally distinct from ULD geometry and exports. */
@@ -705,7 +707,7 @@ export class AKEViewer {
     this.hemi = new THREE.HemisphereLight(0xbcd6ea, 0x2a2118, m.hemi);
     this.scene.add(this.hemi);
 
-    this.interior = new THREE.PointLight(0xfff0d0, 0.5, 2.6, 2);
+    this.interior = new THREE.PointLight(0xfff4e5, 0, 2.6, 2);
     this.interior.position.set(-0.3, 0.7, 0);
     this.scene.add(this.interior);
   }
@@ -729,6 +731,14 @@ export class AKEViewer {
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
+    this.contactShadow = new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({map:makeContactTexture(), transparent:true,
+        opacity:0.42, depthWrite:false, toneMapped:false}));
+    this.contactShadow.rotation.x=-Math.PI/2;
+    this.contactShadow.position.y=0.002;
+    this.contactShadow.userData.isAnnotation=true;
+    this.contactShadow.name="Illustrative grounding shadow";
+    this.scene.add(this.contactShadow);
   }
 
   private applyMood(id: MoodId, initial = false) {
@@ -819,10 +829,16 @@ export class AKEViewer {
     this.rebuildCompare();
     this.markShadowsDirty();
     this.wake();
-    this.interior.intensity =
-      this.state.section || this.state.door > 0.25 ? 1.7 : 0.5;
+    this.updateInspectionLighting();
 
     const prof = this.container.profile;
+    const footprint = contactFootprint(prof,spec.dims.depth);
+    if(footprint){
+      this.contactShadow.position.x=footprint.centerX;
+      this.contactShadow.scale.set(footprint.width+2*CONTACT_PADDING_M,
+        footprint.depth+2*CONTACT_PADDING_M,1);
+    }
+    this.contactShadow.visible=!!footprint && this.state.explode<0.001 && !this.state.section && !this.state.wireframe;
     const x0 = Math.min(...prof.map((p) => p.x));
     const minY = Math.min(...prof.map((p) => p.y));
     const baseLeft = Math.min(
@@ -1564,8 +1580,14 @@ export class AKEViewer {
     }
     // Opening the door or cutting a section exposes the cavity: raise the
     // interior work-light so wall construction reads clearly inside.
-    this.interior.intensity =
-      this.state.section || this.state.door > 0.25 ? 1.7 : 0.5;
+    this.updateInspectionLighting();
+  }
+
+  private updateInspectionLighting() {
+    const spec=MODELS[this.state.model];
+    this.interior.intensity=inspectionFill(this.displayedDoor,this.state.section,
+      !!spec.palletOption,this.state.model==="ake"&&this.state.akeDoor==="fabric");
+    this.contactShadow.visible=this.state.explode<0.001&&!this.state.section&&!this.state.wireframe;
   }
 
   /** Live metalness / roughness trim on top of the selected finish. */
@@ -1964,6 +1986,7 @@ export class AKEViewer {
       this.displayedDoor = next.position;
       this.doorVelocity = next.velocity;
       this.container?.setDoorOpen(this.displayedDoor);
+      this.updateInspectionLighting();
       this.markShadowsDirty();
       this.sectionBoxCache = null;
     }
@@ -2330,6 +2353,9 @@ export class AKEViewer {
     this.skyBgs.forEach((t) => t.dispose());
     this.skyEnvs.forEach((t) => t.dispose());
     this.roomEnv?.dispose();
+    this.contactShadow.geometry.dispose();
+    this.contactShadow.material.map?.dispose();
+    this.contactShadow.material.dispose();
     this.floor.geometry.dispose();
     this.floorMat.map?.dispose();
     this.floorMat.dispose();
