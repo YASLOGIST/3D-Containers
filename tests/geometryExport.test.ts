@@ -3,7 +3,7 @@ import test from "node:test";
 import * as THREE from "three";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
-import { geometryOnlyExportScene } from "../src/three/geometryExport.ts";
+import { geometryOnlyExportScene, structuralVertexBounds } from "../src/three/geometryExport.ts";
 
 const tolerance = 1e-5;
 
