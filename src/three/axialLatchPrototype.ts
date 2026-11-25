@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { MODELS } from "./models";
 import { mesh } from "./primitives";
 import { axialCamSleeve, camStroke } from "./axialCamTrack";
+import { axialAntiRotationGuideGeometry, AXIAL_GUIDE } from "./axialAntiRotationGuide";
 
 /**
  * Opt-in AKE-only research assembly. Not used by the public viewer.
@@ -20,6 +21,7 @@ export function buildAKEAxialLatchPrototype(detail = true) {
     keepers.forEach(k=>k.visible=false);
     const pins: {mesh: THREE.Mesh; closedY: number; direction: number; spindle: THREE.Object3D; hand: 1|-1}[]=[];
     const followers: THREE.Mesh[]=[];
+    const antiRotationGuides: THREE.Mesh[]=[];
     const receivers: THREE.Mesh[]=[];
     const guides: THREE.Mesh[]=[];
     const section=(outer:number,inner:number,half:number)=>new THREE.LatheGeometry([
@@ -28,7 +30,8 @@ export function buildAKEAxialLatchPrototype(detail = true) {
       new THREE.Vector2(outer,-half)],32);
     const ringGeometry=section(.015,.009,.0015);
     const pinGeometry=new THREE.CylinderGeometry(.007,.007,.032,24);
-    const followerGeometry=new THREE.CylinderGeometry(.001,.001,.005,16);
+    const followerGeometry=new THREE.CylinderGeometry(AXIAL_GUIDE.followerRadius,AXIAL_GUIDE.followerRadius,AXIAL_GUIDE.followerLength,16);
+    const antiRotationGeometry=axialAntiRotationGuideGeometry();
     for(const [i,s] of spindles.entries()){
       if(i===0)s.position.x+=.075;
       for(const part of s.children)
@@ -53,8 +56,11 @@ export function buildAKEAxialLatchPrototype(detail = true) {
         pivot.add(bolt);
         const follower=mesh(followerGeometry,model.materials.latchContact,"Prototype cam follower");
         follower.rotation.z=-Math.PI/2;
-        follower.position.set(.0095,top?-.014:.014,0);
+        follower.position.set(AXIAL_GUIDE.followerCenterX,top?-.014:.014,0);
         bolt.add(follower);followers.push(follower);
+        const channel=mesh(antiRotationGeometry,model.materials.steel,"Prototype anti-rotation channel");
+        channel.position.set(s.position.x,top?1.499:.211,s.position.z);
+        pivot.add(channel);antiRotationGuides.push(channel);
         pins.push({mesh:bolt,closedY,direction:top?-1:1,spindle:s,hand});
       }
     }
@@ -66,6 +72,6 @@ export function buildAKEAxialLatchPrototype(detail = true) {
     // The research adapter and its underlying model share one motion entry point.
     model.setDoorOpen=setDoorOpen;
     setDoorOpen(0);
-    return {model, guides, pins, receivers, followers, originalKeepers:keepers, setDoorOpen};
+    return {model, guides, pins, receivers, followers, antiRotationGuides, originalKeepers:keepers, setDoorOpen};
   }catch(error){model.dispose();throw error;}
 }

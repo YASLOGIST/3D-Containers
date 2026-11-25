@@ -7,6 +7,7 @@ import {geometryOnlyExportScene,structuralVertexBounds} from "../src/three/geome
 import {worldFaces,hasSurfaceCrossing} from "./meshSurfaceIntersection.ts";
 import {rigidDoorPose} from "../src/three/doorKinematics.ts";
 import {camStroke,CAM_ANGLE,CAM_TRAVEL} from "../src/three/axialCamTrack.ts";
+import {AXIAL_GUIDE} from "../src/three/axialAntiRotationGuide.ts";
 
 const poses=[0,.0225,.045,.0675,.09,.1125,.135,.1575,.18,.19,.2,.225,.25,.3,.375,.5,.75,1];
 function crossing(a:THREE.Mesh,b:THREE.Mesh){
@@ -143,4 +144,44 @@ test("mirrored helical slots expose the follower path over 122 forward and rever
   assert.equal(camStroke(-CAM_ANGLE,-1),CAM_TRAVEL);
   assert.equal(camStroke(NaN,1),0);
  }finally{material.dispose();a.model.dispose();}
+});
+
+test("door-local U-channels constrain the follower while allowing the complete axial stroke",()=>{
+ const a=buildAKEAxialLatchPrototype();
+ try{
+  assert.equal(a.antiRotationGuides.length,4);
+  const pivot=a.model.doorPivot!;
+  for(const [i,channel] of a.antiRotationGuides.entries()){
+   assert.equal(channel.parent,pivot,"guide must not rotate with sleeve");
+   assert.equal(a.pins[i].mesh.parent,pivot);
+  }
+  const steps=Array.from({length:61},(_,i)=>.18*i/60);
+  let samples=0;
+  for(const progress of [...steps,...steps.slice().reverse()]){
+   a.model.setDoorOpen(progress);a.model.group.updateMatrixWorld(true);
+   for(const [i,channel] of a.antiRotationGuides.entries()){
+    const follower=a.followers[i];
+    const local=channel.worldToLocal(follower.getWorldPosition(new THREE.Vector3()));
+    assert.ok(Math.abs(local.z)<1e-9);
+    assert.ok(Math.abs(local.y)+AXIAL_GUIDE.followerRadius<AXIAL_GUIDE.length/2);
+    assert.ok(local.x+AXIAL_GUIDE.followerLength/2>AXIAL_GUIDE.innerX);
+    assert.ok(local.x+AXIAL_GUIDE.followerLength/2<AXIAL_GUIDE.backX);
+    assert.equal(crossing(follower,channel),false,"normal slide");
+    assert.equal(crossing(channel,a.guides[Math.floor(i/2)]),false,"rotating sleeve");
+    samples++;
+   }
+  }
+  assert.equal(samples,488);
+  // Intentional angular disturbance, applied only in a research test.
+  a.model.setDoorOpen(.09);
+  for(const [i,channel] of a.antiRotationGuides.entries()){
+   const pin=a.pins[i].mesh;
+   for(const sign of [-1,1]){
+    pin.rotation.y=sign*Math.PI/20;
+    a.model.group.updateMatrixWorld(true);
+    assert.equal(crossing(a.followers[i],channel),true,"side wall arrests angular disturbance");
+    pin.rotation.y=0;
+   }
+  }
+ }finally{a.model.dispose();}
 });
