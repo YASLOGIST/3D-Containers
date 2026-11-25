@@ -12,8 +12,30 @@ const COLS = 26;
 const ROWS = 34;
 const TAU = Math.PI * 2;
 
+/** Illustrative material-space attachment layout, not measured OEM stitch dimensions. */
+export const WEBBING_CENTRES = [0.25, 0.75] as const;
+export const WEBBING_END_ZONES = [[0.035, 0.105], [0.895, 0.965]] as const;
+
+/** Canvas Y is inverted relative to undeformed mesh UV. */
+export function attachmentRasterBand(v: readonly [number, number], height: number) {
+  return { y: Math.round((1 - v[1]) * height), height: Math.round((v[1] - v[0]) * height) };
+}
+
+function drawStitchLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, pitch: number) {
+  const length = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.ceil(length / pitch));
+  for (let i = 0; i < n; i++) {
+    const t = (i + .5) / n;
+    const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+    ctx.fillStyle = "rgba(28,39,46,.40)";
+    ctx.fillRect(x, y + 1, 2, 1);
+    ctx.fillStyle = "rgba(229,234,231,.68)";
+    ctx.fillRect(x, y, 2, 1);
+  }
+}
+
 function makeTextileMap(): THREE.Texture {
-  return cachedTexture("ake:textile-weave:v2", () => {
+  return cachedTexture("ake:textile-weave:v3", () => {
     const c = document.createElement("canvas");
     c.width = c.height = 512;
     const ctx = c.getContext("2d")!;
@@ -51,6 +73,20 @@ function makeTextileMap(): THREE.Texture {
         ctx.fillRect(i, edge + 1, 2, 1);
       }
     }
+    // Reinforcement patches aligned with the same material coordinates
+    // used by the two webbing strips. Baked only into the existing raster.
+    for (const u of WEBBING_CENTRES) for (const v of WEBBING_END_ZONES) {
+      const band = attachmentRasterBand(v, 512);
+      const x = Math.round(u * 512) - 17;
+      ctx.fillStyle = "rgba(70,87,97,.20)";
+      ctx.fillRect(x, band.y - 3, 34, band.height + 6);
+      ctx.fillStyle = "rgba(206,213,214,.36)";
+      ctx.fillRect(x + 1, band.y - 2, 32, band.height + 4);
+      drawStitchLine(ctx, x + 3, band.y, x + 3, band.y + band.height, 4);
+      drawStitchLine(ctx, x + 29, band.y, x + 29, band.y + band.height, 4);
+      drawStitchLine(ctx, x + 3, band.y, x + 29, band.y, 4);
+      drawStitchLine(ctx, x + 3, band.y + band.height, x + 29, band.y + band.height, 4);
+    }
     const tex = new THREE.CanvasTexture(c);
     tex.name = "AKE representative coated textile";
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -62,7 +98,7 @@ function makeTextileMap(): THREE.Texture {
 
 /** Procedural woven webbing; illustrative rather than a measured OEM textile. */
 function makeWebbingMap(): THREE.Texture {
-  return cachedTexture("ake:webbing:v1", () => {
+  return cachedTexture("ake:webbing:v2", () => {
     const c = document.createElement("canvas");
     c.width = 64; c.height = 512;
     const ctx = c.getContext("2d")!;
@@ -86,6 +122,19 @@ function makeWebbingMap(): THREE.Texture {
     for (let y = 4; y < 508; y += 8) {
       ctx.fillStyle = "rgba(244,248,250,.65)";
       ctx.fillRect(5, y, 1, 5); ctx.fillRect(58, y, 1, 5);
+    }
+    // Box-X reinforcement and dense end bar tacks. UV coordinates remain
+    // fixed while the webbing folds with the existing animated curtain.
+    for (const v of WEBBING_END_ZONES) {
+      const band = attachmentRasterBand(v, 512);
+      const y0 = band.y + 4, y1 = band.y + band.height - 4;
+      for (const [x0, ya, x1, yb] of [
+        [10,y0,54,y0], [54,y0,54,y1], [54,y1,10,y1],
+        [10,y1,10,y0], [10,y0,54,y1], [54,y0,10,y1],
+      ]) drawStitchLine(ctx,x0,ya,x1,yb,3);
+      for (const y of [y0+3,y1-3]) {
+        drawStitchLine(ctx,10,y,54,y,2);
+      }
     }
     const texture = new THREE.CanvasTexture(c);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -204,7 +253,7 @@ export function createAKEFabricDoor(o: FabricDoorOptions): FabricDoor {
 
   const straps: { mesh: THREE.Mesh; u: number; width: number }[] = [];
   if (o.detailed) {
-    for (const u of [0.25, 0.75]) {
+    for (const u of WEBBING_CENTRES) {
       const strapGeo = new THREE.BufferGeometry();
       const coords = new Float32Array((ROWS + 1) * 2 * 3);
       const faces: number[] = [];
@@ -232,7 +281,7 @@ export function createAKEFabricDoor(o: FabricDoorOptions): FabricDoor {
   const buckles: THREE.Mesh[] = [];
   if (o.detailed) {
     const fittingGeometry = makeWebbingBuckleGeometry();
-    for (const u of [0.25, 0.75]) {
+    for (const u of WEBBING_CENTRES) {
       const buckle = new THREE.Mesh(fittingGeometry, buckleMaterial);
       buckle.name = "AKE fabric strap buckle - representative two-slot fitting";
       buckle.castShadow = true;
