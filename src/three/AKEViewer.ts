@@ -24,6 +24,7 @@ import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./texture
 import { contactFootprint, makeContactTexture, inspectionFill, CONTACT_PADDING_M } from "./contactLighting";
 import { applyFloorWear } from "./floorWear";
 import { applyMechanicalWear } from "./mechanicalWear";
+import { makeHangarBackdrop, makeParkingMark } from "./industrialStage";
 import { formatDistance } from "@/lib/units";
 import { pixelRatioForViewport, stepAdaptiveResolution } from "@/lib/renderQuality";
 
@@ -315,6 +316,8 @@ export class AKEViewer {
   private interior!: THREE.PointLight;
   private floor!: THREE.Mesh;
   private floorMat!: THREE.MeshStandardMaterial;
+  private apronTexture!: THREE.Texture;
+  private parkingMark!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   private contactShadow!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
 
   private modelRoot = new THREE.Group();
@@ -719,6 +722,7 @@ export class AKEViewer {
     // ULD meshes, cargo cartons and engineering outputs are unchanged.
     const tex = makeApronTexture(touchFirstPreferred() ? 512 : 1024);
     tex.repeat.set(5, 5);
+    this.apronTexture=tex;
     this.floorMat = new THREE.MeshStandardMaterial({
       map: tex,
       color: new THREE.Color(MOODS.hangar.floor),
@@ -733,6 +737,14 @@ export class AKEViewer {
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
     this.scene.add(this.floor);
+    this.parkingMark=new THREE.Mesh(new THREE.PlaneGeometry(6.4,5.8),
+      new THREE.MeshBasicMaterial({map:makeParkingMark(touchFirstPreferred()?256:512),
+        transparent:true,opacity:.52,depthWrite:false,toneMapped:true}));
+    this.parkingMark.rotation.x=-Math.PI/2;
+    this.parkingMark.position.y=.001;
+    this.parkingMark.name="Single illustrative handling bay marking";
+    this.scene.add(this.parkingMark);
+
     this.contactShadow = new THREE.Mesh(new THREE.PlaneGeometry(1,1),
       new THREE.MeshBasicMaterial({map:makeContactTexture(), transparent:true,
         opacity:0.42, depthWrite:false, toneMapped:false}));
@@ -749,7 +761,9 @@ export class AKEViewer {
     this.scene.fog = new THREE.Fog(new THREE.Color(m.fog), 9, 34);
 
     if (!this.skyBgs.has(id)) {
-      this.skyBgs.set(id, makeSkyTexture(m.sky[0], m.sky[1], m.sky[2]));
+      this.skyBgs.set(id,id==="hangar"
+        ? makeHangarBackdrop(touchFirstPreferred()?512:1024)
+        : makeSkyTexture(m.sky[0], m.sky[1], m.sky[2]));
     }
     const bg = this.skyBgs.get(id)!;
     this.scene.background = bg;
@@ -778,6 +792,9 @@ export class AKEViewer {
     this.rim.intensity = m.rim.intensity;
     this.hemi.intensity = m.hemi;
     this.floorMat.color.set(m.floor);
+    this.floorMat.map=id==="studio"?null:this.apronTexture;
+    this.floorMat.roughness=id==="studio" ? .82 : .91;
+    this.parkingMark.visible=id!=="studio";
     this.floorMat.needsUpdate = true;
     if (initial) this.renderer.toneMappingExposure = m.exposure;
     this.markShadowsDirty();
@@ -2361,7 +2378,10 @@ export class AKEViewer {
     this.contactShadow.material.map?.dispose();
     this.contactShadow.material.dispose();
     this.floor.geometry.dispose();
-    this.floorMat.map?.dispose();
+    this.parkingMark.geometry.dispose();
+    this.parkingMark.material.map?.dispose();
+    this.parkingMark.material.dispose();
+    this.apronTexture.dispose();
     this.floorMat.dispose();
     this.highlightBox.geometry.dispose();
     (this.highlightBox.material as THREE.Material).dispose();
