@@ -51,6 +51,7 @@ import {
   roundedShape,
   tag,
   wallBox,
+  ventilatedFanShroudGeometry,
   type Assembly,
   type BaseMaterials,
   type ContainerStats,
@@ -897,7 +898,7 @@ export function createRKNContainer(
 
   // ---- evaporator fan: shroud ring + five blades on a spinning hub ------
   const shroud = mesh(
-    new THREE.CylinderGeometry(0.17, 0.19, 0.03, 28, 1, true),
+    ventilatedFanShroudGeometry(0.17, 0.19, 0.03, 28),
     mat.shroud,
     "Fan shroud",
   );
