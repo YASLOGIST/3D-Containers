@@ -941,37 +941,29 @@ export function makeApronTexture(size = 1024) {
   return cachedTexture(key, () => {
     const rand = seededRandom(0xa9017);
     const { c, ctx } = canvas2d(size, size);
-    ctx.fillStyle = "#181b1e";
+    ctx.fillStyle = "#777a79";
     ctx.fillRect(0, 0, size, size);
 
-    // concrete mottling
-    for (let i = 0; i < 9000; i++) {
-      const v = 20 + rand() * 44;
-      ctx.fillStyle = `rgba(${v},${v + 3},${v + 6},${0.15 + rand() * 0.4})`;
-      const r = 1 + rand() * 22;
-      ctx.beginPath();
-      ctx.arc(rand() * size, rand() * size, r, 0, Math.PI * 2);
-      ctx.fill();
+    // Fine aggregate and broad low-contrast trowel variation; world-scale
+    // painted markings are handled separately so they never tile.
+    for (let i=0;i<100;i++) {
+      const x=rand()*size,y=rand()*size,r=size*(.025+rand()*.11);
+      const g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,rand()<.5?"rgba(28,33,35,.075)":"rgba(213,216,207,.08)");
+      g.addColorStop(1,"rgba(119,122,121,0)");
+      ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
     }
-
-    // slab joints
-    ctx.strokeStyle = "rgba(0,0,0,0.55)";
-    ctx.lineWidth = 5;
-    for (const p of [0, size / 2]) {
-      ctx.beginPath();
-      ctx.moveTo(p, 0);
-      ctx.lineTo(p, size);
-      ctx.moveTo(0, p);
-      ctx.lineTo(size, p);
-      ctx.stroke();
+    for(let i=0;i<size*18;i++){
+      const x=rand()*size,y=rand()*size,r=.45+rand()*1.7;
+      ctx.fillStyle=rand()<.55?"rgba(32,38,39,.14)":"rgba(221,223,215,.16)";
+      ctx.fillRect(x,y,r,r*.8);
     }
-
-    // painted ULD parking box
-    ctx.strokeStyle = "rgba(255,176,32,0.5)";
-    ctx.lineWidth = 14;
-    ctx.setLineDash([70, 46]);
-    ctx.strokeRect(size * 0.12, size * 0.12, size * 0.76, size * 0.76);
-    ctx.setLineDash([]);
+    // Thin inset expansion joints, scaled with the raster resolution.
+    ctx.strokeStyle="rgba(36,40,41,.43)";ctx.lineWidth=Math.max(1,size/512);
+    for(const n of [0,size/2,size]){
+      ctx.beginPath();ctx.moveTo(n,0);ctx.lineTo(n,size);
+      ctx.moveTo(0,n);ctx.lineTo(size,n);ctx.stroke();
+    }
 
     return toTexture(c, true);
   });
