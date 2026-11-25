@@ -2,6 +2,7 @@ import "./headlessCanvas.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
+import { attachmentRasterBand, WEBBING_CENTRES, WEBBING_END_ZONES } from "../src/three/akeFabricDoor.ts";
 import { MODELS } from "../src/three/models.ts";
 
 test("AKE woven strap UVs remain stable across seven sampled curtain poses", () => {
@@ -41,4 +42,23 @@ test("AKE woven strap UVs remain stable across seven sampled curtain poses", () 
   } finally {
     built.dispose();
   }
+});
+
+test("reinforcement stitch bands align with both strap ends in material space", () => {
+  assert.deepEqual(WEBBING_CENTRES, [.25, .75]);
+  const bands = WEBBING_END_ZONES.map(v => attachmentRasterBand(v, 512));
+  assert.deepEqual(bands, [{y:458,height:36},{y:18,height:36}]);
+  for (const b of bands) {
+    assert.ok(b.y >= 8 && b.y+b.height <= 504);
+    assert.ok(b.height > 8);
+  }
+  const built=MODELS.ake.build({contour:true,finish:"mill",detail:true,rivets:true,doorOpen:0,akeDoor:"fabric",reefer:true,setpoint:-18,load:0});
+  try {
+    const cloth = built.group.getObjectByName("AKE tensioned coated textile curtain") as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>;
+    const strap = built.group.getObjectByName("AKE fabric tension strap") as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>;
+    assert.equal(cloth.material.map!.name,"ake:textile-weave:v3");
+    assert.equal(strap.material.map!.name,"ake:webbing:v2");
+    assert.equal(cloth.material.map!.image.width*cloth.material.map!.image.height,512*512);
+    assert.equal(strap.material.map!.image.width*strap.material.map!.image.height,64*512);
+  } finally { built.dispose(); }
 });
