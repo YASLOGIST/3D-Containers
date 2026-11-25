@@ -307,7 +307,7 @@ export function createRKNContainer(
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.34, 0, 0.34]) {
     const strip = box(
-      mat.hullInner,
+      mat.floorWear,
       W - 0.26,
       0.008,
       0.1,

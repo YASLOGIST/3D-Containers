@@ -22,6 +22,7 @@ import { MODELS, reeferOf, type ModelId } from "./models";
 import { createAnnotations } from "./annotations";
 import { makeApronTexture, makeSkyTexture, makeInServicePatina } from "./textures";
 import { contactFootprint, makeContactTexture, inspectionFill, CONTACT_PADDING_M } from "./contactLighting";
+import { applyFloorWear } from "./floorWear";
 import { formatDistance } from "@/lib/units";
 import { pixelRatioForViewport, stepAdaptiveResolution } from "@/lib/renderQuality";
 
@@ -943,6 +944,7 @@ export class AKEViewer {
     this.eachMaterial((m) => {
       const std = m as THREE.MeshStandardMaterial;
       if ("wireframe" in std) std.wireframe = this.state.wireframe;
+      applyFloorWear(std,this.state.surfaceCondition === "service");
       std.envMapIntensity =
         (std.userData.baseEnv ??= std.envMapIntensity ?? 1) *
         this.state.envIntensity;

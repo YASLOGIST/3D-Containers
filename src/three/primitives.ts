@@ -473,6 +473,8 @@ export interface BaseMaterials {
   shell: THREE.MeshPhysicalMaterial;
   /** interior liner */
   hullInner: THREE.MeshStandardMaterial;
+  /** Existing transverse handling wear strips, independent of wall liner. */
+  floorWear: THREE.MeshStandardMaterial;
   /** bright extruded aluminium frame */
   alloy: THREE.MeshStandardMaterial;
   /** hardware, latch rods, hinges */
@@ -531,6 +533,16 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       roughness: 0.66,
       side: THREE.DoubleSide,
       envMapIntensity: 0.6,
+    }),
+    floorWear: new THREE.MeshStandardMaterial({
+      color: "#a5adb1",
+      metalness: 0.85,
+      roughness: 0.58,
+      roughnessMap: hardware.roughnessMap,
+      normalMap: hardware.normalMap,
+      normalScale: new THREE.Vector2(0.14, 0.14),
+      envMapIntensity: 0.65,
+      userData: { wearSurface: "strip" },
     }),
     alloy: new THREE.MeshStandardMaterial({
       color: "#aeb9c2",
