@@ -2,9 +2,10 @@ import "./headlessCanvas.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
-import {buildAKEAxialLatchPrototype} from "../src/three/axialLatchPrototype.ts";
+import {buildAKEAxialLatchPrototype,buildAxialLatchPrototype,AXIAL_RESEARCH_MODELS} from "../src/three/axialLatchPrototype.ts";
 import {geometryOnlyExportScene,structuralVertexBounds} from "../src/three/geometryExport.ts";
 import {worldFaces,hasSurfaceCrossing} from "./meshSurfaceIntersection.ts";
+import {MODELS} from "../src/three/models.ts";
 import {rigidDoorPose} from "../src/three/doorKinematics.ts";
 import {camStroke,CAM_ANGLE,CAM_TRAVEL} from "../src/three/axialCamTrack.ts";
 import {AXIAL_GUIDE} from "../src/three/axialAntiRotationGuide.ts";
@@ -222,4 +223,33 @@ test("representative guide tabs seat at the leaf and clear unrelated mesh surfac
    assert.equal(seats,72);assert.equal(checks,144);
   }finally{material.dispose();}
  }finally{a.model.dispose();}
+});
+
+test("selected rigid families pass sampled axial assembly crossing and depth checks",()=>{
+ for(const id of AXIAL_RESEARCH_MODELS){
+  const a=buildAxialLatchPrototype(id);
+  try{
+   const targets:THREE.Mesh[]=[];
+   const moving=[...a.pins.map(p=>p.mesh),...a.followers,...a.antiRotationGuides,...a.guideMounts,...a.guides,...a.receivers];
+   a.model.group.traverse(o=>{if(o instanceof THREE.Mesh&&o.visible&&!o.userData.visualOnlyDecal)targets.push(o);});
+   for(const pose of [0,.045,.09,.135,.18,.25,.5,.75,1]){
+    a.setDoorOpen(pose);a.model.group.updateMatrixWorld(true);
+    const data=targets.map(o=>({o,b:new THREE.Box3().setFromObject(o),f:undefined as ReturnType<typeof worldFaces>|undefined}));
+    for(const x of moving){
+     const xb=new THREE.Box3().setFromObject(x);let xf:ReturnType<typeof worldFaces>|undefined;
+     for(const t of data){
+      if(x===t.o||x.parent===t.o||t.o.parent===x||!xb.intersectsBox(t.b))continue;
+      const mi=a.guideMounts.indexOf(x),ti=a.guideMounts.indexOf(t.o);
+      if(mi>=0&&a.antiRotationGuides[Math.floor(mi/2)]===t.o)continue;
+      if(ti>=0&&a.antiRotationGuides[Math.floor(ti/2)]===x)continue;
+      if(a.guides.includes(x)&&["Latch hub","Latch handle","Rotating latch cam"].includes(t.o.name)&&x.parent===t.o.parent)continue;
+      assert.equal(hasSurfaceCrossing(xf??=worldFaces(x),t.f??=worldFaces(t.o)),false,id+" "+pose+" "+x.name+" / "+t.o.name);
+     }
+    }
+   }
+   a.setDoorOpen(0);
+   assert.ok(Math.abs(structuralVertexBounds(a.model.group).getSize(new THREE.Vector3()).z-MODELS[id].dims.depth)<1e-6,id+" depth");
+  }finally{a.model.dispose();}
+ }
+ for(const id of ["amd","rkn","rap","pag","pmc","pga"] as const)assert.throws(()=>buildAxialLatchPrototype(id),RangeError);
 });
