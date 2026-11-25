@@ -25,6 +25,7 @@ import { contactFootprint, makeContactTexture, inspectionFill, CONTACT_PADDING_M
 import { applyFloorWear } from "./floorWear";
 import { applyMechanicalWear } from "./mechanicalWear";
 import { makeHangarBackdrop, makeParkingMark } from "./industrialStage";
+import { makeIndustrialReflectionScene } from "./industrialReflection";
 import { formatDistance } from "@/lib/units";
 import { pixelRatioForViewport, stepAdaptiveResolution } from "@/lib/renderQuality";
 
@@ -305,8 +306,7 @@ export class AKEViewer {
   private homeOrthoSize = 4;
   private controls: OrbitControls;
   private pmrem: THREE.PMREMGenerator;
-  private roomEnv: THREE.Texture | null = null;
-  private skyEnvs = new Map<MoodId, THREE.Texture>();
+  private reflectionTargets = new Map<MoodId, THREE.WebGLRenderTarget>();
   private skyBgs = new Map<MoodId, THREE.Texture>();
 
   private key!: THREE.DirectionalLight;
@@ -769,19 +769,32 @@ export class AKEViewer {
     this.scene.background = bg;
     this.scene.backgroundIntensity = m.bgIntensity;
 
-    if (m.envFromSky) {
-      if (!this.skyEnvs.has(id)) {
-        this.skyEnvs.set(id, this.pmrem.fromEquirectangular(bg).texture);
-      }
-      this.scene.environment = this.skyEnvs.get(id)!;
-    } else {
-      if (!this.roomEnv) {
+    // Bake each rig once per context; the live scene keeps its existing
+    // geometry and direct lighting. Retain targets so framebuffer resources
+    // (not only their texture handles) are released on restoration/disposal.
+    if (!this.reflectionTargets.has(id)) {
+      let target: THREE.WebGLRenderTarget;
+      if (m.envFromSky) {
+        target = this.pmrem.fromEquirectangular(bg);
+      } else if (id === "hangar") {
+        const rig = makeIndustrialReflectionScene();
+        try {
+          target = this.pmrem.fromScene(rig.scene, 0.035, 0.1, 100,
+            { size: touchFirstPreferred() ? 128 : 256 });
+        } finally {
+          rig.dispose();
+        }
+      } else {
         const room = new RoomEnvironment();
-        this.roomEnv = this.pmrem.fromScene(room, 0.035).texture;
-        room.dispose();
+        try {
+          target = this.pmrem.fromScene(room, 0.035);
+        } finally {
+          room.dispose();
+        }
       }
-      this.scene.environment = this.roomEnv;
+      this.reflectionTargets.set(id, target);
     }
+    this.scene.environment = this.reflectionTargets.get(id)!.texture;
 
     this.key.color.set(m.key.color);
     this.key.intensity = m.key.intensity;
@@ -1839,10 +1852,9 @@ export class AKEViewer {
 
   private onContextRestored = () => {
     // PMREM outputs are context-owned; regenerate them after driver recovery.
-    this.skyEnvs.forEach((texture) => texture.dispose());
-    this.skyEnvs.clear();
-    this.roomEnv?.dispose();
-    this.roomEnv = null;
+    this.scene.environment = null;
+    this.reflectionTargets.forEach((target) => target.dispose());
+    this.reflectionTargets.clear();
     this.applyMood(this.state.mood);
     this.applyMaterialState();
     this.updateSection(true);
@@ -2372,8 +2384,9 @@ export class AKEViewer {
       this.capMesh = null;
     }
     this.skyBgs.forEach((t) => t.dispose());
-    this.skyEnvs.forEach((t) => t.dispose());
-    this.roomEnv?.dispose();
+    this.scene.environment = null;
+    this.reflectionTargets.forEach((target) => target.dispose());
+    this.reflectionTargets.clear();
     this.contactShadow.geometry.dispose();
     this.contactShadow.material.map?.dispose();
     this.contactShadow.material.dispose();
