@@ -46,6 +46,7 @@ import {
   roundedShape,
   tag,
   wallBox,
+  ventilatedFanShroudGeometry,
   type Assembly,
   type BaseMaterials,
   type ContainerStats,
@@ -940,7 +941,7 @@ export function createRAPContainer(
   for (const fx of [-0.42, 0.42]) {
     const fanY = unitH * 0.26;
     const shroud = mesh(
-      new THREE.CylinderGeometry(0.23, 0.26, 0.034, 30, 1, true),
+      ventilatedFanShroudGeometry(0.23, 0.26, 0.034, 30),
       mat.shroud,
       "Fan shroud",
     );

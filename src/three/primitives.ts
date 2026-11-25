@@ -241,6 +241,33 @@ export function cornerRailSection(
   const E1i = E1.clone().addScaledVector(inP, Rt);
   const E2i = E2.clone().addScaledVector(inN, Rt);
 
+  // Reflex corners such as the AKH knee cannot use the convex tangent-arc
+  // construction: the arcs fold over and the two end caps fail triangulation.
+  // Connect the offset lines as a constant-thickness, unrounded elbow.
+  const incoming = P.clone().sub(new THREE.Vector2(prev.x, prev.y));
+  const outgoing = new THREE.Vector2(next.x, next.y).sub(P);
+  const turn = incoming.x * outgoing.y - incoming.y * outgoing.x;
+  if (turn < -1e-9) {
+    const innerPrev = P.clone().addScaledVector(inP, Rt);
+    const innerNext = P.clone().addScaledVector(inN, Rt);
+    const cross = (a: THREE.Vector2, b: THREE.Vector2) => a.x * b.y - a.y * b.x;
+    const den = cross(uP, uN);
+    if (Math.abs(den) < 1e-6) {
+      throw new Error("Reflex corner rail has nearly parallel edges");
+    }
+    const t = cross(innerNext.clone().sub(innerPrev), uN) / den;
+    const join = innerPrev.addScaledVector(uP, t);
+    const elbow = new THREE.Shape();
+    elbow.moveTo(E1.x, E1.y);
+    elbow.lineTo(P.x, P.y);
+    elbow.lineTo(E2.x, E2.y);
+    elbow.lineTo(E2i.x, E2i.y);
+    elbow.lineTo(join.x, join.y);
+    elbow.lineTo(E1i.x, E1i.y);
+    elbow.closePath();
+    return { shape: elbow, leg: Math.max(W, tanD + 0.03) };
+  }
+
   const a1 = Math.atan2(T1.y - C.y, T1.x - C.x);
   const a2 = Math.atan2(T2.y - C.y, T2.x - C.x);
   const am = Math.atan2(P.y - C.y, P.x - C.x); // arc mid-point faces the corner
@@ -290,6 +317,37 @@ export function mesh(
   m.castShadow = shadow;
   m.receiveShadow = shadow;
   return m;
+}
+
+/** Hollow, tapered condenser shroud with an unobstructed airflow bore.
+ * Unlike an open-ended CylinderGeometry side wall, the four walls/rims
+ * form a closed *annular* solid without capping the central opening.
+ * Dimensions and wall thickness are illustrative, not OEM tolerances.
+ */
+export function ventilatedFanShroudGeometry(
+  radiusTop: number,
+  radiusBottom: number,
+  depth: number,
+  segments: number,
+  wallThickness = 0.004,
+): THREE.LatheGeometry {
+  if (
+    ![radiusTop, radiusBottom, depth, wallThickness].every(Number.isFinite) ||
+    Math.min(radiusTop, radiusBottom, depth, wallThickness) <= 0 ||
+    wallThickness >= Math.min(radiusTop, radiusBottom) ||
+    !Number.isInteger(segments) || segments < 8
+  ) {
+    throw new RangeError("Invalid ventilated fan shroud geometry");
+  }
+  const half = depth / 2;
+  const section = [
+    new THREE.Vector2(radiusBottom, -half),
+    new THREE.Vector2(radiusTop, half),
+    new THREE.Vector2(radiusTop - wallThickness, half),
+    new THREE.Vector2(radiusBottom - wallThickness, -half),
+    new THREE.Vector2(radiusBottom, -half),
+  ];
+  return new THREE.LatheGeometry(section, segments);
 }
 
 /** Axis-aligned rounded plate. */
