@@ -712,8 +712,8 @@ export class AKEViewer {
     this.hemi = new THREE.HemisphereLight(0xbcd6ea, 0x2a2118, m.hemi);
     this.scene.add(this.hemi);
 
-    this.interior = new THREE.PointLight(0xfff4e5, 0, 2.6, 2);
-    this.interior.position.set(-0.3, 0.7, 0);
+    this.interior = new THREE.PointLight(0xf2f6ff, 0, 2.6, 2);
+    this.interior.position.set(0, 0.95, -0.25);
     this.scene.add(this.interior);
   }
 
