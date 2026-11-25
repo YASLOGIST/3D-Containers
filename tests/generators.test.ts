@@ -565,3 +565,20 @@ test("rigid doors and reefer housings do not cross selected frame surfaces at sa
     built.dispose();
   }
 });
+
+test("all generators dispose every instanced mesh buffer owner", () => {
+  let count = 0;
+  for (const id of Object.keys(MODELS) as ModelId[]) {
+    const model = MODELS[id].build(options);
+    const instances: THREE.InstancedMesh[] = [];
+    model.group.traverse((obj) => {
+      if ((obj as THREE.InstancedMesh).isInstancedMesh) instances.push(obj as THREE.InstancedMesh);
+    });
+    const released = new Set<THREE.InstancedMesh>();
+    for (const instance of instances) instance.addEventListener("dispose", () => released.add(instance));
+    model.dispose();
+    assert.equal(released.size, instances.length, id);
+    count += instances.length;
+  }
+  assert.ok(count > 0);
+});
