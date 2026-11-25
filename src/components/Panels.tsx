@@ -297,8 +297,9 @@ function SpecSheetBase({
           tone={spansWithinTolerance === false ? "amber" : "steel"}
         />
         <p className="mt-1.5 text-[10.5px] leading-relaxed text-dim">
-          Door closed and pallet load stowed. This compares bounding-box
-          dimensions with the registry's overall spans, allowing 1 mm excess.
+          Door closed and pallet load stowed. This compares visible structural
+          vertex spans (excluding printed decals) with registry overall spans,
+          allowing 1 mm excess.
           It does not check position, contour clearance or certify the model.
           The section above is a registry reference, not a live geometry check.
         </p>

@@ -12,7 +12,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
-import { geometryOnlyExportScene } from "./geometryExport";
+import { geometryOnlyExportScene, structuralVertexBounds } from "./geometryExport";
 
 import type { Assembly, ViewerContainer } from "./primitives";
 import { cargoCoreForModel, type CargoPlacement } from "@/lib/cargoPlacement";
@@ -843,8 +843,7 @@ export class AKEViewer {
     this.container.setDoorOpen(0);
     this.container.setLoad?.(0);
     this.container.group.updateMatrixWorld(true);
-    const measuredSize = new THREE.Box3()
-      .setFromObject(this.container.group)
+    const measuredSize = structuralVertexBounds(this.container.group)
       .getSize(new THREE.Vector3());
     this.measuredSize = { x: measuredSize.x, y: measuredSize.y, z: measuredSize.z };
     this.container.setDoorOpen(this.state.door);

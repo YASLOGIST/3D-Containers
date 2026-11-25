@@ -51,3 +51,40 @@ export function geometryOnlyExportScene(
   output.updateMatrixWorld(true);
   return output;
 }
+
+/** Exact structural vertex bounds in world coordinates, excluding hidden
+ * variants and printed decals as in the geometry-only export. No mesh clones
+ * or per-vertex allocations; call on rebuild, not on the render loop. */
+export function structuralVertexBounds(source: THREE.Object3D): THREE.Box3 {
+  source.updateWorldMatrix(true, true);
+  const bounds = new THREE.Box3();
+  const point = new THREE.Vector3();
+  const instance = new THREE.Matrix4();
+  const transform = new THREE.Matrix4();
+  const visit = (object: THREE.Object3D) => {
+    if (!object.visible || object.userData.visualOnlyDecal === true) return;
+    if (object instanceof THREE.Mesh) {
+      const position = object.geometry.getAttribute("position");
+      const index = object.geometry.getIndex();
+      if (position) {
+        const expand = (matrix: THREE.Matrix4) => {
+          const count = index ? index.count : position.count;
+          for (let i = 0; i < count; i++) {
+            point.fromBufferAttribute(position, index ? index.getX(i) : i);
+            bounds.expandByPoint(point.applyMatrix4(matrix));
+          }
+        };
+        if (object instanceof THREE.InstancedMesh) {
+          for (let i = 0; i < object.count; i++) {
+            object.getMatrixAt(i, instance);
+            transform.multiplyMatrices(object.matrixWorld, instance);
+            expand(transform);
+          }
+        } else expand(object.matrixWorld);
+      }
+    }
+    for (const child of object.children) visit(child);
+  };
+  visit(source);
+  return bounds;
+}
