@@ -19,7 +19,7 @@ test("all 17 model plate textures are bounded, explicitly illustrative and non-s
      plates++;
      assert.equal(map.userData.referenceOnly,true,id);
      assert.equal(map.userData.scannableIdentity,false,id);
-     assert.equal(map.userData.plateLayout,3,id);
+     assert.equal(map.userData.plateLayout,4,id);
      assert.equal(map.userData.projectCredit,"Ahmed Yasser Ali",id);
      assert.equal(map.image.width,1536,id);
      assert.ok(map.image.height>0&&map.image.height<=1536,id);
@@ -60,7 +60,14 @@ test("project credit is drawn once as small regular text, not an owner field",()
   assert.match(credit[0].font,/^400 18px /);
   assert.equal(credit[0].x,370);
   assert.ok(credit[0].x+(credit[0].maxWidth??0)<735);
-  assert.ok(calls.some(c=>c.text==="OWNER REF"));
-  assert.ok(calls.some(c=>c.text==="REFERENCE ONLY / NOT FOR LOADING"));
+  for (const label of ["ULD IDENTIFICATION","OWNER CODE","TARE WEIGHT","MAX GROSS WEIGHT","MAX PAYLOAD","INTERNAL VOLUME","MODEL REFERENCE","ENGINEERING REFERENCE"]) {
+   assert.equal(calls.filter(c=>c.text===label).length,1,label);
+  }
+  for (const old of ["DEMO PLATE","OWNER REF","TARE REF","GROSS REF","PAYLOAD REF","VOLUME REF","DEMO SERIAL","REFERENCE ONLY / NOT FOR LOADING"]) {
+   assert.equal(calls.some(c=>c.text===old),false,old);
+  }
+  const title=calls.find(c=>c.text==="ULD IDENTIFICATION")!;
+  assert.ok(title.x+(title.maxWidth??0)<=965);
+  assert.match(title.font,/^700 18px /);
  }finally{document.createElement=original;texture?.dispose();}
 });

@@ -249,7 +249,7 @@ export interface PlacardOptions {
 
 /** Representative identification plate. No certificate or scannable identity is implied. */
 export function makeIdPlate(o: PlacardOptions) {
-  const key = `id-plate:v3:${JSON.stringify(o)}`;
+  const key = `id-plate:v4:${JSON.stringify(o)}`;
   return cachedTexture(key, () => {
     const rand=seededRandom(0x1d91a7e);
     const W=1536,H=Math.round(W*o.height/o.width);
@@ -286,30 +286,30 @@ export function makeIdPlate(o: PlacardOptions) {
     ctx.font='400 18px "IBM Plex Mono", monospace';ctx.fillStyle="#35434c";
     ctx.fillText("Ahmed Yasser Ali",370,33,330);
     ctx.fillStyle="#263640";ctx.fillRect(735,27,230,46);
-    ctx.font='700 26px "IBM Plex Mono", monospace';ctx.fillStyle="#f1f5f6";
-    ctx.fillText("DEMO PLATE",753,36,194);
+    ctx.font='700 18px "IBM Plex Mono", monospace';ctx.fillStyle="#f1f5f6";
+    ctx.fillText("ULD IDENTIFICATION",753,40,194);
     ctx.font='700 76px "Chakra Petch", sans-serif';ctx.fillStyle="#14232b";
     ctx.fillText(o.id,52,76,660);
-    label("OWNER REF",755,89,205);value(o.carrier,755,115,205);
+    label("OWNER CODE",755,89,205);value(o.carrier,755,115,205);
     ctx.strokeStyle="#738089";ctx.lineWidth=1.4;
     ctx.beginPath();ctx.moveTo(52,169);ctx.lineTo(972,169);ctx.stroke();
     const kg=(n:number)=>`${n.toLocaleString("en-US")} kg`;
-    const rows=[["TARE REF",kg(o.tareKg)],["GROSS REF",kg(o.maxGrossKg)],
-      ["PAYLOAD REF",kg(o.maxGrossKg-o.tareKg)],["VOLUME REF",`${o.volumeM3.toFixed(1)} m³`]];
+    const rows=[["TARE WEIGHT",kg(o.tareKg)],["MAX GROSS WEIGHT",kg(o.maxGrossKg)],
+      ["MAX PAYLOAD",kg(o.maxGrossKg-o.tareKg)],["INTERNAL VOLUME",`${o.volumeM3.toFixed(1)} m³`]];
     rows.forEach(([k,v],i)=>{
       const x=52+(i%2)*470,y=185+Math.floor(i/2)*100;
       label(k,x,y,440);value(v,x,y+30,440);
     });
     ctx.strokeStyle="#738089";ctx.beginPath();ctx.moveTo(52,382);ctx.lineTo(972,382);ctx.stroke();
-    label("DEMO SERIAL",52,393,300);
+    label("MODEL REFERENCE",52,393,300);
     ctx.font='700 31px "IBM Plex Mono", monospace';ctx.fillStyle="#17232a";
     ctx.fillText(o.serial,52,427,920);
     ctx.fillStyle="#34434b";ctx.fillRect(52,475,920,35);
     ctx.font='700 23px "IBM Plex Mono", monospace';ctx.fillStyle="#f4f6f7";
-    ctx.fillText("REFERENCE ONLY / NOT FOR LOADING",67,480,890);
+    ctx.fillText("ENGINEERING REFERENCE",67,480,890);
     const t=toTexture(c,true);
     t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
-    t.userData={referenceOnly:true,scannableIdentity:false,plateLayout:3,projectCredit:"Ahmed Yasser Ali"};
+    t.userData={referenceOnly:true,scannableIdentity:false,plateLayout:4,projectCredit:"Ahmed Yasser Ali"};
     return t;
   });
 }
