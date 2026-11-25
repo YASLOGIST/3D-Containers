@@ -30,6 +30,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { makeAKEBasePlate, akeBaseApertureCentres } from "./akeBaseApertures";
 import { rigidDoorPose } from "./doorKinematics";
 import { createAKEFabricDoor, type FabricDoor } from "./akeFabricDoor";
 import { addAKEPrecisionDetails, addCaptiveFasteners } from "./akePrecisionDetails";
@@ -274,13 +275,11 @@ export function createAKEContainer(
   topPanel.position.set((nominal[2].x + nominal[3].x) / 2, H - RAIL_T / 2, 0);
   A_HULL.group.add(topPanel);
 
-  const belly = box(
-    mat.chassis,
-    BW - 0.16,
-    0.012,
-    BL - 0.2,
-    "Belly pan",
-    0.004,
+  // Corner reliefs keep the representative base apertures unobstructed
+  // from the underside, rather than hiding them behind the belly pan.
+  const belly = mesh(
+    makeAKEBasePlate(BW - 0.16, BL - 0.2, 0.012, 0.105, [], true),
+    mat.chassis, "Belly pan",
   );
   belly.position.set(X0 + BW / 2, 0.006, 0);
   A_HULL.group.add(belly);
@@ -504,13 +503,10 @@ export function createAKEContainer(
   });
 
   /* --- 7.6 base chassis, corner castings, fork pockets ----------------- */
-  const chassis = box(
-    mat.chassis,
-    BW - 0.04,
-    CHASSIS,
-    BL - 0.04,
-    "Skid frame",
-    0.012,
+  const apertureCentres = akeBaseApertureCentres(BW, BL);
+  const chassis = mesh(
+    makeAKEBasePlate(BW - 0.04, BL - 0.04, CHASSIS, 0.012, apertureCentres),
+    mat.chassis, "Skid frame",
   );
   chassis.position.set(X0 + BW / 2, CHASSIS / 2, 0);
   A_BASE.group.add(chassis);
@@ -529,27 +525,15 @@ export function createAKEContainer(
     A_BASE.group.add(beam);
   }
 
-  // lower corner castings with the cargo-system locating bore
-  for (const cx of [X0 + 0.1, X0 + BW - 0.1]) {
-    for (const cz of [-BL / 2 + 0.1, BL / 2 - 0.1]) {
-      const c = box(
-        mat.alloy,
-        0.18,
-        CHASSIS + 0.006,
-        0.18,
-        "Corner casting",
-        0.022,
-      );
-      c.position.set(cx, (CHASSIS + 0.006) / 2, cz);
-      A_BASE.group.add(c);
-      const bore = mesh(
-        new THREE.CylinderGeometry(0.036, 0.036, 0.02, 20),
-        mat.dark,
-        "Casting bore",
-      );
-      bore.position.set(cx, 0.013, cz);
-      A_BASE.group.add(bore);
-    }
+  // Actual open apertures in this illustrative corner fitting; no
+  // painted/disguised solid cylinder. The chassis has larger clearances.
+  const castingGeometry = makeAKEBasePlate(
+    .18, .18, CHASSIS + .006, .022, [{x:0,z:0,radius:.038}],
+  );
+  for (const a of apertureCentres) {
+    const c = mesh(castingGeometry, mat.alloy, "Corner casting");
+    c.position.set(X0 + BW / 2 + a.x, (CHASSIS + .006) / 2, a.z);
+    A_BASE.group.add(c);
   }
 
   // fork pockets: tunnels across the 1.53 m width, entered from both long walls.
