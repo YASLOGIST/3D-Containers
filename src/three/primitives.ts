@@ -606,11 +606,11 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       envMapIntensity: 0.8,
     }),
     plate: new THREE.MeshStandardMaterial({
-      metalness: 0.9,
-      roughness: 0.34,
+      metalness: 0.55,
+      roughness: 0.56,
       polygonOffset: true,
       polygonOffsetFactor: -3,
-      envMapIntensity: 1.1,
+      envMapIntensity: 0.65,
     }),
     stencil: new THREE.MeshStandardMaterial({
       metalness: 0.1,
