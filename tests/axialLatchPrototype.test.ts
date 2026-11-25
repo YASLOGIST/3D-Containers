@@ -6,6 +6,7 @@ import {buildAKEAxialLatchPrototype} from "../src/three/axialLatchPrototype.ts";
 import {geometryOnlyExportScene,structuralVertexBounds} from "../src/three/geometryExport.ts";
 import {worldFaces,hasSurfaceCrossing} from "./meshSurfaceIntersection.ts";
 import {rigidDoorPose} from "../src/three/doorKinematics.ts";
+import {camStroke,CAM_ANGLE,CAM_TRAVEL} from "../src/three/axialCamTrack.ts";
 
 const poses=[0,.0225,.045,.0675,.09,.1125,.135,.1575,.18,.19,.2,.225,.25,.3,.375,.5,.75,1];
 function crossing(a:THREE.Mesh,b:THREE.Mesh){
@@ -47,8 +48,8 @@ test("AKE prototype clears selected moving and fixed mesh surfaces at 18 sampled
  });
  for(const pose of poses){
   a.setDoorOpen(pose);a.model.group.updateMatrixWorld(true);
-  for(const [left,right] of [[pins,moving],[pins,fixed],[a.receivers,moving],[pins,a.receivers],[a.guides,moving.filter(o=>o.name==="Door stiffener"||o.name==="Door leaf")]] as const)
-   for(const x of left)for(const y of right)if(x!==y)
+  for(const [left,right] of [[pins,moving],[pins,fixed],[a.receivers,moving],[pins,a.receivers],[a.followers,moving],[a.followers,fixed],[a.followers,a.receivers],[a.guides,moving.filter(o=>o.name==="Door stiffener"||o.name==="Door leaf")]] as const)
+   for(const x of left)for(const y of right)if(x!==y && x.parent!==y && y.parent!==x)
     assert.equal(crossing(x,y),false,pose+" "+x.name+" / "+y.name);
  }
  // The proposed receiver/frame mounting interface remains outside this gate.
@@ -110,4 +111,36 @@ test("bolt engagement and guide overlap are maintained through reverse motion an
    }
   }
  }finally{a.model.dispose();}
+});
+
+test("mirrored helical slots expose the follower path over 122 forward and reverse samples",()=>{
+ const a=buildAKEAxialLatchPrototype();
+ const material=new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+ try{
+  assert.equal(a.followers.length,4);
+  const probes=a.guides.map(g=>new THREE.Mesh(g.geometry,material));
+  const ray=new THREE.Raycaster();ray.far=.006;
+  let rays=0;
+  const steps=Array.from({length:61},(_,i)=>.18*i/60);
+  for(const progress of [...steps,...steps.slice().reverse()]){
+   a.setDoorOpen(progress);a.model.group.updateMatrixWorld(true);
+   for(const [i,pin] of a.pins.entries()){
+    const guide=a.guides[Math.floor(i/2)];
+    const local=guide.worldToLocal(a.followers[i].getWorldPosition(new THREE.Vector3()));
+    const expected=camStroke(pin.spindle.rotation.y,pin.hand);
+    assert.ok(Math.abs((pin.mesh.position.y-pin.closedY)*pin.direction-expected)<1e-9);
+    const radial=new THREE.Vector3(local.x,0,local.z).normalize();
+    for(const offset of [-.002,0,.002]){
+     const origin=radial.clone().multiplyScalar(.0135);origin.y=local.y+offset;
+     ray.set(origin,radial.clone().negate());
+     assert.equal(ray.intersectObject(probes[Math.floor(i/2)],false).length,0,"follower aperture");
+     rays++;
+    }
+   }
+  }
+  assert.equal(rays,1464);
+  assert.equal(camStroke(CAM_ANGLE,1),CAM_TRAVEL);
+  assert.equal(camStroke(-CAM_ANGLE,-1),CAM_TRAVEL);
+  assert.equal(camStroke(NaN,1),0);
+ }finally{material.dispose();a.model.dispose();}
 });
