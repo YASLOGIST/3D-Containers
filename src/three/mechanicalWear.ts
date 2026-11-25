@@ -1,15 +1,15 @@
 import * as THREE from "three";
 import { cachedTexture, seededRandom } from "./textureSupport";
 
-export type MechanicalSurface = "bearing" | "contact";
+export type MechanicalSurface = "bearing" | "contact" | "casting";
 
 /** Cosmetic contact traces on existing parts, not a measured wear model. */
 export function makeMechanicalWear(kind: MechanicalSurface): THREE.Texture {
   return cachedTexture("mechanical-wear:"+kind,()=>{
-    const c=document.createElement("canvas");c.width=256;c.height=128;
+    const c=document.createElement("canvas");c.width=256;c.height=kind==="casting"?256:128;
     const ctx=c.getContext("2d")!;
     const w=c.width,h=c.height;
-    const rand=seededRandom(kind==="bearing"?0x1eaf:0xc0a7);
+    const rand=seededRandom(kind==="bearing"?0x1eaf:kind==="casting"?0xc451:0xc0a7);
     ctx.fillStyle="#f6f6f5";ctx.fillRect(0,0,w,h);
     if(kind==="bearing"){
       // Cylinder UV: horizontal traces wrap around the pin; narrow
@@ -26,6 +26,25 @@ export function makeMechanicalWear(kind: MechanicalSurface): THREE.Texture {
         const x=rand()*w,y=(rand()<.5?.14:.86)*h+(rand()-.5)*13;
         ctx.fillStyle=rand()<.5?"rgba(52,56,59,.12)":"rgba(255,255,255,.34)";
         ctx.fillRect(x,y,3+rand()*28,.6);
+      }
+    }else if(kind==="casting"){
+      // Local XZ projection: the bore radius is 38 mm in the existing
+      // 180 mm fitting, placing the contact band at roughly 54 px.
+      const centre=w/2, radius=w*.038/.18;
+      const g=ctx.createRadialGradient(centre,centre,radius-5,centre,centre,radius+15);
+      g.addColorStop(0,"rgba(75,78,79,.14)");
+      g.addColorStop(.23,"rgba(255,255,255,.58)");
+      g.addColorStop(.5,"rgba(90,92,91,.10)");
+      g.addColorStop(1,"rgba(90,92,91,0)");
+      ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+      for(let i=0;i<180;i++){
+        const a=rand()*Math.PI*2,r=radius+rand()*13;
+        const x=centre+Math.cos(a)*r,y=centre+Math.sin(a)*r;
+        const len=2+rand()*6;
+        ctx.strokeStyle=rand()<.55?"rgba(64,67,68,.17)":"rgba(255,255,255,.43)";
+        ctx.lineWidth=.55+rand()*.6;
+        ctx.beginPath();ctx.moveTo(x,y);
+        ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();
       }
     }else{
       // Short crossing traces and edge polish, restricted to cam/keeper
@@ -49,7 +68,7 @@ export function makeMechanicalWear(kind: MechanicalSurface): THREE.Texture {
 
 export function applyMechanicalWear(material: THREE.MeshStandardMaterial, service: boolean) {
   const kind=material.userData.mechanicalSurface as MechanicalSurface|undefined;
-  if(kind!=="bearing"&&kind!=="contact")return;
+  if(kind!=="bearing"&&kind!=="contact"&&kind!=="casting")return;
   if(service&&!material.map){
     material.map=makeMechanicalWear(kind);material.needsUpdate=true;
   }else if(!service&&material.map){
