@@ -25,7 +25,7 @@ export function buildAKEAxialLatchPrototype(detail = true) {
       new THREE.Vector2(outer,-half),new THREE.Vector2(outer,half),
       new THREE.Vector2(inner,half),new THREE.Vector2(inner,-half),
       new THREE.Vector2(outer,-half)],32);
-    const ringGeometry=section(.022,.009,.0015);
+    const ringGeometry=section(.015,.009,.0015);
     const pinGeometry=new THREE.CylinderGeometry(.007,.007,.032,24);
     for(const [i,s] of spindles.entries()){
       if(i===0)s.position.x+=.075;
@@ -40,7 +40,7 @@ export function buildAKEAxialLatchPrototype(detail = true) {
       guides.push(rod);
       for(const top of [false,true]){
         const ring=mesh(ringGeometry,model.materials.latchContact,"Prototype axial receiver");
-        ring.position.set(s.position.x+pivot.position.x,top?1.5435:.1665,s.position.z+pivot.position.z);
+        ring.position.set(s.position.x+pivot.position.x,top?1.543499:.166501,s.position.z+pivot.position.z);
         pivot.parent.add(ring);
         receivers.push(ring);
         const bolt=mesh(pinGeometry,model.materials.steel,"Prototype retracting bolt");
@@ -50,11 +50,14 @@ export function buildAKEAxialLatchPrototype(detail = true) {
         pins.push({mesh:bolt,closedY,direction:top?-1:1});
       }
     }
+    const baseSetDoorOpen=model.setDoorOpen.bind(model);
     const setDoorOpen=(progress:number)=>{
-      model.setDoorOpen(progress);
+      baseSetDoorOpen(progress);
       const stroke=.030*(1-rigidDoorPose(progress,0).engagement);
       pins.forEach(p=>p.mesh.position.y=p.closedY+p.direction*stroke);
     };
+    // The research adapter and its underlying model share one motion entry point.
+    model.setDoorOpen=setDoorOpen;
     setDoorOpen(0);
     return {model, guides, pins, receivers, originalKeepers:keepers, setDoorOpen};
   }catch(error){model.dispose();throw error;}
