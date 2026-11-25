@@ -805,10 +805,10 @@ export function createAKEContainer(
     spindle.add(rod);
 
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
-      const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
+      const hub = box(mat.latchContact, 0.048, 0.05, 0.04, "Latch hub", 0.01);
       hub.position.set(0, hy, 0);
       spindle.add(hub);
-      const cam = box(mat.alloy, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
+      const cam = box(mat.latchContact, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
       cam.position.set(0.032, hy, -0.015);
       spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
@@ -821,7 +821,7 @@ export function createAKEContainer(
   // keepers belong to the frame, not the leaf
   for (const rx of [X0 + FRAME_W + 0.06, X0 + BW - 0.1]) {
     for (const ky of [CHASSIS + 0.13, H - 0.13]) {
-      const k = box(mat.alloy, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
+      const k = box(mat.latchContact, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
       k.position.set(rx, ky, BL / 2 - 0.028);
       A_DOOR.group.add(k);
     }
@@ -831,7 +831,7 @@ export function createAKEContainer(
   for (const hy of [CHASSIS + 0.22, CHASSIS + (H - CHASSIS) / 2, H - 0.24]) {
     const pin = mesh(
       new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14),
-      mat.steel,
+      mat.bearing,
       "Hinge pin",
     );
     pin.position.set(HINGE_X, hy, HINGE_Z);

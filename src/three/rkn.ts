@@ -807,7 +807,7 @@ export function createRKNContainer(
     spindle.add(rod);
 
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
-      const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
+      const hub = box(mat.latchContact, 0.048, 0.05, 0.04, "Latch hub", 0.01);
       hub.position.set(0, hy, 0);
       spindle.add(hub);
       // fold-flat lever, kept inside the frame rebate
@@ -821,7 +821,7 @@ export function createRKNContainer(
   // keepers belong to the frame, not the leaf
   for (const rx of [X0 + FRAME_W + 0.06, X0 + W - 0.1]) {
     for (const ky of [CHASSIS + 0.13, H - 0.13]) {
-      const k = box(mat.alloy, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
+      const k = box(mat.latchContact, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
       k.position.set(rx, ky, D / 2 - 0.028);
       A_DOOR.group.add(k);
     }
@@ -831,7 +831,7 @@ export function createRKNContainer(
   for (const hy of [CHASSIS + 0.22, CHASSIS + (H - CHASSIS) / 2, H - 0.24]) {
     const pin = mesh(
       new THREE.CylinderGeometry(0.016, 0.016, 0.13, 14),
-      mat.steel,
+      mat.bearing,
       "Hinge pin",
     );
     pin.position.set(HINGE_X, hy, HINGE_Z);

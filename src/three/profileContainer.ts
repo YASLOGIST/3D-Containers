@@ -522,12 +522,12 @@ export function createProfileContainer(
     spindle.add(rod);
     for (const hy of [CHASSIS + 0.2, CHASSIS + (H - CHASSIS) * 0.55, H - 0.2]) {
       if (hy > leafTopAtX(rx) - 0.08) continue; // hub would float past a sloped leaf edge
-      const hub = box(mat.steel, 0.048, 0.05, 0.04, "Latch hub", 0.01);
+      const hub = box(mat.latchContact, 0.048, 0.05, 0.04, "Latch hub", 0.01);
       hub.position.set(0, hy, 0);
       spindle.add(hub);
       // The off-axis cam rotates away from the fixed keeper before the
       // door leaf can swing. It is representative geometry, not load rated.
-      const cam = box(mat.alloy, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
+      const cam = box(mat.latchContact, 0.07, 0.028, 0.034, "Rotating latch cam", 0.005);
       cam.position.set(0.032, hy, -0.015);
       spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
@@ -540,7 +540,7 @@ export function createProfileContainer(
     for (const kyRaw of [CHASSIS + 0.13, H - 0.13]) {
       const ky = Math.min(kyRaw, leafTopAtX(rx) - 0.09);
       if (ky < CHASSIS + 0.1) continue;
-      const k = box(mat.alloy, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
+      const k = box(mat.latchContact, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
       k.position.set(rx, ky, BL / 2 - 0.028);
       A_DOOR.group.add(k);
     }
@@ -563,7 +563,7 @@ export function createProfileContainer(
     const fractions = segLen > 0.45 ? [0.28, 0.72] : [0.5];
     for (const f of fractions) {
       const at = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
-      const knuckle = mesh(knuckleGeo, mat.steel, "Hinge knuckle");
+      const knuckle = mesh(knuckleGeo, mat.bearing, "Hinge knuckle");
       knuckle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir3);
       if (knuckleIdx % 2 === 0) {
         knuckle.position.set(px(at.x), at.y, FACE - 0.012);

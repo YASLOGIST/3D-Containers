@@ -840,7 +840,7 @@ export function createRAPContainer(
       CHASSIS + (H - CHASSIS) * 0.5,
       H - 0.24,
     ]) {
-      const hub = box(mat.steel, 0.055, 0.058, 0.046, "Latch hub", 0.012);
+      const hub = box(mat.latchContact, 0.055, 0.058, 0.046, "Latch hub", 0.012);
       hub.position.set(0, hy, 0);
       spindle.add(hub);
       const handle = box(mat.accent, 0.034, 0.16, 0.02, "Latch handle", 0.009);
@@ -858,7 +858,7 @@ export function createRAPContainer(
     X0 + W - 0.12,
   ]) {
     for (const ky of [CHASSIS + 0.16, H - 0.16]) {
-      const k = box(mat.alloy, 0.07, 0.062, 0.05, "Latch keeper", 0.01);
+      const k = box(mat.latchContact, 0.07, 0.062, 0.05, "Latch keeper", 0.01);
       k.position.set(rx, ky, D / 2 - 0.034);
       A_DOOR.group.add(k);
     }
@@ -868,7 +868,7 @@ export function createRAPContainer(
   for (const hy of [CHASSIS + 0.28, CHASSIS + (H - CHASSIS) / 2, H - 0.3]) {
     const pin = mesh(
       new THREE.CylinderGeometry(0.018, 0.018, 0.15, 14),
-      mat.steel,
+      mat.bearing,
       "Hinge pin",
     );
     pin.position.set(HINGE_X, hy, HINGE_Z);

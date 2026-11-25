@@ -479,6 +479,9 @@ export interface BaseMaterials {
   alloy: THREE.MeshStandardMaterial;
   /** hardware, latch rods, hinges */
   steel: THREE.MeshStandardMaterial;
+  /** Hinge bearing surfaces and localized latch contact parts. */
+  bearing: THREE.MeshStandardMaterial;
+  latchContact: THREE.MeshStandardMaterial;
   /** rubber gaskets, fittings */
   dark: THREE.MeshStandardMaterial;
   /** painted steel base frame */
@@ -561,6 +564,18 @@ export function createBaseMaterials(finish: FinishId): BaseMaterials {
       normalMap: hardware.normalMap,
       normalScale: new THREE.Vector2(0.12,0.12),
       envMapIntensity: 0.9,
+    }),
+    bearing: new THREE.MeshStandardMaterial({
+      color: "#bfc6cb", metalness: 1, roughness: 0.28,
+      roughnessMap: hardware.roughnessMap, normalMap: hardware.normalMap,
+      normalScale: new THREE.Vector2(0.08,0.08), envMapIntensity: 0.95,
+      userData: { mechanicalSurface: "bearing" },
+    }),
+    latchContact: new THREE.MeshStandardMaterial({
+      color: "#aeb8bf", metalness: 1, roughness: 0.39,
+      roughnessMap: hardware.roughnessMap, normalMap: hardware.normalMap,
+      normalScale: new THREE.Vector2(0.15,0.15), envMapIntensity: 0.85,
+      userData: { mechanicalSurface: "contact" },
     }),
     dark: new THREE.MeshStandardMaterial({
       color: "#d6d9db",
