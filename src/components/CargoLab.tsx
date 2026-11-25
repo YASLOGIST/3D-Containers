@@ -10,6 +10,7 @@ import { assessCargoEvidence } from "@/lib/cargoEvidence";
 import { CargoEvidencePanel } from "@/components/CargoEvidencePanel";
 import { diagnoseCartons, exportCartonDiagnosticsCSV } from "@/lib/cargoDiagnostics";
 import { downloadText } from "@/lib/io";
+import { cargoMassLedger } from "@/lib/cargoMassLedger";
 
 const PRESETS = [
   { name: "Small", widthM: 0.4, depthM: 0.4, heightM: 0.4, massKg: 20 },
@@ -34,6 +35,7 @@ export function CargoLab({
   const sequence = useRef(1);
   const core = cargoCoreForModel(model, contour);
   const spec = MODELS[model];
+  const ledger = cargoMassLedger(plan.placed, core);
   const evidence = assessCargoEvidence(model, items, plan);
   const diagnostics = useMemo(
     () => diagnoseCartons(model, items, plan, contour),
@@ -91,6 +93,21 @@ export function CargoLab({
         Core: {core.widthM.toFixed(2)} × {core.depthM.toFixed(2)} × {core.heightM.toFixed(2)} m.
         It is smaller than the ULD's rated cargo volume.
       </div>
+
+      <section aria-label="Cargo mass ledger" className="border border-line bg-void/55 p-2">
+        <h3 className="stencil text-[10px] text-ink">Mass ledger · geometric preview</h3>
+        {!ledger.valid ? <p className="mt-1 text-signal">Ledger unavailable: ambiguous or invalid placement.</p>
+          : !plan.placed.length ? <p className="mt-1 text-dim">Add cargo to inspect mass attribution.</p>
+          : <>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-ink">
+              <div>Weighted centroid above preview floor<br /><strong>{ledger.centroidAboveCoreFloorM!.toFixed(3)} m</strong></div>
+              <div>Base cartons / stacked cartons<br /><strong>{ledger.floorBaseCount} / {ledger.supportedAboveCount}</strong></div>
+              <div>Heaviest attributed stack<br /><strong>{ledger.maxStackMassKg!.toFixed(1)} kg</strong></div>
+              <div>Mass attributed to base cartons<br /><strong>{ledger.allocatedKg.toFixed(1)} kg</strong></div>
+            </div>
+            <p className="mt-2 text-[9px] leading-relaxed text-dim">Single-support carton bookkeeping only; not measured floor reactions, stack strength, floor pressure or aircraft centre of gravity. Container tare mass is excluded.</p>
+          </>}
+      </section>
 
       <div className="space-y-2 border-t border-line pt-3">
         <div className="stencil text-[10px] text-ink">Add an axis-aligned carton</div>
