@@ -29,7 +29,7 @@ test("AKE plate components have closed edge topology and original envelopes",()=
  }finally{s.g.dispose()}
 });
 
-test("four AKE underside apertures remain clear through the complete lower assembly",()=>{
+test("four AKE underside recesses are open to the 90 mm frame boundary",()=>{
  for(const contour of [true,false]){
   const m=MODELS.ake.build({contour,finish:"mill",detail:true,rivets:true,doorOpen:0,akeDoor:"rigid",reefer:true,setpoint:-18,load:0});
   try{
@@ -42,9 +42,11 @@ test("four AKE underside apertures remain clear through the complete lower assem
    assert.equal(targets.filter(o=>o.name==="Casting bore").length,0);
    for(const a of akeBaseApertureCentres(w,d)){
     for(const [dx,dz] of [[0,0],[.025,0],[-.025,0],[0,.025],[0,-.025]]){
-     const ray=new THREE.Raycaster(new THREE.Vector3(cx+a.x+dx,-.05,a.z+dz),new THREE.Vector3(0,1,0),0,.145);
-     const hit=ray.intersectObjects(targets,false);
-     assert.equal(hit.length,0,"clear aperture "+JSON.stringify({contour,a,dx,dz,hit:hit.map(h=>h.object.name)}));
+     const ray=new THREE.Raycaster(new THREE.Vector3(cx+a.x+dx,-.05,a.z+dz),new THREE.Vector3(0,1,0),0,.25);
+     const hit=ray.intersectObjects(targets,false)[0];
+     assert.ok(hit,"recess has a roof, not an unbounded through-hole");
+     assert.ok(Math.abs(hit.point.y-.09)<.0001,"clear depth "+JSON.stringify({contour,a,dx,dz,hit:hit.object.name,y:hit.point.y}));
+     assert.ok(hit.object.name.startsWith("Corner extrusion"),"existing frame closes recess");
     }
     const rimRay=new THREE.Raycaster(new THREE.Vector3(cx+a.x+.06,-.05,a.z),new THREE.Vector3(0,1,0),0,.145);
     assert.ok(rimRay.intersectObjects(targets,false).some(h=>h.object.name==="Corner casting"));
