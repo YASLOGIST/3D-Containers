@@ -30,6 +30,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { applyInteriorFloorGroups, makeInteriorFloorMaterial } from "./interiorFloor";
 import { makeAKEBasePlate, akeBaseApertureCentres } from "./akeBaseApertures";
 import { rigidDoorPose } from "./doorKinematics";
 import { createAKEFabricDoor, type FabricDoor } from "./akeFabricDoor";
@@ -261,7 +262,15 @@ export function createAKEContainer(
     { depth: hullLen, bevelEnabled: false, curveSegments: 10, steps: 1 },
   );
   hullGeo.translate(0, 0, -hullLen / 2);
-  A_HULL.group.add(mesh(hullGeo, mat.shell, "Hull — contour tube"));
+  applyInteriorFloorGroups(hullGeo, CHASSIS + RAIL_T + WALL);
+  const hullMesh = mesh(hullGeo, mat.shell, "Hull — contour tube");
+  const floorMaterial = makeInteriorFloorMaterial();
+  const floorHull = new THREE.Mesh(hullGeo, [mat.shell, floorMaterial]);
+  floorHull.name = hullMesh.name;
+  floorHull.userData = hullMesh.userData;
+  floorHull.castShadow = hullMesh.castShadow;
+  floorHull.receiveShadow = hullMesh.receiveShadow;
+  A_HULL.group.add(floorHull);
 
   // top and belly panels close the envelope flush with the frame extrusions
   const topPanel = box(
