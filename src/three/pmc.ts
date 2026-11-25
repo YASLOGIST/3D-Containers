@@ -143,6 +143,7 @@ function createMaterials(finish: FinishId, width: number, depth: number) {
       clearcoat: 0.35,
       clearcoatRoughness: 0.25,
       envMapIntensity: 1.25,
+      userData: { wearSurface: "deck" },
     }),
     track: new THREE.MeshStandardMaterial({
       color: "#ffffff",
@@ -303,7 +304,7 @@ export function createPallet(
   for (const f of [-0.39, -0.185, 0, 0.185, 0.39]) {
     const dz = f * D;
     const rib = box(
-      mat.deck,
+      mat.alloy,
       W - 0.3,
       0.014,
       0.1,

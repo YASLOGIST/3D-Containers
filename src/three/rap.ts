@@ -314,7 +314,7 @@ export function createRAPContainer(
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.8, -0.4, 0, 0.4, 0.8]) {
     const strip = box(
-      mat.hullInner,
+      mat.floorWear,
       W - 0.3,
       0.01,
       0.12,

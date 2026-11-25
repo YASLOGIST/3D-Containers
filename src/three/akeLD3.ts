@@ -289,7 +289,7 @@ export function createAKEContainer(
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-0.36, 0, 0.36]) {
     const strip = box(
-      mat.hullInner,
+      mat.floorWear,
       BW - 0.26,
       0.008,
       0.1,

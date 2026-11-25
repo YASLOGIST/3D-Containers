@@ -229,7 +229,7 @@ export function createProfileContainer(
   // interior fit-out, visible with the door open
   const floorY = CHASSIS + RAIL_T + WALL;
   for (const dz of [-BL * 0.25, 0, BL * 0.25]) {
-    const strip = box(mat.hullInner, BW - 0.26, 0.008, 0.1, "Floor wear strip", 0.003);
+    const strip = box(mat.floorWear, BW - 0.26, 0.008, 0.1, "Floor wear strip", 0.003);
     strip.position.set(bottomCx, floorY + 0.005, dz);
     A_HULL.group.add(strip);
   }
