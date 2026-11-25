@@ -30,6 +30,7 @@
  * ============================================================================
  */
 import * as THREE from "three";
+import { createDoorGasketMaterial } from "./doorGasketMaterial";
 import { applyInteriorFloorGroups, makeInteriorFloorMaterial } from "./interiorFloor";
 import { makeAKEBasePlate, akeBaseApertureCentres } from "./akeBaseApertures";
 import { rigidDoorPose } from "./doorKinematics";
@@ -787,7 +788,7 @@ export function createAKEContainer(
     { depth: 0.016, bevelEnabled: false, curveSegments: 10 },
   );
   sealGeo.translate(-HINGE_X, 0, leafZ - 0.017);
-  const sealMesh = mesh(sealGeo, mat.dark, "Door gasket", false);
+  const sealMesh = mesh(sealGeo, createDoorGasketMaterial(), "Door gasket", false);
   doorPivot.add(sealMesh);
 
   const latchSpindles: THREE.Group[] = [];
