@@ -794,7 +794,7 @@ export function createAKEContainer(
   const latchSpindles: THREE.Group[] = [];
 
   // cam latch rods with fold-flat handles
-  for (const rx of [X0 + FRAME_W + 0.06, X0 + BW - 0.1]) {
+  for (const rx of [X0 + FRAME_W + 0.11, X0 + BW - 0.1]) {
     const rodLen = H - CHASSIS - 0.2;
     const spindle = new THREE.Group();
     spindle.name = "Articulated cam latch spindle";
@@ -817,14 +817,20 @@ export function createAKEContainer(
       cam.position.set(0.032, hy, -0.015);
       spindle.add(cam);
       const handle = box(mat.accent, 0.03, 0.14, 0.018, "Latch handle", 0.008);
-      handle.position.set(0.009, hy - 0.045, 0.023);
+      // Mirror the lever offset with the spindle's release direction.
+      // The folded lever stays inside the depth envelope and clears the
+      // leaf face through the sampled release sequence.
+      // Compact representative lever: 105 mm finished length, with its
+      // upper end clear of the cam and the hub connection retained.
+      handle.scale.y = 0.75;
+      handle.position.set(latchSpindles.length === 1 ? -0.009 : 0.009, hy - 0.0675, 0.006);
       handle.rotation.x = -0.1;
       spindle.add(handle);
     }
   }
 
   // keepers belong to the frame, not the leaf
-  for (const rx of [X0 + FRAME_W + 0.06, X0 + BW - 0.1]) {
+  for (const rx of [X0 + FRAME_W + 0.11, X0 + BW - 0.1]) {
     for (const ky of [CHASSIS + 0.13, H - 0.13]) {
       const k = box(mat.latchContact, 0.06, 0.055, 0.045, "Latch keeper", 0.008);
       k.position.set(rx, ky, BL / 2 - 0.028);
